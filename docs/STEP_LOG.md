@@ -247,6 +247,16 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Sysctl and power management:** `net.ipv4.tcp_syncookies=0` actively and in both `/etc/sysctl.conf` and `/etc/sysctl.d/99-sysctl.conf` views. These paths may alias/symlink; do not blindly edit both. Four power-management targets are masked. Security settings require a deliberate policy-reviewed change, not unattended automation.
 - **Current decision:** **Basic QEMU/libvirt/KVM runtime PASS**, **Step 7 host readiness and guest containment NOT PASSED**. No restart, reboot, service change, system configuration edit, or VM creation by assistant. Keep status pending until approved fixes and negative isolation tests. See [STEP7_FINAL_DIAGNOSTICS.md](STEP7_FINAL_DIAGNOSTICS.md).
 
+### Step 7A — Backup of KVM modprobe configuration completed (2026-10-09)
+
+- **User-performed manual procedure:** Previously supplied backup/diagnostics block inspected `/etc/modprobe.d/blacklist-kvm.conf`, created a restricted backup under `/root`, verified the backup byte-for-byte, and recorded module state. Input: `SSL55_Step7_KVM_Backup_20261009_030850.txt` (not committed).
+- **Backup verified:** `/root/SSL55_KVM_Backup_yTIScjEU/blacklist-kvm.conf`, `Backup verification: PASSED`, original owner/mode `root:root 0644`, 37 bytes; source and backup **both SHA-256 `d172d41f94534d38db5a0f3cb489313e45c89a47e23007693e7e29775d6052c1`**.
+- **Current exact config:** first line `-e blacklist kvm_intel` (**malformed and ignored**); second line `blacklist kvm` (**valid and currently effective** for relevant modalias-based module autoload behavior). `sudo modprobe --showconfig` reproduced the bad-line parse error and reported `blacklist kvm`, `options kvm ignore_msrs=Y`, and `options kvm report_ignored_msrs=N`.
+- **Runtime remains usable before modification:** `kvm_intel` and `kvm` loaded; `/dev/kvm` present, root:kvm. No modules reloaded, config changed or reboot performed as part of Step 7A.
+- **Next approved manual correction proposal (NOT YET EXECUTED):** After checking exact source hash and matching backup, replace **only the malformed first line with a comment preserving its original text**, leave the valid `blacklist kvm` directive untouched pending separate policy review. Verify exact resulting two lines, file metadata and `modprobe --showconfig`; do not unload modules/restart/reboot.
+- **Automation portability:** The eventual installer must check module config syntax, policy intent, intended autoload behavior and existing aliases; never unconditionally remove a blacklist or reuse SSL-55's expected SHA/backup path on another machine. Maintain backup, expected-state match, exact diff, verification and a separate post-reboot test.
+- **Evidence detail:** [STEP7_KVM_BACKUP.md](STEP7_KVM_BACKUP.md).
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
