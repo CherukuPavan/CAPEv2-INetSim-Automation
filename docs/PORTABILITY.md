@@ -79,7 +79,9 @@ Check and record (while redacting sensitive information in shared logs):
 
 ## Current status
 
-- Steps 1–3 (host inventory, `cpu-checker` installation, KVM checks) have user-supplied terminal evidence.
+- Steps 1–4 (host inventory, `cpu-checker` installation, KVM checks, Git availability and CAPEv2 source clone) have user-supplied terminal evidence.
 - The existing host/KVM script is read-only and remains an unverified draft on SSL-55.
-- **No full dependency bootstrap, VM deployment, CAPEv2 installation, INetSim deployment or three-command system exists yet.**
+- `scripts/bootstrap_cape_source.sh` is a separate **installer draft**: it bootstraps a missing Git package on an Ubuntu host, clones with normal user privileges, checks Git origin and HEAD and rejects unexpected pre-existing state. Its unit-like tests used a synthetic Git repository with simulated Ubuntu metadata, **not** SSL-55 or a verified clean Ubuntu test host. The missing-Git APT path remains untested.
+- The original SSL-55 `sudo git clone` may produce a root-owned checkout. Future automation will not assume user ownership or silently change it.
+- CAPEv2 source checkout has been reported, but **no full dependency bootstrap, VM deployment, CAPEv2 runtime installation, INetSim deployment or three-command system exists yet.**
 - This document records requirements for future implementation, not actions performed on SSL-55.
