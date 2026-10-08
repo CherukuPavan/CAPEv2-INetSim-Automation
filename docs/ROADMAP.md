@@ -139,3 +139,9 @@ The user explicitly confirmed that the objective includes **executing real malwa
 - Incorporate a first-class, fail-closed **authorization-and-containment gate** into the planned three-command workflow (first VM, additional parallel VMs, separate Ubuntu INetSim VM). Every additional Windows guest must inherit the same validated network restriction, with no unexpected NIC, route or name-resolution path.
 - Prefer a dedicated lab server physically/logically segregated from normal student workloads. VM network isolation alone does not eliminate host/VM escape or management-interface risk.
 - See [LIVE_MALWARE_CONTAINMENT_POLICY.md](LIVE_MALWARE_CONTAINMENT_POLICY.md) for detailed release requirements and the outstanding institutional-authorization question.
+
+## Step 8 — Existing Virt-Manager found; no reinstall (2026-10-09)
+
+- User's Step 8 report found `/usr/local/bin/virt-manager`, `virt-manager --version = 5.1.0` and an active `libvirtd.service`; `dpkg-query` found neither `virt-manager` nor `ubuntu-desktop` package. The source/local install provides the executable despite package absence.
+- **Do not execute** the proposed `sudo ./kvm-qemu.sh virtmanager charan`: it would rerun upstream source-installer/service/schema routines on a shared college workstation and invoke unconditional top-level power-target masking. Virt-Manager installation is **functionally present at CLI-level**, but the GUI and user-system libvirt connection remain unverified.
+- Next user-performed safe check: launch the existing GUI as non-root to test the `qemu:///system` connection, without installing or creating guest VMs. For fresh machine automation, use functional+provenance detection, not `dpkg` presence alone. See [STEP_LOG.md](STEP_LOG.md).
