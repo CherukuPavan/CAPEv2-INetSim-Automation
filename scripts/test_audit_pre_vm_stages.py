@@ -108,6 +108,32 @@ class ReportTests(TestCase):
 
 
 
+
+class ModprobeRegressionTests(TestCase):
+    def test_malformed_dash_e_line_and_active_kvm_blacklist(self):
+        malformed, blacklist = m.classify_modprobe_lines([
+            "-e blacklist kvm_intel",
+            "blacklist kvm",
+        ])
+        self.assertTrue(malformed)
+        self.assertTrue(blacklist)
+
+    def test_commented_bad_line_is_not_invalid(self):
+        malformed, blacklist = m.classify_modprobe_lines([
+            "# -e blacklist kvm_intel",
+            "blacklist kvm",
+        ])
+        self.assertFalse(malformed)
+        self.assertTrue(blacklist)
+
+    def test_no_effective_blacklist(self):
+        malformed, blacklist = m.classify_modprobe_lines([
+            "# blacklist kvm",
+            "options kvm ignore_msrs=Y",
+        ])
+        self.assertFalse(malformed)
+        self.assertFalse(blacklist)
+
 class LogClassificationTests(TestCase):
     def test_expected_errors_match_without_copying_private_lines(self):
         import tempfile
