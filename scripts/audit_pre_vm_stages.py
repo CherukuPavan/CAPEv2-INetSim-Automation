@@ -203,6 +203,18 @@ class Audit:
         self.add("07", "TCP syncookies",
                  "PASS" if Path("/proc/sys/net/ipv4/tcp_syncookies").exists() and Path("/proc/sys/net/ipv4/tcp_syncookies").read_text().strip() == "1" else "WARN",
                  "enabled" if Path("/proc/sys/net/ipv4/tcp_syncookies").exists() and Path("/proc/sys/net/ipv4/tcp_syncookies").read_text().strip() == "1" else "unexpected/unknown")
+        # Match observed Step 7 malformed first-line and persistent blacklist separately.
+        modprobe = Path("/etc/modprobe.d/blacklist-kvm.conf")
+        try:
+            modlines = modprobe.read_text(errors="replace").splitlines()
+        except OSError:
+            modlines = []
+        malformed = any(re.match(r"^\\s*-e\\s+blacklist\\b", line) for line in modlines)
+        disabled_auto = any(re.match(r"^\\s*blacklist\\s+kvm\\s*(?:#.*)?$", line) for line in modlines)
+        self.add("07", "KVM modprobe syntax", "BLOCKED" if malformed else "PASS",
+                 "malformed -e blacklist line found" if malformed else "no known malformed line")
+        self.add("07", "KVM autoload blacklist", "WARN" if disabled_auto else "PASS",
+                 "active blacklist kvm: boot policy needs review" if disabled_auto else "no exact blacklist kvm line")
         for target in ("sleep", "suspend", "hibernate", "hybrid-sleep"):
             rc, state = run(["systemctl", "is-enabled", target + ".target"])
             self.add("07", target + " target", "WARN" if state == "masked" else "PASS",
@@ -231,6 +243,11 @@ class Audit:
             found = (cape / "conf" / (name + ".conf")).is_file()
             self.add("10", "CAPE " + name + " config", "PASS" if found else "PENDING",
                      "present" if found else "missing")
+        rc, tz = run(["timedatectl", "show", "-p", "Timezone", "--value"])
+        if rc == 0 and re.fullmatch(r"[A-Za-z0-9_+./-]+", tz):
+            self.add("10", "System timezone", "WARN", "current=" + tz + "; base installer may modify host-wide timezone")
+        else:
+            self.add("10", "System timezone", "UNKNOWN", "cannot query global timezone")
         for service in CAPE_SERVICES:
             state = service_state(service)
             active = state.get("ActiveState", "unknown")
