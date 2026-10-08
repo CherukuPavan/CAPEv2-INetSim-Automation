@@ -130,3 +130,12 @@ The completed read-only alias review in [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_RE
 - **Separate blast-radius gates:** Assess existing users/processes and coordinate host-wide power, reboot, service, and network changes; do not change all four masks or run disruptive upstream `kvm-qemu.sh all` again without reviewed impact. No claim that such disruptions are authorized by the installation permission alone.
 - **Malware-analysis gate:** The existing transient `default` libvirt network is NAT and not malware-safe. No live malware on SSL-55/college LAN until institution-approved containment and negative IPv4/IPv6 egress tests, preferably on a dedicated host, are independently verified.
 - Preserve the existing Step 7F diagnostic outcome and continue toward the three-command portable installer, which must ask/detect shared-machine constraints on future hosts.
+
+## Confirmed live-malware operating target and containment gate (2026-10-09)
+
+The user explicitly confirmed that the objective includes **executing real malware in CAPEv2 Windows analysis VMs**. SSL-55 remains a **shared college host with other student accounts**; user permission for installing CAPEv2 with `charan` is confirmed, but institutional authorization for **live malware execution on that shared host** has not been separately confirmed.
+
+- Continue the reference manual build and automation design with benign tests. **Block all real-sample execution** on SSL-55 until a college-approved physical/lab deployment, a separate dedicated non-NAT INetSim analysis network, guest/host hardening, and negative IPv4/IPv6 egress tests are verified. Existing transient `default` libvirt NAT is unsafe for this purpose.
+- Incorporate a first-class, fail-closed **authorization-and-containment gate** into the planned three-command workflow (first VM, additional parallel VMs, separate Ubuntu INetSim VM). Every additional Windows guest must inherit the same validated network restriction, with no unexpected NIC, route or name-resolution path.
+- Prefer a dedicated lab server physically/logically segregated from normal student workloads. VM network isolation alone does not eliminate host/VM escape or management-interface risk.
+- See [LIVE_MALWARE_CONTAINMENT_POLICY.md](LIVE_MALWARE_CONTAINMENT_POLICY.md) for detailed release requirements and the outstanding institutional-authorization question.
