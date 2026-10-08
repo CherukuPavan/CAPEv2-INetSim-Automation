@@ -271,6 +271,14 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Automation:** Added [`scripts/audit_kvm_modprobe.py`](../scripts/audit_kvm_modprobe.py), a **read-only** module-policy inspector, with [14 synthetic tests](../scripts/test_audit_kvm_modprobe.py) passing. It detects the malformed original directive and recognizes the corrected file as syntax-clean but with an existing KVM blacklist requiring human review. It does not modify files, enable modules or certify reboot safety. Git blobs match locally tested content.
 - **Updated analysis:** [STEP7_KVM_BACKUP.md](STEP7_KVM_BACKUP.md).
 
+### Step 7C — SYN-cookie sysctl alias inspection VERIFIED (2026-10-09)
+
+- **User-run read-only report:** `SSL55_Step7C_SysctlReview_DeiDOi9A.txt`. The active `net.ipv4.tcp_syncookies = 0` remains disabled. No change made in this step.
+- **Identity confirmed:** `/etc/sysctl.conf`, `root:root 0644`, size 2804 bytes, contains a single active setting at line 77, `net.ipv4.tcp_syncookies = 0`. `/etc/sysctl.d/99-sysctl.conf` is a symlink `-> ../sysctl.conf`, resolving to the same underlying device/inode. **The two grep matches are ONE underlying definition.**
+- **Action:** **Step 7C review completed**, **Step 7D correction NOT EXECUTED**. Proposed future backup-first, exact-line narrow change to `1`, only after policy and expected-state checks. Apply runtime change with single-key `sysctl -w`, not broad `sysctl --system`. Preserve canonical file, alias, mode/owner, other sysctl keys and host services; verify after. No reboot.
+- **Automation:** New read-only [`scripts/audit_sysctl_alias.py`](../scripts/audit_sysctl_alias.py), with [15 synthetic tests](../scripts/test_audit_sysctl_alias.py) passing locally. Module compares actual file identity and settings without modifying source; GitHub blobs verified against tested files. **Not run on SSL-55**. See [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_REVIEW.md).
+- **Remaining independent issues:** valid `blacklist kvm` needs policy review; default libvirt network has NAT and is transient; four power targets masked; guest/INetSim containment and reboot readiness unverified.
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
