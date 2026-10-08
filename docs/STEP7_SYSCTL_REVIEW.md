@@ -36,3 +36,11 @@ The value `0` disables TCP SYN-cookie functionality. For an Ubuntu host using TC
 Other supported Ubuntu releases or hardened hosts may have missing aliases, independent override files, different config precedence or explicit policy. A future installer must **discover** source policy rather than assume SSL-55's inode, username, line number or file layout. A read-only preflight cannot authorize an unattended global sysctl rewrite. Do not declare the hypervisor ready for Windows malware analysis: KVM module blacklist intent, persistent NAT network and guest isolation remain unresolved.
 
 Related: [STEP_LOG.md](STEP_LOG.md), [STEP7_FINAL_DIAGNOSTICS.md](STEP7_FINAL_DIAGNOSTICS.md), [PORTABILITY.md](PORTABILITY.md).
+
+## Step 7D — Cancelled first attempt (2026-10-09)
+
+The user pasted the initial Step 7D correction using `bash <<'BASH'`, which passes the shell script through stdin. The same script attempted interactive `read -r -p 'Type APPLY ...' CONFIRM` from stdin. The terminal returned **`Cancelled. No changes made.`** and the shell prompt. No backup, sysctl file change, or runtime `sysctl -w` was evidenced; **Step 7D is still pending**. The paste also displayed garbled intervening text, so syntax-checking a saved script before execution is advisable.
+
+**Safer procedure:** write the script to a user-owned temporary file using a quoted heredoc, `bash -n` syntax-check the saved file, execute it from its path, and read explicit approval using `</dev/tty`. Verify the original expected inode, metadata, line 77, symlink target and absence of independent sysctl overrides; require a root-only byte-verified backup and full narrow-diff check before single-key `sysctl -w` at runtime. Report failure without blind retry. This is an SSL-55-specific manual recovery pattern and not a production-ready bootstrap or general host template.
+
+The completed read-only alias review in [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_REVIEW.md) remains valid, but the active/persistent kernel setting should not be claimed fixed until the user provides a successful post-change TXT report.
