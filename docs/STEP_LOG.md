@@ -1,5 +1,8 @@
 # SSL-55 canonical manual installation log
 
+> **LATEST CHECKPOINT — Steps 1–11D reviewed; first Windows VM not yet created.** Verified manual installation output and errors are recorded below. New [coverage ledger](AUTOMATION_COVERAGE_STEPS_1_11.md) lists which steps have executable **audit**, **controlled install**, or **not-yet-implemented** automation. The existing introductory historical status paragraphs were written earlier in the installation and do not override this later checkpoint. No end-to-end unattended installation or malware-safe guest network has been validated.
+
+
 **Status:** Steps 1–7 reported with terminal evidence. The user ran the custom `kvm-qemu.sh all` hypervisor build in Step 7, which showed successful component stages **and serious unresolved errors**; overall hypervisor runtime is NOT verified. CAPEv2 runtime, Windows VMs, INetSim, and guest isolation remain unverified/not reported.
 
 **Evidence provenance:** The user supplied a terminal transcription on 2026-10-08. Commands were **not** independently executed by the assistant on SSL-55, and exact execution timestamps were not supplied. "Terminal-evidenced" below means supported by the supplied output, not separately re-tested. Exact site-specific private IP addresses are intentionally **redacted from this GitHub record**; the original user-provided transcript remains in the conversation.
