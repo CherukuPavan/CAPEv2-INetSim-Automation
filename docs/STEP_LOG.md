@@ -337,3 +337,10 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - `scripts/audit_kvm_build_step7.py` is an early read-only Step 7 user/build-log verifier; it must not be mistaken for a safe deployment wrapper. The source installer run reported failures and has no fully verified success status.
 - **Do not** run installation or environment changes on SSL-55 without explicit user direction.
 - Next manual step is chosen and executed by the user.
+
+### Step 7F follow-up — CAPEv2 installation permission clarified (2026-10-09)
+
+- The user explicitly states that **CAPEv2 installation using the `charan` login is permitted**, and they have performed CAPEv2 installations under that login on other college machines. Treat installing CAPEv2 as an allowed project activity; do **not** repeatedly ask for the same installation permission or assume CAPEv2 installation itself is prohibited merely because other student logins exist.
+- This permission does **not automatically establish approval for unattended **system-wide** power target changes, coordinated reboot timing, disruption of active student sessions, external network redirection, or live malware execution. Continue one verified **user-executed** manual step at a time with safe preflight, narrow backups, reports, and the `development` branch only.
+- Existing persistent four-target power masks remain unchanged pending workstation policy decision; boot-time KVM and analysis-network safety are still unverified. Distinguish CAPEv2 installation/development from live malware execution: **no real samples on unisolated `default` NAT or institution LAN**.
+- Next useful question: whether SSL-55 will be used only to install/test the platform, or whether live samples are intended. That determines the required containment environment and whether a dedicated authorized malware lab must be involved.
