@@ -10,11 +10,14 @@ Cross-cutting requirements: Ubuntu compatibility checks; resources and CPU virtu
 
 ## Current implementation status — 2026-10-08
 
-- Canonical manual **Steps 1–3 recorded** in `docs/STEP_LOG.md`: host/interface baseline, installation of `cpu-checker`, and evidence that KVM acceleration is available on SSL-55.
+- Canonical manual **Steps 1–4 recorded** in `docs/STEP_LOG.md`: host/interface baseline, installation of `cpu-checker`, KVM evidence, pre-existing Git availability, and successful CAPEv2 **source checkout**. A source checkout is not CAPEv2 installation.
 - `scripts/check_host_virtualization.sh` is an **initial read-only draft**, not one of the three deployment commands. It does not install packages, modify networking or configure KVM.
+- `scripts/bootstrap_cape_source.sh` is a **separate draft installer component**, not a final entrypoint: detect/install missing Git on an Ubuntu host, clone CAPEv2 as the intended non-root user, verify existing checkouts without replacing them, optionally pin a full commit SHA. It has not been executed on SSL-55.
 - Draft underwent Bash syntax validation and a negative-path smoke test in a separate restricted environment; it has **not** been run or validated on SSL-55. The restricted environment lacks a usable KVM device, so it cannot establish host readiness.
 - APT duplicate VirtualBox repository entry warnings were observed on SSL-55. **No source changes** have been authorized or made as part of our workflow.
-- **No deployment command is implemented or validated yet.** CAPEv2, Windows guests, INetSim VM, parallel analysis and network isolation remain to be manually verified and automated.
+- **No end-to-end deployment command is implemented or validated yet.** The CAPEv2 repository was cloned manually, but CAPEv2 runtime, Windows guests, INetSim VM, parallel analysis and network isolation remain to be manually verified and automated.
+
+- Step 4 module tests: Bash syntax check and isolated local fixture tests using simulated Ubuntu metadata (successful first clone, idempotent rerun, rejection of remote/revision mismatch). **Actual Ubuntu host, missing-Git APT path and real upstream checkout were not tested**. The user's `sudo git clone` may leave a root-owned checkout; ownership and selected HEAD require later verification.
 
 ## Cross-machine release gate
 
