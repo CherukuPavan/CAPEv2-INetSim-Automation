@@ -7,6 +7,9 @@ on:
       - 'scripts/test_audit_pre_vm_stages.py'
       - 'scripts/bootstrap_pre_vm_prereqs.sh'
       - 'scripts/command1_pre_vm.sh'
+      - 'scripts/bootstrap_virtualization_stack.sh'
+      - 'scripts/install_cape_optional_deps.py'
+      - 'scripts/test_install_cape_optional_deps.py'
       - '.github/workflows/pre-vm-audit.yml'
   pull_request:
     paths:
@@ -14,6 +17,9 @@ on:
       - 'scripts/test_audit_pre_vm_stages.py'
       - 'scripts/bootstrap_pre_vm_prereqs.sh'
       - 'scripts/command1_pre_vm.sh'
+      - 'scripts/bootstrap_virtualization_stack.sh'
+      - 'scripts/install_cape_optional_deps.py'
+      - 'scripts/test_install_cape_optional_deps.py'
       - '.github/workflows/pre-vm-audit.yml'
 
 permissions:
@@ -26,13 +32,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile Python module (syntax only)
-        run: python3 -m py_compile scripts/audit_pre_vm_stages.py scripts/test_audit_pre_vm_stages.py
+        run: python3 -m py_compile scripts/audit_pre_vm_stages.py scripts/test_audit_pre_vm_stages.py scripts/install_cape_optional_deps.py scripts/test_install_cape_optional_deps.py
       - name: Run isolated unit tests
-        run: python3 -m unittest discover -s scripts -p 'test_audit_pre_vm_stages.py' -v
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_audit_pre_vm_stages.py' -v
+          python3 -m unittest discover -s scripts -p 'test_install_cape_optional_deps.py' -v
       - name: Bash syntax only
         run: |
           bash -n scripts/bootstrap_pre_vm_prereqs.sh
           bash -n scripts/command1_pre_vm.sh
-      - name: No accidental host provisioning during tests
+          bash -n scripts/bootstrap_virtualization_stack.sh      - name: No accidental host provisioning during tests
         run: |
           echo 'The CI suite is offline-only; no apt, pip, libvirt or malware execution.'
