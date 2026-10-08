@@ -26,6 +26,9 @@ Cross-cutting requirements: Ubuntu compatibility checks; resources and CPU virtu
 - **Draft module:** [`scripts/prepare_acpi_replacements.py`](../scripts/prepare_acpi_replacements.py) defaults to read-only; verifies raw DSDT header/checksum, chooses an unambiguous exactly-four-byte BXPC candidate, requires reviewed eight-field profile, source SHA pin and external backup before opt-in patch. No host-side automatic installation or modifications.
 - **Tests:** 13 synthetic tests passed. Not tested against the actual SSL-55 file and DSDT binary; no fresh Ubuntu host test. Full machine-independent device/firmware profile discovery remains **unsolved** and is a release blocker for fully unattended deployment.
 
+
+- **Supplemental Step 5 references reviewed (2026-10-09):** Screenshot methods `Custom` (six characters; not an eligible four-character token), `PNP0` (generic hardware-ID prefix; not OEM), and `CBX3` (model-specific Dell table ID) added to [ACPI_REPLACEMENTS.md](ACPI_REPLACEMENTS.md). Candidate extraction now blocks known generic/virtual markers. **Five new regression tests committed** (18 in the suite); nine targeted selector cases passed independently. Full updated suite, real firmware and QEMU/SeaBIOS integration remain unverified.
+
 ## Cross-machine release gate
 
 Follow [PORTABILITY.md](PORTABILITY.md) for the dependency-by-dependency bootstrap contract and the fresh-machine test matrix. Completion requires supported-OS/hardware declarations, independent clean-host testing with dependencies absent, idempotent reruns, recovery from failures, protection of existing services, and verified network isolation. **Do not claim compatibility with every arbitrary machine.**
