@@ -124,3 +124,13 @@ The user-generated post-build report establishes that source-installed QEMU/libv
 The report also exposes **a transient/non-autostart libvirt network**, **account groups listed in the database but not in the current login session**, a **malformed KVM modprobe file and a separate blacklist directive**, disabled TCP SYN cookies, masked sleep/suspend targets and a pending reboot. These are critical post-install invariants for a fresh host. Detect and report unsafe or nonpersistent state, but never automatically destroy/restart networks, remove blacklists, unmask host sleep policy, modify security sysctls or reboot without a separately reviewed and authorized change plan.
 
 See [STEP7_POSTBUILD_AUDIT.md](STEP7_POSTBUILD_AUDIT.md). Read-only post-build parser [`scripts/audit_step7_postbuild.py`](../scripts/audit_step7_postbuild.py) has **14 passing synthetic tests** and classified the report as `REVIEW_REQUIRED`. Real guest networking and reboot survivability remain untested.
+
+## Step 7 — Confirmed NAT/alias-aware persistent state (2026-10-09)
+
+The final SSL-55 read-only report conclusively shows `<forward mode='nat'>` on the **active but transient** libvirt `default` network. The bridge `virbr0` is down without attached guests; this observation by itself is **not** a failure. Future automation must distinguish defined/active/persistent/autostart, forwarding modes, link/carrier lifecycle and guest isolation tests; no single libvirt bridge status can certify containment. Never persist/start default NAT merely to satisfy a deployment gate for malware analysis.
+
+The host has Ethernet and Wi-Fi default routes with different metrics, so discover egress from real routing context and explicitly resolve ambiguity while keeping malware guests without real-world egress. The account's supplemental group memberships and the current login session's credential groups differ: verify both, and refresh only through the user's approved session handling rather than repeated `usermod`.
+
+Detect host-security regressions including malformed modprobe directives, potentially intentional KVM blacklists, `net.ipv4.tcp_syncookies=0` and masked power targets. Check whether persistent sysctl paths like `/etc/sysctl.conf` and `/etc/sysctl.d/99-sysctl.conf` are aliases/symlinks or multiple distinct precedence layers **before** backing up and changing any file. Preserve user host policy unless an explicit approved remediation is available; neither a reboot nor a network reset is an automatic fix.
+
+User evidence, precise boundaries and approval-gated remediation proposal: [STEP7_FINAL_DIAGNOSTICS.md](STEP7_FINAL_DIAGNOSTICS.md). End-to-end automated guest isolation and host security restoration remain **unimplemented and untested**.
