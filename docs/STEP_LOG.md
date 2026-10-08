@@ -253,9 +253,23 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Backup verified:** `/root/SSL55_KVM_Backup_yTIScjEU/blacklist-kvm.conf`, `Backup verification: PASSED`, original owner/mode `root:root 0644`, 37 bytes; source and backup **both SHA-256 `d172d41f94534d38db5a0f3cb489313e45c89a47e23007693e7e29775d6052c1`**.
 - **Current exact config:** first line `-e blacklist kvm_intel` (**malformed and ignored**); second line `blacklist kvm` (**valid and currently effective** for relevant modalias-based module autoload behavior). `sudo modprobe --showconfig` reproduced the bad-line parse error and reported `blacklist kvm`, `options kvm ignore_msrs=Y`, and `options kvm report_ignored_msrs=N`.
 - **Runtime remains usable before modification:** `kvm_intel` and `kvm` loaded; `/dev/kvm` present, root:kvm. No modules reloaded, config changed or reboot performed as part of Step 7A.
-- **Next approved manual correction proposal (NOT YET EXECUTED):** After checking exact source hash and matching backup, replace **only the malformed first line with a comment preserving its original text**, leave the valid `blacklist kvm` directive untouched pending separate policy review. Verify exact resulting two lines, file metadata and `modprobe --showconfig`; do not unload modules/restart/reboot.
+- **Status at the time of Step 7A (subsequently completed in Step 7B):** After checking exact source hash and matching backup, replace **only the malformed first line with a comment preserving its original text**, leave the valid `blacklist kvm` directive untouched pending separate policy review. Verify exact resulting two lines, file metadata and `modprobe --showconfig`; do not unload modules/restart/reboot.
 - **Automation portability:** The eventual installer must check module config syntax, policy intent, intended autoload behavior and existing aliases; never unconditionally remove a blacklist or reuse SSL-55's expected SHA/backup path on another machine. Maintain backup, expected-state match, exact diff, verification and a separate post-reboot test.
 - **Evidence detail:** [STEP7_KVM_BACKUP.md](STEP7_KVM_BACKUP.md).
+
+### Step 7B — First-line KVM module configuration correction VERIFIED (2026-10-09)
+
+- **Input:** User-uploaded `SSL55_Step7B_KVM_Correction_2icT1bAB.txt` (25 physical lines); this is the **user's terminal evidence**, not an assistant-run change. No secrets or raw institutional host metadata included in GitHub.
+- **Pre-change checks passed:** Output shows `Original and backup verification: PASSED`. The previous Step 7A backup SHA and matching source were verified by the user's guarded procedure before modification.
+- **Exact modified config, verified by script using byte-for-byte expected-content comparison:**
+  ```text
+  # Malformed directive preserved for review: -e blacklist kvm_intel
+  blacklist kvm
+  ```
+- **Post-change checks PASSED:** Owner `root:root`, mode `0644`; `modprobe --showconfig` had successful exit and no stderr (report: `modprobe configuration parsing: PASSED`); the valid `blacklist kvm` rule was preserved; `kvm_intel` and `kvm` remained loaded. **No reboot or module reload performed**. No full fresh-session/post-reboot module-loading test done.
+- **Manual result:** **Step 7B SUCCESS for precise malformed-line correction**, not proof of the entire Step 7 installation or reboot readiness. Remaining valid `blacklist kvm` may affect automatic module loading and must be policy-reviewed separately; disabled `net.ipv4.tcp_syncookies=0`, masked sleep targets, and NAT/nonpersistent `default` network remain unresolved.
+- **Automation:** Added [`scripts/audit_kvm_modprobe.py`](../scripts/audit_kvm_modprobe.py), a **read-only** module-policy inspector, with [14 synthetic tests](../scripts/test_audit_kvm_modprobe.py) passing. It detects the malformed original directive and recognizes the corrected file as syntax-clean but with an existing KVM blacklist requiring human review. It does not modify files, enable modules or certify reboot safety. Git blobs match locally tested content.
+- **Updated analysis:** [STEP7_KVM_BACKUP.md](STEP7_KVM_BACKUP.md).
 
 ## Automation status after Steps 1–7
 
