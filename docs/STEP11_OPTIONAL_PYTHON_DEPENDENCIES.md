@@ -16,3 +16,13 @@
 **Outcome:** **Step 11 APT + optional-package installation completed according to terminal log; actual `cape` service environment availability unverified.** Next is one read-only environment review report (Step 11A) before any further Python-package install. No malware execution; Step 10B first Windows guest and independent Suricata issue remain open.
 
 See [STEP_LOG.md](STEP_LOG.md), [ROADMAP.md](ROADMAP.md), and [PORTABILITY.md](PORTABILITY.md).
+
+## Step 11A — Local Poetry environment comparison (2026-10-08/09)
+
+User-generated read-only `SSL55_Step11_PoetryEnv_20261008_224841_GcnbGnfH.txt` confirms:
+- `/usr/bin/poetry` version **1.8.2**, but CAPE service runtime explicitly invokes `/etc/poetry/bin/poetry` version **2.5.1**.
+- Actual `cape.service`, `cape-processor.service`, `cape-web.service` run as `User=cape` and use `/etc/poetry/bin/poetry`; their workdirs are `/opt/CAPEv2`, `/opt/CAPEv2`, and `/opt/CAPEv2/web` respectively.
+- `charan` virtualenv exists at `~/.cache/pypoetry/virtualenvs/non-package-mode-t2x27zRb-py3.12` with `ImageHash=4.3.2`, `deepdiff=9.1.0`, `binGraph=3.3.2`, `HTTPReplay=0.3`, `Socks5man=0.3.0`, `pyattck=7.2.1`.
+- A `cape` virtualenv was **not identified** because the earlier check discarded stderr and reported a generic result when the `env info --path` command failed, returned empty, or pointed to a path without an executable. It is **not justified** to claim `cape` has no environment or that packages must be copied/reinstalled.
+
+**Next:** A small non-mutating Step11B query under `cape` with visible `env info` status, Poetry virtualenv config, and in-project `.venv` metadata; avoid `poetry run` or global pip until correct interpreter proven. Keep full CAPE runtime readiness pending.
