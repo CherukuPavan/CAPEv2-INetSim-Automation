@@ -279,6 +279,14 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Automation:** New read-only [`scripts/audit_sysctl_alias.py`](../scripts/audit_sysctl_alias.py), with [15 synthetic tests](../scripts/test_audit_sysctl_alias.py) passing locally. Module compares actual file identity and settings without modifying source; GitHub blobs verified against tested files. **Not run on SSL-55**. See [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_REVIEW.md).
 - **Remaining independent issues:** valid `blacklist kvm` needs policy review; default libvirt network has NAT and is transient; four power targets masked; guest/INetSim containment and reboot readiness unverified.
 
+### Step 7D — First approval attempt CANCELLED (2026-10-09)
+
+- **Observed output from user terminal:** `Step 7D: Enable TCP SYN-cookie protection.` / `Only the canonical sysctl file and one live kernel setting will change.` / `Cancelled. No changes made.` Returned to the `charan` shell prompt. Some portions of the pasted heredoc appeared garbled in the display; no separate system-change log was supplied.
+- **Cause of cancellation:** Previous assistant-supplied `bash <<'BASH'` fed the script to Bash via standard input, while its `read -r -p 'Type APPLY ...' CONFIRM` also attempted to read from the same input. This **did not reliably read from the user's keyboard**. The script entered the non-`APPLY` cancellation branch. **The expected backup/file-edit/`sysctl -w` code was after this branch and therefore did not run, as far as the supplied transcript supports.**
+- **Outcome:** **No Step 7D correction verified or claimed; canonical `/etc/sysctl.conf` and active `net.ipv4.tcp_syncookies` remain at the last observed value `0` unless changed independently.** Do not report a backup, `sysctl -w`, or root-owned config update from this attempt.
+- **Correction to the *procedure*:** Use an explicit controlling terminal for interactive confirmation (`read ... </dev/tty`) and preferably write a privately permissioned temporary script with a heredoc, validate it using `bash -n`, then execute that saved script so it does not consume its own source as stdin. Keep all Step 7C alias/inode/metadata guards, a root-only backup, exact line diff and one-key-only `sysctl -w`. Do not blindly rerun a partially applied remediation; confirm state first.
+- **No automatic host edits** were performed by the assistant. Await a user-executed corrected procedure and TXT report before marking Step 7D passed.
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
