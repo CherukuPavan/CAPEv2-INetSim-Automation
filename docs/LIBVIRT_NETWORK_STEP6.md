@@ -16,9 +16,13 @@ ifconfig
 cd ~/CAPEv2/installer
 sudo sed -i 's/^NETWORK_IFACE=.*/NETWORK_IFACE=virbr0/' cape2.sh
 sudo sed -i 's/^IFACE_IP=.*/IFACE_IP="192.168.122.1"/' cape2.sh
-sudo sed -i 's/^INTERNET_IFACE=.*/INTERNET_IFACE=eno1/' cape2.sh
+sudo sed -i 's/^INTERNET_IFACE=.*/INTERNET_IFACE=eno1/' cape2.sh  # first value, later superseded
 # The user also changed PASSWD using sudo sed with a literal secret;
 # REDACTED: never reproduce/commit that command's original secret.
+grep -E '^(NETWORK_IFACE|IFACE_IP|INTERNET_IFACE|PASSWD)=' cape2.sh
+# Correction completed later, after destination-specific routing check:
+ip -4 route get 1.1.1.1
+sudo sed -i 's/^INTERNET_IFACE=.*/INTERNET_IFACE=enp0s31f6/' cape2.sh
 grep -E '^(NETWORK_IFACE|IFACE_IP|INTERNET_IFACE|PASSWD)=' cape2.sh
 ```
 
@@ -34,14 +38,14 @@ The screenshot suggests `sudo virsh net-start default` and `sudo virsh net-autos
   ```text
   NETWORK_IFACE=virbr0
   IFACE_IP="192.168.122.1"
-  INTERNET_IFACE=eno1
+  INTERNET_IFACE=enp0s31f6
   PASSWD=[REDACTED]
   ```
-  Successful `grep` output establishes only textual assignment, **not correctness** or service reachability. No `cape2.sh` installer execution was supplied for this step.
+  **Updated after the user's correction.** The earlier `eno1` setting is superseded, not the current SSL-55 state. The user-supplied `ip -4 route get 1.1.1.1` output selected `enp0s31f6`, supporting the route decision for that destination only. This **does not prove Internet connectivity** or service reachability. No `cape2.sh` installer execution was supplied for this step.
 
 ### Important unresolved problems (must not silently "fix")
 
-1. **Unrecognized uplink `eno1`:** It does not appear in the supplied full prior `ip -br addr` inventory, nor in the later `ifconfig` list. The actual Ethernet interface visible is `enp0s31f6`, with Wi-Fi `wlp0s20f3` also active. `eno1` should be treated as unverified/likely wrong until `ip -j link` and default routing are examined. Do not assume a singular default route or rename interfaces.
+1. **Uplink setting corrected:** The earlier `eno1` assignment did not match any observed interface; the user subsequently set `INTERNET_IFACE=enp0s31f6` after `ip -4 route get 1.1.1.1` selected Ethernet. This resolves the configuration typo **for the observed destination**. Internet connectivity, alternate destinations, multiple default routes, policy routing and future interface changes still require checks. Do not assume a singular default route or rename interfaces.
 2. **NAT is not malware isolation:** The standard libvirt `default` network is normally **NAT-forwarded**, with guest outbound access. `virsh net-list` and `ifconfig` do **not** show forwarding policy, so actual XML/host forwarding was not verified from the uploaded log. The official [libvirt network XML reference](https://libvirt.org/formatnetwork.html) documents `default` with `<forward mode='nat'/>`, and the difference between NAT and networks with no `<forward>`. **Never attach an analysis VM used for malware to default NAT without a separately validated containment design.** Dedicated non-forwarding analysis network, INetSim integration, firewall/routing checks and guest negative-connectivity tests remain mandatory. Do not destroy an existing default network or apply global firewall resets.
 3. **Password disclosure:** The `PASSWD` assignment in the uploaded log contains a literal credential. Upstream `cape2.sh` uses this value for PostgreSQL account/connection configuration and some password-protected operations. It is **not simply a Linux login password**. Do not commit or echo its value. Rotate the supplied credential wherever reused and later in dependent services if provisioning already occurred. Future automation must generate/obtain and store secrets through a reviewed method, avoid command-line and shell-history disclosure, and protect any generated settings.
 4. **Mixed APT suites:** `apt update` reported Ubuntu `noble` (24.04) *and* older `focal` (20.04) repository entries, plus third-party `jammy` MongoDB repos. It repeated duplicate VirtualBox target warnings and architecture-support notices. **Do not assume cross-release repositories are safe**. The eventual bootstrap should inspect OS release and APT source compatibility and stop on unsupported mixes; never rewrite third-party sources without informed authorization.
@@ -62,7 +66,7 @@ The screenshot suggests `sudo virsh net-start default` and `sudo virsh net-autos
 [`scripts/audit_libvirt_cape_network.py`](../scripts/audit_libvirt_cape_network.py) is **strictly read-only**:
 - Parses literal assignment lines in `cape2.sh` without sourcing or executing it; redacts any `PASSWD` value.
 - Queries `virsh -c qemu:///system net-dumpxml`, `ip -j link show`, and `ip -j route show default` with bounded timeouts. No `net-start`, `net-autostart`, `apt install`, firewall edits, network creation or password changes.
-- Identifies NAT/forwarding, bridge/IP mismatches, non-existing uplink interfaces and ambiguous dynamic expressions.
+- Identifies NAT/forwarding, bridge/IP mismatches, non-existing uplink interfaces and ambiguous dynamic expressions. This existing auditor is **not** a complete destination-route resolver; see the new companion module below.
 - Reports hazards in structured JSON. **`safe_to_use_for_malware` is always false** because XML+interface checks cannot substitute for runtime guest isolation/negative connectivity testing. The command exits nonzero until a separate complete safety gate exists.
 - Optionally writes a sanitized, non-overwriting JSON report to an explicitly provided path (do not publish host topology unreviewed).
 - Depends on Python 3, `iproute2`, `virsh`; eventual bootstrap must check/install supported dependencies when authorized.
@@ -72,6 +76,16 @@ The screenshot suggests `sudo virsh net-start default` and `sudo virsh net-autos
 - Tests `c0ef2075d021cdcc9b37afe0a815eb11cfae59a9`
 
 **Not yet tested:** Actual SSL-55 runtime audit; fresh Ubuntu/libvirt installation; guest-connected topology; audit of system firewall rules; network packet negative tests; use with complete CAPEv2 runtime or INetSim; actual isolation. This draft is **not** production ready.
+
+## Additional dynamic host-uplink component (correction, 2026-10-09)
+
+The user supplied both a route lookup (`ip -4 route get 1.1.1.1`) and a second `cape2.sh` grep proving `INTERNET_IFACE=enp0s31f6`. This replaces the previously recorded current value of `eno1`, without changing the historical chronology. The password remains fully redacted.
+
+[`scripts/discover_host_uplink.py`](../scripts/discover_host_uplink.py) is a new **read-only** route selection draft that validates route destination, selected interface existence, interface status, source IP address assignment, default route multiplicity, policy rules, network-interface class (including bridges and VPNs), and optional operator override. It neither sends packets nor enables forwarding, NAT or guest access. The optional report is created with mode `0600` and never overwritten. Configuration is **not** automatically edited.
+
+There are **19 passed synthetic unit tests** in [`scripts/test_discover_host_uplink.py`](../scripts/test_discover_host_uplink.py), and a limited read-only smoke test on a **separate execution environment**. The Git blob hashes of the committed Python files match the locally tested files. Tests cover Ethernet-only, Wi-Fi-only, multiple routes/default routes, policy routing, VPNs, container bridges, disconnected interfaces, unassigned source IPs and overrides. No SSL-55 runtime test has been performed.
+
+For dedicated analysis-network selection, the existing libvirt XML auditor can inspect one named network. Automatic discovery, provisioning and isolation verification of a suitable analysis network are **not complete**. See [DYNAMIC_NETWORK_DISCOVERY.md](DYNAMIC_NETWORK_DISCOVERY.md).
 
 ## Release design rules
 
