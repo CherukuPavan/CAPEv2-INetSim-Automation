@@ -68,3 +68,9 @@ The initial `scripts/check_host_virtualization.sh` is deliberately **read-only**
 - `virbr0` reported DOWN with no guests defined; this alone is **not** proof of a broken virtual bridge. Ethernet and Wi-Fi both supply default routes (metrics **100** and **600**), consistent with Ethernet as the earlier destination-selected uplink while requiring multi-route checks on fresh hosts.
 - Current login has not adopted the **already configured** `kvm`/`libvirt` supplemental memberships. Malformed KVM module config (`-e blacklist kvm_intel`; `blacklist kvm`), persistent `tcp_syncookies=0` and four masked power targets remain host policy issues. The two sysctl paths may point to the same underlying file and must be checked before any authorized modification. No reboot/repair performed.
 - Detailed technical interpretation and approval-gated remediation plan: [STEP7_FINAL_DIAGNOSTICS.md](STEP7_FINAL_DIAGNOSTICS.md). This is documentation and preflight design, not an executed fix or completed automation.
+
+## Step 7A — Verified KVM configuration backup (2026-10-09)
+
+- User made a protected root-only backup of `/etc/modprobe.d/blacklist-kvm.conf`; `cmp` and matching SHA-256 confirm it matches the 37-byte original. Modules `kvm_intel`/`kvm` remained loaded. The first line `-e blacklist kvm_intel` is malformed, while `blacklist kvm` is a **separate valid** directive.
+- A **guarded manual first-line correction is proposed but has not been executed**: require source/backup hash and byte-for-byte match, comment only the malformed line, retain the valid blacklist pending policy review, verify result and modprobe parser. Do not restart/reboot.
+- See [STEP7_KVM_BACKUP.md](STEP7_KVM_BACKUP.md). Future portable installer must inspect machine-specific policy rather than hardcode SSL-55's backup, SHA or blacklist assumptions.
