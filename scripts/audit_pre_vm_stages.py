@@ -230,9 +230,15 @@ class Audit:
             self.add("11", "cape virtualenv", "BLOCKED", "python not executable by service account")
             return
         self.add("11", "cape virtualenv", "PASS", "service account can execute selected interpreter")
-        code = ("import importlib.metadata as m,json;"
-                "d={n:next((str(m.version(n)),),None) for n in " + repr(OPTIONAL_DISTRIBUTIONS) + "};"
-                "print(json.dumps(d))")
+        code = ("import importlib.metadata as m, json\n"
+                "names = " + repr(OPTIONAL_DISTRIBUTIONS) + "\n"
+                "d = {}\n"
+                "for n in names:\n"
+                "    try:\n"
+                "        d[n] = m.version(n)\n"
+                "    except m.PackageNotFoundError:\n"
+                "        d[n] = None\n"
+                "print(json.dumps(d))\n")
         rc, output = run(["sudo", "-n", "-u", "cape", "-H", path, "-B", "-c", code], timeout=20)
         try:
             data = json.loads(output) if rc == 0 else {}
