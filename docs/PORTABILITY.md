@@ -142,3 +142,11 @@ User-run SSL-55 diagnostics confirm a root-only, byte-identical backup with matc
 ## Step 7B — Verifiable syntax correction versus boot policy
 
 SSL-55's user-executed Step 7B shows a guarded repair of one malformed modprobe directive, with its backup intact and the existing valid `blacklist kvm` retained. A clean parser and loaded KVM modules are **not** proof of reboot-time autoload. [`scripts/audit_kvm_modprobe.py`](../scripts/audit_kvm_modprobe.py) implements read-only detection of malformed configuration and valid targeted blacklists; **14 tests passed** on synthetic fixtures, and committed blobs match tested versions. The release installer must detect actual effective policy across **all** modprobe files, consider `kvm_intel`/`kvm_amd` for hardware, and require a reviewed change before overriding institutional policy. Follow [STEP7_KVM_BACKUP.md](STEP7_KVM_BACKUP.md).
+
+## Step 7C — Alias-aware sysctl review and prospective repair
+
+The SSL-55 read-only report proves that the two paths `/etc/sysctl.conf` and `/etc/sysctl.d/99-sysctl.conf` are **the same underlying file**: the latter is a symlink `-> ../sysctl.conf`, with matching stat device/inode. The current single persistent `net.ipv4.tcp_syncookies = 0` is a security regression. It must not be treated as two separate files or edited twice. No user-executed corrective modification has been reported yet.
+
+A proposed correction to `1` must be approved and limited to one guarded canonical-file edit with checksum/backup, preserved ownership/mode, restored setting and exact runtime `sysctl -w` for this key alone. Do not run wholesale `sysctl --system` on machines with mixed or unsafe unrelated settings, overwrite administrator policy, break links, or imply reboot readiness from one corrected sysctl.
+
+New [read-only symlink-aware audit](../scripts/audit_sysctl_alias.py) and [15 synthetic tests](../scripts/test_audit_sysctl_alias.py) committed and hash-verified; **not** executed on SSL-55. On different hosts, discover the actual effective sysctl source hierarchy: do not assume Ubuntu alias, file line 77 or SSL-55 values. See [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_REVIEW.md).
