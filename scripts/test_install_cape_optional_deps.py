@@ -62,7 +62,8 @@ class ServiceAccountTests(TestCase):
 
     def test_pip_resolution_dryrun_no_install_by_host(self):
         plan = {"proposed": [{"name": "ImageHash", "version": "4.3.2"}]}
-        with patch.object(m, "call", return_value=(0, json.dumps(plan))) as runner:
+        with patch.object(Path, "read_bytes", return_value=b"test fixture"), \
+             patch.object(m, "call", return_value=(0, json.dumps(plan))) as runner:
             self.assertEqual(m.proposed_changes(Path("/venv/bin/python"), Path("/opt/CAPEv2/extra/optional_dependencies.txt")), plan)
         cmd = runner.call_args.args[0]
         self.assertEqual(cmd[:5], ["sudo", "-n", "-u", "cape", "-H"])
@@ -70,9 +71,17 @@ class ServiceAccountTests(TestCase):
         self.assertNotIn("--upgrade", cmd)
 
     def test_resolver_failure_blocks_install(self):
-        with patch.object(m, "call", return_value=(0, '{"error":"resolver-failed","code":1}')):
+        with patch.object(Path, "read_bytes", return_value=b"fixture"), \
+             patch.object(m, "call", return_value=(0, '{"error":"resolver-failed","code":1}')):
             with self.assertRaisesRegex(RuntimeError, "dry-run failed"):
                 m.proposed_changes(Path("/venv/bin/python"), Path("/opt/CAPEv2/extra/optional_dependencies.txt"))
+
+    def test_pip_constraints_enforced_during_both_modes(self):
+        self.assertIn("--constraint", m.RESOLVE_CODE)
+        self.assertIn("mode=='resolve'", m.RESOLVE_CODE)
+        self.assertIn("mode=='apply'", m.RESOLVE_CODE)
+        self.assertIn("locked=tomllib.load", m.RESOLVE_CODE)
+        self.assertIn("f.write('\\n'.join(rows)+'\\n')", m.RESOLVE_CODE)
 
 
 if __name__ == "__main__":
