@@ -108,3 +108,11 @@ Our [read-only route detector](../scripts/discover_host_uplink.py) now validates
 - The original SSL-55 `sudo git clone` may produce a root-owned checkout. Future automation will not assume user ownership or silently change it.
 - CAPEv2 source checkout has been reported, but **no full dependency bootstrap, VM deployment, CAPEv2 runtime installation, INetSim deployment or three-command system exists yet.**
 - This document records requirements for future implementation, not actions performed on SSL-55.
+
+## Step 7 — Hypervisor build portability gate (2026-10-09)
+
+The upstream source installer uses `SUDO_USER` as its target username; its positional second-user-argument handler is commented out in the inspected revision. Validate the existing non-root Ubuntu account and execution identity explicitly. Do not hardcode SSL-55's login.
+
+The user-supplied Step 7 log shows a QEMU/SeaBIOS/libvirt build with several unresolved package and configuration errors. On a fresh host, a safe installer must check existing package ownership and compatible versions before changing system components. It must not blindly repeat source-installer operations, overwrite distro-owned firmware, globally override Python packages, or change boot and service policies without review.
+
+Use isolated, testable build stages with captured exit statuses, dependency checks, configuration backups and post-install functionality checks. The read-only audit module and tests are linked in [KVM_QEMU_STEP7.md](KVM_QEMU_STEP7.md). The current log is not evidence of a fully verified deployment.
