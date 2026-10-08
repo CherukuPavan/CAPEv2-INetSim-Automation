@@ -1,6 +1,6 @@
 # SSL-55 canonical manual installation log
 
-**Status:** Steps 1–6 reported with terminal evidence. CAPEv2 upstream source checkout (Step 4), nine-variable installer edit (Step 5), and libvirt/bridge installation plus CAPE installer settings (Step 6) were performed manually. Windows VMs, INetSim, guest isolation and CAPEv2 runtime remain unverified/not reported.
+**Status:** Steps 1–7 reported with terminal evidence. The user ran the custom `kvm-qemu.sh all` hypervisor build in Step 7, which showed successful component stages **and serious unresolved errors**; overall hypervisor runtime is NOT verified. CAPEv2 runtime, Windows VMs, INetSim, and guest isolation remain unverified/not reported.
 
 **Evidence provenance:** The user supplied a terminal transcription on 2026-10-08. Commands were **not** independently executed by the assistant on SSL-55, and exact execution timestamps were not supplied. "Terminal-evidenced" below means supported by the supplied output, not separately re-tested. Exact site-specific private IP addresses are intentionally **redacted from this GitHub record**; the original user-provided transcript remains in the conversation.
 
@@ -197,12 +197,40 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Portability:** Missing system packages should be installed only in the authorized deployment stage after checking OS/repo health, package versions and conflicts; preserve existing workloads. Derive actual interface names/routes, use dedicated isolated guest networking with negative-connectivity checks, store credentials securely, and refuse to proceed with malware operations until safety gates pass.
 - **Full evidence:** Original uploaded transcript is retained in the conversation with its confidential information, not copied into GitHub.
 
-## Automation status after Steps 1–6
+## Step 7 — Run custom KVM/QEMU/SeaBIOS/libvirt installer (partial / unverified)
+
+- **Reported date:** 2026-10-09. **Performed by:** user on SSL-55 (`charan`), not by assistant.
+- **Manual procedure, as reported:**
+  ```bash
+  cd ~/CAPEv2/installer
+  sudo chmod a+x kvm-qemu.sh
+  sudo ./kvm-qemu.sh --help
+  sudo ./kvm-qemu.sh all charan 2>&1 | tee kvm-qemu-all.log
+  ```
+- **Objective:** Build customized QEMU, SeaBIOS, libvirt/KVM and optional desktop virtualization manager. On a fresh machine the Ubuntu login name may vary; never hardcode `charan`.
+- **Actual command argument semantics:** Inspected upstream `kvm-qemu.sh` initializes `username=$SUDO_USER` and comments out the branch that would set username from `$2`. `all charan` therefore does **not** independently guarantee the intended user is `charan`; under ordinary `sudo` from `charan`, `SUDO_USER` supplies that identity. Validate account existence/non-root UID/permissions and current revision. There is a top-level `systemctl mask` before help/command dispatch; `--help` is **not** harmless. See [KVM_QEMU_STEP7.md](KVM_QEMU_STEP7.md).
+- **Evidence:** Uploaded `Pasted text(4).txt` had **9,154 lines**. It **begins mid-build** with `[1683/3252]` and ends at a returned shell prompt; the original `all` shell exit status and initial log prefix were **not captured**. A pipeline without `set -o pipefail` normally reports `tee` status; even zero installer exit status would require functional checks.
+- **Positive stage indicators (from the supplied excerpt):** QEMU **9.2.2** package created/installed, SeaBIOS **1.16.3** `bios.bin` generated/copied, libvirt-python **11.1.0** wheel installed, KVM acceleration reported usable, `virt-host-validate qemu` produced multiple PASS results, libvirt sockets were enabled and virt-manager installation activity reached the end of output. These are **not** proof that runtime/guest isolation is working.
+- **Errors and warnings requiring review:**
+  - The script purged previously installed Ubuntu libvirt-client/daemon/config packages (9 packages) and set APT holds; existing default bridge/network may have been disrupted.
+  - `libkmod` repeatedly found invalid `/etc/modprobe.d/blacklist-kvm.conf` line beginning with `-e`.
+  - `fatal: The group 'kvm' already exists`; group membership still needs verification and creation must be idempotent.
+  - SeaBIOS first patch attempt encountered missing `.config`, followed by compiler and linker warnings (including string overread).
+  - Forced OVMF install overwrote files owned by the custom QEMU package.
+  - Python package installer failed attempting to remove distro `cryptography 41.0.7` (missing RECORD), and attempts to satisfy Python 2 era dependencies (e.g. `python-enum34`) exposed conflicts. Mixed `focal`/`noble` APT sources add risk.
+  - Global system sysctl, GRUB/IOMMU and sleep-target masks were modified; script emitted `[+] Please reboot`. Reboot not verified or authorized by assistant.
+- **Safety:** Do not rerun `all` blindly, purge additional libvirt packages, force-overwrite firmware, fix grub/sysctl or reboot as automatic remedies. Protect Docker/networking and unrelated workloads. Use isolated malware-analysis network only after validated negative guest connectivity checks.
+- **Verification status:** **PARTIAL BUILD WITH ERRORS — not fully successful or production-ready.** No post-run `virsh version`, binary provenance, running service validation, guest VM or INetSim checks were supplied.
+- **Automation:** [`scripts/audit_kvm_build_step7.py`](../scripts/audit_kvm_build_step7.py) read-only audit: **10 synthetic tests passed**, and real excerpt classified `UNVERIFIED_WITH_ERRORS` with nine distinct findings. Inspects source `SUDO_USER` semantics and validates non-root target usernames when invoked with a real local account. GitHub committed sources matched tested blob SHAs. Future install will use gated modular steps and actual exit codes; not automatic execution of upstream `all`.
+- **Detailed evidence and acceptance requirements:** [KVM_QEMU_STEP7.md](KVM_QEMU_STEP7.md). Raw user log is **not committed**.
+
+## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
 - `scripts/bootstrap_cape_source.sh` is a separate **Git/source bootstrap draft** based on Step 4; it would modify a host **only if intentionally executed** as an installer component. It is not one of the three final commands and is not yet release-ready.
 - The user reported CAPEv2 **source clone, nine-variable installer edit, libvirt package installation and CAPE installer settings**, not CAPEv2 runtime installation. No Windows VM, INetSim VM, isolated network or full three-command deployment automation has been installed or validated as part of this canonical build.
 - `scripts/prepare_acpi_replacements.py` is an early **conditional** draft: inspection is read-only and mutation requires `--apply`, reviewed values and source pin. It is not validated on SSL-55.
 - `scripts/audit_libvirt_cape_network.py` is a **read-only** Step 6 diagnostic draft with 11 synthetic tests passed. It deliberately does not assert malware-ready isolation.
+- `scripts/audit_kvm_build_step7.py` is an early read-only Step 7 user/build-log verifier; it must not be mistaken for a safe deployment wrapper. The source installer run reported failures and has no fully verified success status.
 - **Do not** run installation or environment changes on SSL-55 without explicit user direction.
 - Next manual step is chosen and executed by the user.
