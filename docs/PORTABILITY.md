@@ -81,6 +81,9 @@ Check and record (while redacting sensitive information in shared logs):
 
 See [ACPI_REPLACEMENTS.md](ACPI_REPLACEMENTS.md). The manual SSL-55 substitution of nine `<WOOT>` values with `DELL` is **not** a universal mapping: source inspection shows different fields for tablet, disks, SeaBIOS and ACPI. `BXPC` can be derived cautiously from a four-character ACPI candidate when one is unambiguous; the other eight fields require verified contextual replacement values. A production-grade fully automatic profile selection remains to be designed and validated. The guarded Python module is an early tested **draft**, not the final no-input installer. The Ubuntu fresh-host bootstrap must check/install Python 3 and `acpica-tools` where actually needed; raw DSDT header reading is possible without disassembly, so do not force unnecessary packages.
 
+
+**2026-10-09 supplementary examples:** The supplied screenshots confirm variable-length DSDT fields (`Custom` is six characters), generic `PNP0` hardware IDs, and different four-character OEM ID/Table ID values (`DELL` versus `CBX3`) on some Dell models. The early draft rejects generic/virtual four-character markers and stops on competing candidates instead of inventing precedence. Five regression cases were added; selector rules passed nine targeted synthetic cases. This **does not** complete automatic hardware-profile discovery or establish fresh-machine support. See [ACPI_REPLACEMENTS.md](ACPI_REPLACEMENTS.md).
+
 ## Current status
 
 - Steps 1–5 (host inventory, `cpu-checker`, KVM, Git/CAPEv2 source clone, and ACPI inspection + nine-variable installer edit) have user-supplied terminal evidence.
