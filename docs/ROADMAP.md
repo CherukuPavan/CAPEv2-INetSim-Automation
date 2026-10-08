@@ -55,3 +55,9 @@ Cross-cutting requirements: Ubuntu compatibility checks; resources and CPU virtu
 Follow [PORTABILITY.md](PORTABILITY.md) for the dependency-by-dependency bootstrap contract and the fresh-machine test matrix. Completion requires supported-OS/hardware declarations, independent clean-host testing with dependencies absent, idempotent reruns, recovery from failures, protection of existing services, and verified network isolation. **Do not claim compatibility with every arbitrary machine.**
 
 The initial `scripts/check_host_virtualization.sh` is deliberately **read-only**. Missing packages will be provisioned by future installer/bootstrap modules **after** sufficient manual evidence and design review; absence of an optional diagnostic tool does not automatically authorize installation during preflight.
+
+## Step 7 post-build findings — 2026-10-09
+
+- User's follow-up report confirms QEMU **9.2.2**, libvirt system API **11.1.0**, active `libvirtd`, and KVM acceleration. This is an important basic-runtime pass, **not** a complete guest VM test.
+- **Blockers:** Existing `default` network became transient (`active / autostart no / persistent no`); KVM modprobe file malformed, active `blacklist kvm`; global SYN cookie setting disabled; power-management targets masked and reboot required. Existing login has not adopted `kvm`/`libvirt` memberships. Never claim the hypervisor is safe after reboot until these are resolved.
+- Added [post-build technical report](STEP7_POSTBUILD_AUDIT.md), [read-only audit script](../scripts/audit_step7_postbuild.py) and [14 passing tests](../scripts/test_audit_step7_postbuild.py). Actual report classified `REVIEW_REQUIRED`. No host modification, service restart, reboot or malware/guest-network test performed.
