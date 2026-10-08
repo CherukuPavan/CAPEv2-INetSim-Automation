@@ -39,6 +39,10 @@ done
 . /etc/os-release
 [[ "${ID:-}" == ubuntu ]] || { echo 'Only supported Ubuntu hosts are considered by this draft.' >&2; exit 2; }
 [[ $(uname -m) == x86_64 ]] || { echo 'This draft supports x86_64 only.' >&2; exit 2; }
+if [[ $MODE == apply && "${VERSION_ID:-}" != "24.04" ]]; then
+  echo 'Apply is restricted to Ubuntu 24.04 x86_64 until other releases are validated.' >&2
+  exit 2
+fi
 command -v dpkg-query >/dev/null || { echo 'dpkg-query unavailable' >&2; exit 2; }
 command -v apt-get >/dev/null || { echo 'apt-get unavailable' >&2; exit 2; }
 
