@@ -406,6 +406,12 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Distinction:** Prior unprivileged `poetry run pip3 install -r extra/optional_dependencies.txt` under `charan` installed selected optional modules in `/home/charan/.cache/pypoetry/virtualenvs/non-package-mode-t2x27zRb-py3.12`, **not proved present** in the now-identified `cape` environment. Do **not** reinstall the environment, re-run `cape2.sh base`, change systemd service users, or point CAPE to `charan`'s private environment.
 - **Next concise check:** Read-only `importlib.metadata.version` in exactly the `cape` environment as user `cape` for optional packages (e.g., ImageHash, deepdiff, binGraph, HTTPReplay, Socks5man, pyattck), preserving command exit code; no pip action before a missing dependency is demonstrated. Step 11B **PASS**, optional dependency parity **UNVERIFIED**; prior Windows guest `cuckoo1` missing and unrelated Suricata service failure remain separate.
 
+### Step 11C — Python path found; wrong account used for executable check (2026-10-08/09)
+
+- User-uploaded read-only 9-line `SSL55_Step11C_OptionalDeps_qKKlJkJa.txt` shows Poetry env discovery **exit 0** and the `cape` Python at `/home/cape/.cache/pypoetry/virtualenvs/capev2-t2x27zRb-py3.12/bin/python`; no installations/restarts/changes.
+- The assistant's Step11C script made a **privilege-context error**: checking `[ -x "$CAPE_PY" ]` under `charan` can fail to traverse `cape`'s private home even when interpreter runs fine as `cape`. This false-negative skipped all package checks, and **must not be treated as an invalid or absent CAPE environment**. The earlier Step11B report showed `Valid: True`.
+- Plan short read-only Step11D to execute `test -x` and package metadata via sudo under the service account `cape`, without changing home directory permissions, reinstalling Poetry, or modifying services. Optional dependency availability remains **UNVERIFIED**. [Step11 record](STEP11_OPTIONAL_PYTHON_DEPENDENCIES.md).
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
