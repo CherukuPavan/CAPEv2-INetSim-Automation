@@ -388,6 +388,16 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - The Ubuntu packaged Poetry 1.8.2 may coexist with a separately installed `/etc/poetry/bin/poetry`. Presence of one executable and `Successfully installed` does not prove the service virtualenv has the same packages. Do not conflate the two interpreters; do not change host service account or force bulk reinstallation.
 - **Status:** Step 11 reported install success **in a new charan virtualenv**, service-runtime integration **pending one read-only environment check**. Existing first Windows VM dependency and Suricata service issue from Step 10B remain separate. [Detailed record](STEP11_OPTIONAL_PYTHON_DEPENDENCIES.md).
 
+### Step 11A — Different Poetry executables and `cape` runtime unresolved (2026-10-08/09)
+
+- **User-executed read-only report:** `SSL55_Step11_PoetryEnv_20261008_224841_GcnbGnfH.txt` (39 physical lines / 40 indexed). This check did **not** install any package, restart services, alter networking or run VMs.
+- **Two distinct Poetry commands:** `command -v poetry` gives `/usr/bin/poetry`, **version 1.8.2**; separately `/etc/poetry/bin/poetry` exists, **version 2.5.1**.
+- **Local real systemd unit properties:** `cape.service` and `cape-processor.service` have `User=cape`, `WorkingDirectory=/opt/CAPEv2`, and use **`/etc/poetry/bin/poetry`** in ExecStart. `cape-web.service` likewise runs under `cape` and `/etc/poetry/bin/poetry`, with `WorkingDirectory=/opt/CAPEv2/web`. This is verified locally, not just guessed from upstream.
+- **`charan` Poetry virtualenv:** `/home/charan/.cache/pypoetry/virtualenvs/non-package-mode-t2x27zRb-py3.12` is usable; package metadata confirms `ImageHash=4.3.2`, `deepdiff=9.1.0`, `binGraph=3.3.2`, `HTTPReplay=0.3`, `Socks5man=0.3.0`, `pyattck=7.2.1`. These packages are therefore **confirmed only in charan's environment**.
+- **`cape` environment query:** Prior script attempted `sudo -n -u cape -H /etc/poetry/bin/poetry -C /opt/CAPEv2 env info --path` with **stderr suppressed**. It printed `No usable cape Poetry environment identified.` Crucially, this is **not proof no `cape` Python environment exists**: command could have failed due to invocation/configuration/access, returned an empty path because a system interpreter is used, or returned a path that lacked a usable Python file.
+- **Decision:** Step 11 optional dependency pip command **completed successfully for the charan environment**. CAPE's service runtime / optional dependency availability is **UNDETERMINED**, not installation failure. **Do not reinstall Poetry or bulk optional dependencies**, do not point services to charan's private venv, and do not run a mutation-capable `poetry run` just to inspect. Next perform a short read-only Step11B that surfaces the cape Poetry `env info` output/exit status and venv preference explicitly; then inspect actual interpreter/package metadata if identifiable.
+- Existing incomplete Windows guest `cuckoo1` and separately failed Suricata remain unchanged and must not be confused with this dependency provenance issue. [Step11 dependency record](STEP11_OPTIONAL_PYTHON_DEPENDENCIES.md).
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
