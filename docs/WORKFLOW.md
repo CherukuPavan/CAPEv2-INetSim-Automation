@@ -1,5 +1,8 @@
 # Verified-manual-build to automation workflow
 
+> **Current stage:** Manual Steps 1–11D complete through base CAPEv2 and optional Python package checks; VM provisioning starts next session. [Automation coverage and blockers](AUTOMATION_COVERAGE_STEPS_1_11.md) is the authoritative status map. `scripts/command1_pre_vm.sh` is a partial developer-stage entrypoint, NOT the finished three-command installer.
+
+
 ## Source of truth
 SSL-55 is the reference machine for a **fresh, user-led manual** CAPEv2 + Windows analysis VM + INetSim VM installation. The user performs every manual operation and supplies the exact commands, configuration changes, GUI actions, results, and evidence. Do **not** assume prior experiments or rolled-back changes form part of the canonical build.
 
