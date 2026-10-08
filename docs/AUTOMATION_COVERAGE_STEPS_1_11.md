@@ -62,6 +62,30 @@ bash scripts/command1_pre_vm.sh bootstrap-source --revision <VERIFIED_FULL_SHA40
 - All original logs and diagnostic reports must be inspected for sensitive
   contents **before uploading or sharing**; do not commit to Git.
 
+## Implementation extension — additional code written at user's request (2026-10-08/09)
+
+**Implemented and committed on `development`:**
+
+| New module | Exact function | Important limitation |
+|---|---|---|
+| `scripts/bootstrap_virtualization_stack.sh` | Ubuntu 24.04 x86_64 distro QEMU/libvirt/virt-manager/OVMF/SWTPM package plan and explicit apply, APT simulation, checks missing packages, fails on removals/upgrades | **NOT** source-built QEMU 9.2/SeaBIOS 1.16.3 parity; skips/blocks when source-managed binaries exist, must validate CAPE compatibility |
+| `scripts/install_cape_optional_deps.py` | Discovers service Python as `cape`; reports optional versions; explicit `--mode apply` calls pip resolver `--dry-run --report`; compares proposal against locked Poetry core; requires exact requirements SHA and live-service acknowledgment | This part has **not been executed on SSL-55**, does not claim a transactional rollback; an actual resolver/build/package install still requires a controlled host test |
+| `scripts/audit_upstream_installers.py` | Reads actual local `kvm-qemu.sh`/`cape2.sh` contents; scans and counts risky host-wide operations, computes hashes without displaying credentials | Deliberately **cannot invoke** upstream installers because the manually observed defaults can mask sleep, change timezone/sudoers/routing, disable AppArmor, purge/pin/overwrite packages, and expose insecure credentials |
+| `scripts/command1_pre_vm.sh` | Exposes `plan-virt`, `apply-virt`, `plan-optionals`, `apply-optionals`, `audit-installers` in addition to prior audit/prereq/source commands | Modular partial entrypoint; not a finished 3-command malware lab deployment |
+| New regression tests | `test_install_cape_optional_deps.py` plus `test_audit_upstream_installers.py`; CI syntax and offline unittest workflow expanded | Synthetic-only; no KVM guest, CAPE service, apt apply, package resolver or live-malware containment verification |
+
+**Critical remaining Step 7 and Step 10 gap:** A **safe, idempotent, machine-portable replacement** for the custom upstream `kvm-qemu.sh all` and `cape2.sh base` routines has **not** been coded end-to-end. Replaying those original scripts is not equivalent to a production installer, given observed host-wide policy changes and packaging errors. Even though the staged aptitude and Poetry operations above are executable, they **do not** reproduce the entire manual installation yet. Do not tell the user that *each and every step is automated* until those components are implemented and independently verified.
+
+New plan commands, run from an automation checkout on `development`:
+
+```bash
+bash scripts/command1_pre_vm.sh plan-virt
+bash scripts/command1_pre_vm.sh plan-optionals
+bash scripts/command1_pre_vm.sh audit-installers
+```
+
+The first two are read-only plan operations; the third reads the original script files and writes a private report. The `apply-virt` and `apply-optionals` operations are **explicitly opt-in** and must be checked against the host plan and backed-up runtime, not run blindly on SSL-55.
+
 ## Regression coverage
 
 - **Latest confirmed GitHub Actions run:** [pre-VM checks #37857879371](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/37857879371) on `development` completed **successfully** (Python compilation, offline unittest and Bash syntax). The tests are synthetic and do NOT prove installation, fresh-host portability or guest isolation.
