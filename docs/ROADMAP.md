@@ -10,7 +10,7 @@ Cross-cutting requirements: Ubuntu compatibility checks; resources and CPU virtu
 
 ## Current implementation status — 2026-10-08
 
-- Canonical manual **Steps 1–4 recorded** in `docs/STEP_LOG.md`: host/interface baseline, installation of `cpu-checker`, KVM evidence, pre-existing Git availability, and successful CAPEv2 **source checkout**. A source checkout is not CAPEv2 installation.
+- Canonical manual **Steps 1–5 recorded** in `docs/STEP_LOG.md`: host/interface baseline, installation of `cpu-checker`, KVM evidence, pre-existing Git availability, and successful CAPEv2 **source checkout**. A source checkout is not CAPEv2 installation.
 - `scripts/check_host_virtualization.sh` is an **initial read-only draft**, not one of the three deployment commands. It does not install packages, modify networking or configure KVM.
 - `scripts/bootstrap_cape_source.sh` is a **separate draft installer component**, not a final entrypoint: detect/install missing Git on an Ubuntu host, clone CAPEv2 as the intended non-root user, verify existing checkouts without replacing them, optionally pin a full commit SHA. It has not been executed on SSL-55.
 - Draft underwent Bash syntax validation and a negative-path smoke test in a separate restricted environment; it has **not** been run or validated on SSL-55. The restricted environment lacks a usable KVM device, so it cannot establish host readiness.
@@ -18,6 +18,13 @@ Cross-cutting requirements: Ubuntu compatibility checks; resources and CPU virtu
 - **No end-to-end deployment command is implemented or validated yet.** The CAPEv2 repository was cloned manually, but CAPEv2 runtime, Windows guests, INetSim VM, parallel analysis and network isolation remain to be manually verified and automated.
 
 - Step 4 module tests: Bash syntax check and isolated local fixture tests using simulated Ubuntu metadata (successful first clone, idempotent rerun, rejection of remote/revision mismatch). **Actual Ubuntu host, missing-Git APT path and real upstream checkout were not tested**. The user's `sudo git clone` may leave a root-owned checkout; ownership and selected HEAD require later verification.
+
+## Step 5 — ACPI-specific installer customization (draft, 2026-10-08)
+
+- **Manual evidence:** `acpica-tools` installed; DSDT extracted/disassembled (with unresolved external-method warning); `DELL  ` OEM ID and `Dell Inc` OEM Table ID identified; nine CAPEv2 source placeholders changed to `DELL` in SSL-55's local `kvm-qemu.sh`. No compile/run validation yet. See [ACPI_REPLACEMENTS.md](ACPI_REPLACEMENTS.md).
+- **Technical finding:** Upstream script has nine different QEMU/SeaBIOS device/firmware identifiers, not nine equal ACPI OEM fields. Hardcoding one machine's DELL/895C/PNP0 is invalid; assigning an ACPI identifier to unrelated storage/tablet fields without evidence is also invalid.
+- **Draft module:** [`scripts/prepare_acpi_replacements.py`](../scripts/prepare_acpi_replacements.py) defaults to read-only; verifies raw DSDT header/checksum, chooses an unambiguous exactly-four-byte BXPC candidate, requires reviewed eight-field profile, source SHA pin and external backup before opt-in patch. No host-side automatic installation or modifications.
+- **Tests:** 13 synthetic tests passed. Not tested against the actual SSL-55 file and DSDT binary; no fresh Ubuntu host test. Full machine-independent device/firmware profile discovery remains **unsolved** and is a release blocker for fully unattended deployment.
 
 ## Cross-machine release gate
 
