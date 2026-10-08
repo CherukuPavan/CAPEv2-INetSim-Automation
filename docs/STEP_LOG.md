@@ -236,6 +236,17 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Automation:** [`scripts/audit_step7_postbuild.py`](../scripts/audit_step7_postbuild.py), a secret-safe read-only parser with **14 passed synthetic tests**; run on this exact report, it returned `REVIEW_REQUIRED` and 11 diagnostic categories. Committed source/test Git hashes match local tested versions. This is a diagnostic draft, **not** an installer.
 - **No modifications performed to SSL-55 by assistant.**
 
+### Step 7 second follow-up — Final topology and policy diagnostics (2026-10-09)
+
+- **User-run read-only report:** `SSL55_Step7_FinalDiagnostics_20261009_030314.txt`. Detailed interpretation: [STEP7_FINAL_DIAGNOSTICS.md](STEP7_FINAL_DIAGNOSTICS.md). The raw report was not committed due to institution-specific IP/MAC/UUID data.
+- **Conclusive guest-network fact:** `virsh net-dumpxml default` showed **`<forward mode='nat'>`** and DHCP on `virbr0` with gateway `192.168.122.1/24`. This is **not** an isolated malware analysis network. No guest/host firewall or negative connectivity test has been done. **Never run live samples on this network.**
+- **Persistence:** `net-info default` reports **active yes, persistent no, autostart no**. The source-installer's network definition is therefore currently transient; do not force autostart or persist the existing NAT just to satisfy a check. `ip -br addr show virbr0` showed **DOWN**; with no guest attached, this does not independently prove bridge failure.
+- **Host uplink:** Two main-table IPv4 default routes exist, Ethernet `enp0s31f6` metric **100**, Wi-Fi `wlp0s20f3` metric **600**. Prior `ip route get 1.1.1.1` chose Ethernet; do not assume a single route or hardcode interfaces across hosts. Preserve Docker bridges and institutional network paths.
+- **User groups:** A separate `id charan` confirms account group membership in `kvm` and `libvirt`; the current session's `id` shows neither. A new login may be required before non-root libvirt usage.
+- **Modprobe:** File `/etc/modprobe.d/blacklist-kvm.conf` contains an invalid `-e blacklist kvm_intel` line plus the valid `blacklist kvm` directive. Current KVM works, but the post-reboot module-loading policy is not verified. No file edits authorized or performed.
+- **Sysctl and power management:** `net.ipv4.tcp_syncookies=0` actively and in both `/etc/sysctl.conf` and `/etc/sysctl.d/99-sysctl.conf` views. These paths may alias/symlink; do not blindly edit both. Four power-management targets are masked. Security settings require a deliberate policy-reviewed change, not unattended automation.
+- **Current decision:** **Basic QEMU/libvirt/KVM runtime PASS**, **Step 7 host readiness and guest containment NOT PASSED**. No restart, reboot, service change, system configuration edit, or VM creation by assistant. Keep status pending until approved fixes and negative isolation tests. See [STEP7_FINAL_DIAGNOSTICS.md](STEP7_FINAL_DIAGNOSTICS.md).
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
