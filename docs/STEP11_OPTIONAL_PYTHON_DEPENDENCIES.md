@@ -26,3 +26,11 @@ User-generated read-only `SSL55_Step11_PoetryEnv_20261008_224841_GcnbGnfH.txt` c
 - A `cape` virtualenv was **not identified** because the earlier check discarded stderr and reported a generic result when the `env info --path` command failed, returned empty, or pointed to a path without an executable. It is **not justified** to claim `cape` has no environment or that packages must be copied/reinstalled.
 
 **Next:** A small non-mutating Step11B query under `cape` with visible `env info` status, Poetry virtualenv config, and in-project `.venv` metadata; avoid `poetry run` or global pip until correct interpreter proven. Keep full CAPE runtime readiness pending.
+
+## Step 11B — Valid CAPE service venv established (2026-10-08/09)
+
+User-uploaded read-only report `SSL55_Step11B_CapePoetry_20261008_225117_5lyCTb4w.txt` shows both Poetry executables: packaged `/usr/bin/poetry` **1.8.2**, systemd-selected `/etc/poetry/bin/poetry` **2.5.1**. `cape` account home is `/home/cape/`. `/opt/CAPEv2/poetry.lock` is present, while project-local `/opt/CAPEv2/.venv` is absent; this is consistent with the **valid** cached virtualenv identified by Poetry.
+
+The `cape` Poetry `env info` command exited 0, reporting Python **3.12.3**, **Valid: True**, interpreter `/home/cape/.cache/pypoetry/virtualenvs/capev2-t2x27zRb-py3.12/bin/python`; `env info --path` and `env info --executable` also exited 0 and agreed. `virtualenvs.create=true` and `virtualenvs.in-project=null`. Thus **the Step 11A inability to identify the `cape` environment was a diagnostic limitation, not a real installation defect.**
+
+**Outstanding:** The optional dependencies installed under `charan` are not *verified* installed under `cape`. Query `importlib.metadata` in the **actual cape interpreter**, as `cape`, before any repeat of optional pip installation. Step 11B PASS; do not reinstall Poetry, delete/merge venvs, or change systemd service users.
