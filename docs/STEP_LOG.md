@@ -224,6 +224,18 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Automation:** [`scripts/audit_kvm_build_step7.py`](../scripts/audit_kvm_build_step7.py) read-only audit: **10 synthetic tests passed**, and real excerpt classified `UNVERIFIED_WITH_ERRORS` with nine distinct findings. Inspects source `SUDO_USER` semantics and validates non-root target usernames when invoked with a real local account. GitHub committed sources matched tested blob SHAs. Future install will use gated modular steps and actual exit codes; not automatic execution of upstream `all`.
 - **Detailed evidence and acceptance requirements:** [KVM_QEMU_STEP7.md](KVM_QEMU_STEP7.md). Raw user log is **not committed**.
 
+### Step 7 follow-up — Post-build validation (2026-10-09)
+
+- **Input:** user-supplied `SSL55_Step7_PostBuild_20261009_025646.txt`; read-only checks performed **by user** on SSL-55. Full findings: [STEP7_POSTBUILD_AUDIT.md](STEP7_POSTBUILD_AUDIT.md).
+- **Verified functioning:** `qemu-system-x86_64` **9.2.2**; `virsh` **11.1.0**; `virsh -c qemu:///system version` successfully shows libvirt **11.1.0** with running QEMU **9.2.2**; `kvm-ok` confirms acceleration; `libvirtd.service` active. No VMs defined yet.
+- **Network regression from Step 6:** `default` is now **active, autostart no, persistent no**. It is **transient**, so do not rely on it surviving a restart. The actual libvirt XML/bridge isolation was **not inspected in this report**; never assume default NAT is safe for malware guests.
+- **Account permissions:** `getent group kvm` and `libvirt` list `charan`, but the current `id` session lists only the primary `charan` group and `sudo`. Login-session group membership needs refresh/verification, not blind `usermod`.
+- **Host configuration issues:** `/etc/modprobe.d/blacklist-kvm.conf` contains malformed `-e blacklist kvm_intel` and a real `blacklist kvm`; `net.ipv4.tcp_syncookies=0`; sleep/suspend/hibernate targets masked; `qemu` held by APT. These require reviewed host-safe remediation, **not unattended repair**.
+- **Additional observations:** `libvirt-clients`, `libvirt-daemon-system`, `seabios` not installed *as Ubuntu packages*, which does **not** contradict working source-built QEMU/libvirt or copied firmware. `libvirtd` active and modular `virtqemud` / `virtnetworkd` inactive does **not** alone mean broken virtualization. The expected `kvm-qemu-all.log` path was not found. Reboot-required marker present. **Do not reboot until module and network issues are assessed.**
+- **Verification:** **QEMU/libvirt/KVM basic runtime verification PASS; overall Step 7 still BLOCKED/REVIEW REQUIRED** for stable configuration and guest isolation. No Windows VM booted, no post-reboot check and no INetSim tests.
+- **Automation:** [`scripts/audit_step7_postbuild.py`](../scripts/audit_step7_postbuild.py), a secret-safe read-only parser with **14 passed synthetic tests**; run on this exact report, it returned `REVIEW_REQUIRED` and 11 diagnostic categories. Committed source/test Git hashes match local tested versions. This is a diagnostic draft, **not** an installer.
+- **No modifications performed to SSL-55 by assistant.**
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
