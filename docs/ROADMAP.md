@@ -94,3 +94,10 @@ The user pasted the initial Step 7D correction using `bash <<'BASH'`, which pass
 **Safer procedure:** write the script to a user-owned temporary file using a quoted heredoc, `bash -n` syntax-check the saved file, execute it from its path, and read explicit approval using `</dev/tty`. Verify the original expected inode, metadata, line 77, symlink target and absence of independent sysctl overrides; require a root-only byte-verified backup and full narrow-diff check before single-key `sysctl -w` at runtime. Report failure without blind retry. This is an SSL-55-specific manual recovery pattern and not a production-ready bootstrap or general host template.
 
 The completed read-only alias review in [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_REVIEW.md) remains valid, but the active/persistent kernel setting should not be claimed fixed until the user provides a successful post-change TXT report.
+
+## Step 7D — Successful guarded SYN-cookie correction (2026-10-09)
+
+- Initial approval-prompt heredoc attempt **cancelled without change** (historical, retained above). The user then executed the corrected procedure and uploaded `SSL55_Step7D_SynCookies_20261009_032549_1d5Iozfo.txt` confirming **PASSED** preflight/config sources, matching SHA-256 protected backup and exact persistent-file transformation.
+- Active `net.ipv4.tcp_syncookies` is now **`1`**; the canonical persistent configuration was also verified as `1`. Report states no reboot or service restart. **Step 7D accepted; post-reboot persistence still untested**. See [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_REVIEW.md).
+- **Remaining blockers:** valid `blacklist kvm` rule/boot autoload policy; four masked power targets; libvirt `default` remains active/transient/NAT, not an isolated malware network; Windows/INetSim and guest negative connectivity not tested. Neither the wider hypervisor build nor three-command deployment is production-approved.
+- Current [read-only sysctl alias auditor](../scripts/audit_sysctl_alias.py) has 15 prior passing synthetic tests; it is **not** an automatic repair script or a post-change SSL-55 test.
