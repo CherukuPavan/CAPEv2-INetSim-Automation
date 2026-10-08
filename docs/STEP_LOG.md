@@ -1,6 +1,6 @@
 # SSL-55 canonical manual installation log
 
-**Status:** Steps 1–3 reported with terminal evidence; CAPEv2/VM deployment has **not** started in the canonical workflow.
+**Status:** Steps 1–4 reported with terminal evidence. CAPEv2 upstream **source checkout** was performed in Step 4; CAPEv2 runtime installation, Windows VMs and INetSim deployment remain unverified/not reported.
 
 **Evidence provenance:** The user supplied a terminal transcription on 2026-10-08. Commands were **not** independently executed by the assistant on SSL-55, and exact execution timestamps were not supplied. "Terminal-evidenced" below means supported by the supplied output, not separately re-tested. Exact site-specific private IP addresses are intentionally **redacted from this GitHub record**; the original user-provided transcript remains in the conversation.
 
@@ -88,9 +88,47 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Portability notes:** Handle both `kvm_intel` and `kvm_amd`, and possible built-in kernel support; check `/dev/kvm` existence and user access; do not assume loaded modules always indicate guest readiness; do not assume `kvm-ok` is preinstalled on fresh machines.
 - **Related automation:** `scripts/check_host_virtualization.sh` (**draft**, no SSL-55 runtime test).
 
-## Automation status after Steps 1–3
+## Step 4 — Ensure Git availability and clone CAPEv2 upstream source
 
-- One **read-only draft preflight** may be maintained for host/KVM signals observed in Steps 1–3. This is **not** a finished dependency installer or deployment command.
-- No CAPEv2, Windows VM, INetSim VM, isolated network, or three-command deployment automation has been installed or validated as part of this canonical manual build.
+- **Reported date:** 2026-10-08 (exact execution date/time not independently established).
+- **Performed by:** User on SSL-55, terminal identity `charan@CSE-SSL-55`.
+- **Objective:** Ensure Git is available and obtain the upstream CAPEv2 source repository.
+- **Exact manual commands, in chronological order:**
+  ```bash
+  sudo apt-get install git -y
+  cd ~
+  sudo git clone https://github.com/kevoreilly/CAPEv2.git
+  ```
+- **GUI actions:** None reported.
+- **Dependencies and permissions:** APT package manager, sudo privilege, Git binary, DNS/network access to `github.com`, free disk space and working GitHub HTTPS transport. The final clone was run **using sudo** from the user's home working directory.
+- **Package evidence:** APT reported `git is already the newest version (1:2.43.0-1ubuntu7.3)` and `git set to manually installed`. **No newly installed Git package** is evidenced; the APT auto/manual installation state was changed to *manual*.
+- **APT result:** `0 upgraded, 0 newly installed, 0 to remove and 192 not upgraded`. APT displayed an `autoremove` suggestion but the user **did not execute** it. This step's APT output did not contain new repository warnings; that does **not** establish the duplicate VirtualBox repository configuration from Step 2 has been resolved.
+- **Source URL:** `https://github.com/kevoreilly/CAPEv2.git` (original exact upstream URL, preserve in canonical step history).
+- **Observed clone output:**
+  ```text
+  Cloning into 'CAPEv2'...
+  remote: Enumerating objects: 67910, done.
+  remote: Counting objects: 100% (1031/1031), done.
+  remote: Compressing objects: 100% (384/384), done.
+  remote: Total 67910 (delta 861), reused 647 (delta 647), pack-reused 66879 (from 4)
+  Receiving objects: 100% (67910/67910), 255.04 MiB | 4.66 MiB/s, done.
+  Resolving deltas: 100% (45776/45776), done.
+  ```
+  Shell prompt returned after the command.
+- **Expected result:** Git available, repository cloned into the working directory as `CAPEv2`.
+- **Actual result:** **Terminal-evidenced successful source transfer and delta resolution**. Because `cd ~` was run in the `charan` shell, the intended checkout path is `~/CAPEv2`; an absolute path was not displayed. The source commit SHA, branch, on-disk file ownership and repository integrity have **not** been independently verified.
+- **Files/settings changed:** APT marked the pre-existing Git package as manually installed; a new `CAPEv2` checkout directory and contents were created (per Git output). Git clone was launched via sudo, so its files may be **root-owned**. This is a portability and maintainability concern, not proof of a failure on SSL-55.
+- **Warnings/errors:** No fatal error in the supplied clone output. No fix has been attempted for potentially root-owned checkout contents.
+- **Verification status:** **Terminal-evidenced source clone: PASS**. **Full Git checkout identity/ownership/commit: NOT YET VERIFIED.** CAPEv2 has **not** been installed or tested merely by cloning the source.
+- **Troubleshooting:** None reported.
+- **Portability requirements:** On fresh supported Ubuntu machines, detect whether a functioning supported Git is installed; only install it when missing. Detect APT and privilege/repository errors instead of assuming availability. Clone as the intended user where safe (unlike the original `sudo git clone`), use a configurable path, refuse to overwrite arbitrary existing directories or repositories, validate the upstream origin and resulting Git commit. Record a **verified immutable commit SHA** for reproducible deployment; the manual clone did not report the commit, so the current default branch remains unpinned. Avoid hardcoded usernames, shared network CIDRs, and repeated network downloads on rerun.
+- **Related automation:** `scripts/bootstrap_cape_source.sh` **draft**. It has an optional full-commit `--revision` pin, checks Git availability, installs missing Git with APT under explicit execution, clones as an unprivileged user, validates origin/HEAD on existing checkouts and refuses mismatches. This differs intentionally from the historical `sudo git clone` for safe fresh-host behavior.
+- **Automation testing evidence:** Bash syntax validation passed; local sandbox tests of cloning from a **synthetic repository** with a **simulated Ubuntu OS identity** passed for initial clone, second-run no-op, and safe refusal of origin/revision mismatches. **No SSL-55 test, actual upstream clone test or Git-missing installation test was performed**. Draft is not production-ready.
+
+## Automation status after Steps 1–4
+
+- `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
+- `scripts/bootstrap_cape_source.sh` is a separate **Git/source bootstrap draft** based on Step 4; it would modify a host **only if intentionally executed** as an installer component. It is not one of the three final commands and is not yet release-ready.
+- The user reported a successful CAPEv2 **source clone**, not CAPEv2 runtime installation. No Windows VM, INetSim VM, isolated network or full three-command deployment automation has been installed or validated as part of this canonical build.
 - **Do not** run installation or environment changes on SSL-55 without explicit user direction.
 - Next manual step is chosen and executed by the user.
