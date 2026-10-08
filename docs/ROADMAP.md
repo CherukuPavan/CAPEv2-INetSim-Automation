@@ -10,7 +10,7 @@ Cross-cutting requirements: Ubuntu compatibility checks; resources and CPU virtu
 
 ## Current implementation status — 2026-10-08
 
-- Canonical manual **Steps 1–5 recorded** in `docs/STEP_LOG.md`: host/interface baseline, installation of `cpu-checker`, KVM evidence, pre-existing Git availability, and successful CAPEv2 **source checkout**. A source checkout is not CAPEv2 installation.
+- Canonical manual **Steps 1–6 recorded** in `docs/STEP_LOG.md`: host/interface baseline, installation of `cpu-checker`, KVM evidence, pre-existing Git availability, and successful CAPEv2 **source checkout**. A source checkout is not CAPEv2 installation.
 - `scripts/check_host_virtualization.sh` is an **initial read-only draft**, not one of the three deployment commands. It does not install packages, modify networking or configure KVM.
 - `scripts/bootstrap_cape_source.sh` is a **separate draft installer component**, not a final entrypoint: detect/install missing Git on an Ubuntu host, clone CAPEv2 as the intended non-root user, verify existing checkouts without replacing them, optionally pin a full commit SHA. It has not been executed on SSL-55.
 - Draft underwent Bash syntax validation and a negative-path smoke test in a separate restricted environment; it has **not** been run or validated on SSL-55. The restricted environment lacks a usable KVM device, so it cannot establish host readiness.
@@ -28,6 +28,13 @@ Cross-cutting requirements: Ubuntu compatibility checks; resources and CPU virtu
 
 
 - **Supplemental Step 5 references reviewed (2026-10-09):** Screenshot methods `Custom` (six characters; not an eligible four-character token), `PNP0` (generic hardware-ID prefix; not OEM), and `CBX3` (model-specific Dell table ID) added to [ACPI_REPLACEMENTS.md](ACPI_REPLACEMENTS.md). Candidate extraction now blocks known generic/virtual markers. **Five new regression tests committed** (18 in the suite); nine targeted selector cases passed independently. Full updated suite, real firmware and QEMU/SeaBIOS integration remain unverified.
+
+## Step 6 — Libvirt installation and network safety (2026-10-09)
+
+- Manual installation evidence shows **51 newly installed + 2 upgraded packages**, active libvirt `default` network on `virbr0`, and upstream `cape2.sh` settings changed. The configured `eno1` interface was not in observed host inventory. Secret provided in output is **redacted** in project artifacts.
+- **Safety blocker:** libvirt's default network is ordinarily **NAT**, not safe malware isolation. XML/firewall and guest-negative-connectivity evidence have not been collected; do not use it as a live analysis network. A dedicated verified isolated network must be built separately and tested before any malware analysis.
+- **System warnings:** APT mixed `noble`/`focal` sources, duplicated VirtualBox entries, and invalid `/etc/modprobe.d/blacklist-kvm.conf` contents reported by libkmod. No repairs, upgrades, firewall edits or network reconfiguration authorized or executed by us.
+- **Automation:** [`scripts/audit_libvirt_cape_network.py`](../scripts/audit_libvirt_cape_network.py), read-only and password-redacting; **11 synthetic tests passed**. Real SSL-55 execution, fresh-host package bootstrap, actual bridge isolation, and installer integration are **untested**. Full details: [LIBVIRT_NETWORK_STEP6.md](LIBVIRT_NETWORK_STEP6.md).
 
 ## Cross-machine release gate
 
