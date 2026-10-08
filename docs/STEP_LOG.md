@@ -319,6 +319,14 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Automation:** [`scripts/audit_step7f_power_policy.py`](../scripts/audit_step7f_power_policy.py) parses this offline user report without emitting host identifiers. **14 synthetic unit tests passed**, and the actual report classified `PERSISTENT_MASKS_VERIFIED_REVIEW_REQUIRED` with all four `PERSISTENTLY_MASKED`; no parsing errors. Both Git blobs match the locally tested versions. This is read-only preflight, **not** power-policy implementation.
 - **Technical details:** [STEP7F_POWER_POLICY.md](STEP7F_POWER_POLICY.md).
 
+### Step 7F follow-up — SSL-55 identified as shared college workstation (2026-10-09)
+
+- **New user-provided operational constraint:** CSE-SSL-55 is a **college-owned shared machine with other student login accounts**. This corrects any earlier assumption that it is a dedicated, always-on CAPEv2 appliance. Existence of multiple accounts does **not** establish who is currently signed in or whether the user has institutional authorization for host-wide changes.
+- **Power-management policy:** The four persistent systemd sleep/hibernate masks found in Step 7F affect the **entire computer**, not only the user's login. **Do not automatically recommend keeping the masks merely for CAPEv2 analyses, and do not unmask them without coordination with college IT/system administrators and confirmation of baseline institutional policy.** Shared-use preference is to preserve or restore approved general workstation functionality through an authorized, documented and reversible change plan.
+- **Broader host scope:** Upstream `kvm-qemu.sh all` also affected libvirt/QEMU packaging, boot/systemd/sysctl behavior, Python dependencies and virtualization networking. A shared-host compatibility, access/owner, current student sessions/processes, backup and maintenance-window review is required **before further installation, rollback, service restart or reboot**. Merely being in `sudo` does not establish administrative approval.
+- **Containment boundary:** **Do not execute live malware on this shared college workstation or connect it to the institution LAN via NAT as an analysis guest.** Prefer a dedicated college-approved machine/segregated lab under explicit institutional security policy with verified IPv4/IPv6 isolation and negative egress tests; SSL-55 can be kept only as a non-malware documentation/installation reference until authorization and safety are established.
+- **Outcome:** Step 7F read-only inspection COMPLETE; **policy change and reboot NOT authorized**. **Next: confirm the user's authorization and college IT's approved role for SSL-55** before issuing any modifying terminal commands. No additional host changes have been made by the assistant.
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
