@@ -52,11 +52,14 @@ def audit_text(content: str, kind: str) -> dict[str, object]:
 
 
 def read_script(path: Path, kind: str) -> dict[str, object]:
-    content = path.read_text(encoding="utf-8", errors="replace")
+    if path.stat().st_size > 2_000_000:
+        raise ValueError("Installer exceeds conservative audit size limit")
+    raw = path.read_bytes()
+    content = raw.decode("utf-8", errors="replace")
     report = audit_text(content, kind)
     report.update({"script_name": path.name,
-                   "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
-                   "size_bytes": path.stat().st_size})
+                   "sha256": hashlib.sha256(raw).hexdigest(),
+                   "size_bytes": len(raw)})
     return report
 
 
