@@ -70,24 +70,56 @@ def conflicts(proposed: list[dict[str, str]], lock: dict[str, str]) -> list[str]
 # Runs under cape's Python. Dry-run creates a temporary report, not installs.
 # On success output JUST a list of proposed name/version; avoid printing pip
 # logs (which may include VCS URLs or other secrets).
+# Runs UNDER cape. Generates a pinned constraints file from Poetry's lock
+# inside a private temp directory; both dry-run and install use the SAME pins.
+# This prevents unreviewed modifications to locked CAPE core dependencies.
+# pip output is suppressed because it may expose private VCS or credentials.
 RESOLVE_CODE = r"""
-import json, os, subprocess, sys, tempfile
-req=sys.argv[1]
-with tempfile.TemporaryDirectory(prefix='cape-pip-resolve-') as folder:
-    report=os.path.join(folder,'proposal.json')
-    cmd=[sys.executable,'-m','pip','install','--dry-run','--report',report,
-         '--disable-pip-version-check','-r',req]
-    r=subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     timeout=900, check=False)
-    if r.returncode!=0:
-        print(json.dumps({'error':'resolver-failed','code':r.returncode}))
+import hashlib, json, os, re, subprocess, sys, tempfile, tomllib
+req, mode, expected_req_sha, expected_lock_sha = sys.argv[1:5]
+lock_path = '/opt/CAPEv2/poetry.lock'
+if mode not in ('resolve','apply'):
+    raise SystemExit('invalid mode')
+def sha(path):
+    with open(path,'rb') as f: return hashlib.sha256(f.read()).hexdigest()
+if sha(req)!=expected_req_sha or sha(lock_path)!=expected_lock_sha:
+    print(json.dumps({'error':'source-changed'}))
+    raise SystemExit(0)
+with open(lock_path,'rb') as f:
+    locked=tomllib.load(f).get('package', [])
+rows=[]
+for pkg in locked:
+    name, version = pkg.get('name',''), pkg.get('version','')
+    if not (re.fullmatch(r'[A-Za-z0-9_.-]+',name) and
+            re.fullmatch(r'[A-Za-z0-9_!+.*-]+',version)):
+        print(json.dumps({'error':'invalid-lock-package'}))
         raise SystemExit(0)
-    with open(report,encoding='utf-8') as fh:
-        plan=json.load(fh)
-    packages=[{'name':x.get('metadata',{}).get('name',''),
-               'version':x.get('metadata',{}).get('version','')}
-              for x in plan.get('install',[])]
-    print(json.dumps({'proposed':packages}))
+    rows.append(name+'=='+version)
+if not rows:
+    print(json.dumps({'error':'empty-lock'}))
+    raise SystemExit(0)
+with tempfile.TemporaryDirectory(prefix='cape-pip-locked-') as folder:
+    constraints=os.path.join(folder,'constraints.txt')
+    with open(constraints,'w',encoding='utf8') as f:
+        f.write('\\n'.join(rows)+'\\n')
+    cmd=[sys.executable,'-m','pip','install','--disable-pip-version-check',
+         '--constraint',constraints,'-r',req]
+    if mode=='resolve':
+        report=os.path.join(folder,'proposal.json')
+        cmd+=['--dry-run','--report',report]
+    r=subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     timeout=1500 if mode=='apply' else 900, check=False)
+    if r.returncode!=0:
+        print(json.dumps({'error':'pip-'+mode+'-failed','code':r.returncode}))
+        raise SystemExit(0)
+    if mode=='resolve':
+        with open(report,encoding='utf-8') as fh: plan=json.load(fh)
+        packages=[{'name':x.get('metadata',{}).get('name',''),
+                   'version':x.get('metadata',{}).get('version','')}
+                  for x in plan.get('install',[])]
+        print(json.dumps({'proposed':packages}))
+    else:
+        print(json.dumps({'installed_exit_zero':True}))
 """
 
 
@@ -111,7 +143,9 @@ def sample_versions(python: Path) -> dict[str, str | None] | None:
 
 def proposed_changes(python: Path, req: Path) -> dict:
     status, output = call(["sudo", "-n", "-u", "cape", "-H", str(python),
-                           "-B", "-c", RESOLVE_CODE, str(req)], timeout=930)
+                           "-B", "-c", RESOLVE_CODE, str(req), "resolve",
+                           hashlib.sha256(req.read_bytes()).hexdigest(),
+                           hashlib.sha256(LOCK.read_bytes()).hexdigest()], timeout=930)
     if status != 0:
         raise RuntimeError("Resolver could not execute as cape")
     try:
@@ -198,11 +232,19 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     # Only the identified service-account interpreter is used.
                     # stdout is captured but never echoed (URLs/credentials).
-                    rc, _ = call(["sudo", "-n", "-u", "cape", "-H",
-                                  str(python), "-B", "-m", "pip", "install",
-                                  "--disable-pip-version-check", "-r", str(req)], timeout=1800)
-                    data["applied"] = rc == 0
-                    data["status"] = "PIP_EXIT_SUCCESS_REVERIFY_NEEDED" if rc == 0 else "PIP_FAILED_PARTIAL_POSSIBLE"
+                    rc, install_output = call([
+                        "sudo", "-n", "-u", "cape", "-H",
+                        str(python), "-B", "-c", RESOLVE_CODE,
+                        str(req), "apply", sha,
+                        hashlib.sha256(LOCK.read_bytes()).hexdigest(),
+                    ], timeout=1800)
+                    try:
+                        install_result = json.loads(install_output) if rc == 0 else {}
+                    except ValueError:
+                        install_result = {}
+                    data["applied"] = bool(install_result.get("installed_exit_zero"))
+                    data["status"] = ("PIP_EXIT_SUCCESS_REVERIFY_NEEDED"
+                                      if data["applied"] else "PIP_FAILED_PARTIAL_POSSIBLE")
                     data["sample_optional_after"] = sample_versions(python)
 
     output = json.dumps(data, indent=2, sort_keys=True) + "\n"
