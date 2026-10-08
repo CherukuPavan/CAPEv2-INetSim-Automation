@@ -96,6 +96,42 @@ class ACPIAutomationTests(unittest.TestCase):
     def test_unsupported_oem_lengths_refuse(self):
         self.dsdt.write_bytes(table(oem=b'HPQOEM',table=b'ABCDEFGH'))
         self.assertEqual(self.run_program().returncode,2)
+    def test_reference_vm_custom_not_truncated(self):
+        # Screenshot method 3a: PTLTD + Custom is not a four-byte ID.
+        self.dsdt.write_bytes(table(oem=b'PTLTD ', table=b'Custom  '))
+        r=self.run_program()
+        self.assertEqual(r.returncode,2)
+        self.assertIn('Neither DSDT OEM field',r.stderr)
+        self.assertEqual(self.target.read_text(),self.original)
+
+    def test_reference_dell_cbx3_ambiguity_is_not_guessed(self):
+        # Screenshot method 3c: Dell CBX3 conflicts with four-byte DELL OEM ID.
+        self.dsdt.write_bytes(table(oem=b'DELL  ',table=b'CBX3    '))
+        r=self.run_program()
+        self.assertEqual(r.returncode,2)
+        self.assertIn('Conflicting',r.stderr)
+
+    def test_cbx3_is_eligible_when_unambiguous(self):
+        self.dsdt.write_bytes(table(oem=b'DELLXX',table=b'CBX3    '))
+        r=self.run_program()
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn('BXPC candidate: CBX3',r.stdout)
+
+    def test_pnp0_generic_hardware_id_is_not_selected(self):
+        # Screenshot method 3b: generic PNP0-prefix Hardware IDs are not OEMs.
+        self.dsdt.write_bytes(table(oem=b'PTLTD ',table=b'PNP0    '))
+        r=self.run_program()
+        self.assertEqual(r.returncode,2)
+        self.assertIn('Generic/virtual ACPI identifier',r.stderr)
+
+    def test_virtual_machine_tokens_are_rejected(self):
+        for token in (b'QEMU',b'BXPC',b'VBOX',b'ACPI'):
+            with self.subTest(token=token):
+                self.dsdt.write_bytes(table(oem=b'PTLTD ',table=token+b'    '))
+                r=self.run_program()
+                self.assertEqual(r.returncode,2)
+                self.assertIn('Generic/virtual ACPI identifier',r.stderr)
+
     def test_wrong_checksum_refuses(self):
         b=bytearray(self.dsdt.read_bytes()); b[35]^=1; self.dsdt.write_bytes(b)
         self.assertEqual(self.run_program().returncode,2)
