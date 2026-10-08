@@ -67,3 +67,11 @@ Unresolved real errors/warnings (**do not mark as fully successful**):
 A post-build report must confirm actual versions/binary paths/package ownership (`command -v`, `readlink -f`, `dpkg -S`), `virsh -c qemu:///system version`, daemon sockets/services, default network XML/status, KVM access, group membership, relevant sysctl/modprobe status, and whether a reboot is pending. The report must not include secrets. **Do not automatically restart, reinstall, purge or reboot** on the strength of this log.
 
 **Authorization boundary:** Assistant made no changes to SSL-55. Changes in this document and scripts exist only on the project's GitHub `development` branch.
+
+## Post-build runtime evidence — 2026-10-09
+
+A subsequent user-generated report establishes that **QEMU 9.2.2, libvirt 11.1.0 system connection, active libvirtd, and KVM acceleration are functioning at command-line level**. This resolves part of the initial runtime uncertainty; it **does not** resolve earlier build errors or prove Windows VM, firmware, network isolation, or reboot survivability.
+
+The `default` libvirt network is **active but transient/nonpersistent and autostart disabled** (regression since Step 6), the current login session does not reflect `kvm` and `libvirt` membership even though account-group records list the user, and `blacklist-kvm.conf` contains malformed/blacklist lines. TCP SYN cookies are disabled, power-management targets masked, and a reboot is pending. These are substantive host-safety and persistence concerns.
+
+Detailed assessment, action boundaries and next read-only diagnostics: [STEP7_POSTBUILD_AUDIT.md](STEP7_POSTBUILD_AUDIT.md). New offline verifier [`scripts/audit_step7_postbuild.py`](../scripts/audit_step7_postbuild.py) has **14 passed synthetic tests** and classified the actual report as `REVIEW_REQUIRED`. Do not rerun the upstream installer or reboot automatically; preserve the default NAT network until the future isolated guest-network architecture is defined.
