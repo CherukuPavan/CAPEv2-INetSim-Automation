@@ -106,5 +106,31 @@ class ReportTests(TestCase):
             m.Audit().add("11", "test", "READY", "not approved")
 
 
+
+
+class LogClassificationTests(TestCase):
+    def test_expected_errors_match_without_copying_private_lines(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            log = Path(temp) / "cape2-base.log"
+            log.write_text(
+                "ERROR: Cannot uninstall dnspython 2.6.1, RECORD file not found\n"
+                "cp: cannot stat './conf/default/*.env': No such file or directory\n"
+                "Job for suricata.service failed because the control process exited\n"
+                "token=DO_NOT_PRINT\n"
+            )
+            counts = m.count_log_signatures(log, m.LOG_SIGNATURES["cape2-base.log"])
+        self.assertEqual(counts["dnspython uninstall metadata"], 1)
+        self.assertEqual(counts["missing optional env glob"], 1)
+        self.assertEqual(counts["Suricata service start"], 1)
+        self.assertNotIn("DO_NOT_PRINT", repr(counts))
+
+    def test_absent_log_is_unknown_not_zero_failures(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            self.assertIsNone(m.count_log_signatures(
+                Path(temp) / "missing.log", m.LOG_SIGNATURES["cape2-base.log"]
+            ))
+
 if __name__ == "__main__":
     main()
