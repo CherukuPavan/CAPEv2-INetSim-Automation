@@ -344,6 +344,15 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Verification limit:** Binary runs with `--version`, but actual Virt-Manager **GUI launch and connection to `qemu:///system` from the current user's graphical login are NOT yet verified**. Next safe manual step: user launches the existing GUI as their **normal account (not sudo)** and confirms libvirt system connection; if it fails, gather error output and diagnose narrowly before changing packages/groups. Do not create or connect a malware VM to existing `default` NAT.
 - **Automation portability:** Inspect `command -v`, `virt-manager --version`, GUI/display/session readiness and `virsh` libvirt access, and distinguish source installations from `dpkg` packages. Do not install or recompile merely because `dpkg-query` finds no `virt-manager` package. Source dependency version/provenance and GUI validation remain open.
 
+### Step 9 — Non-root libvirt and virtual-network read-only inspection (2026-10-09)
+
+- **User-run terminal evidence:** Under normal `charan` shell, `virsh -c qemu:///system list --all`, `virsh -c qemu:///system net-list --all`, and `ip addr show virbr0` all returned results without `sudo`. The successful queries are evidence of **read-only access to system libvirt from the current login**. They do **not** demonstrate graphical Virt-Manager GUI connectivity, write authorization or new group/session login state.
+- **VM inventory:** `virsh list --all` yielded only header (no defined system-libvirt domains at inspection time); first analysis VM is not yet built.
+- **Default libvirt network:** `default` was **active**, **autostart=no**, **persistent=no** (transient). The `virbr0` interface existed with `192.168.122.1/24`, `UP` flag but `NO-CARRIER` and operational `state DOWN`. With no guests, NO-CARRIER does **not** establish a malfunctioning bridge.
+- **Crucial previous evidence:** Prior Step 7 `net-dumpxml` demonstrated `default` has `<forward mode='nat'>`; **NAT does not provide containment** for real malware, especially on a shared college workstation. Do **not** start sample VMs on `default`, or enable NAT network persistence/autostart as a reflexive fix for these observations.
+- **Decision:** **Step 9 inspection PASSED as a non-mutating baseline check**, but no VM exists and **dedicated isolated analysis network, Windows/INetSim VM deployment, guest egress tests and GUI validation remain NOT COMPLETE**. No libvirt network, power, routes, firewall or guest state changed by this step. A subsequent safe, pre-reviewed manual step can proceed; ask user for the next installer-document instruction rather than guessing or creating the wrong network.
+- **Portability:** Final installer must query `qemu:///system` using the real invoking user, handle sudo group-refresh edge cases, distinguish active vs autostart vs persistent, report empty VM domains without treating it as an error, and check forwarding/NAT XML and guest egress separately from bridge carrier status.
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
