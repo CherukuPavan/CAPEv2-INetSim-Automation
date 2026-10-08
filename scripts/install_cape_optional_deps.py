@@ -101,7 +101,7 @@ if not rows:
 with tempfile.TemporaryDirectory(prefix='cape-pip-locked-') as folder:
     constraints=os.path.join(folder,'constraints.txt')
     with open(constraints,'w',encoding='utf8') as f:
-        f.write('\\n'.join(rows)+'\\n')
+        f.write('\n'.join(rows)+'\n')
     cmd=[sys.executable,'-m','pip','install','--disable-pip-version-check',
          '--constraint',constraints,'-r',req]
     if mode=='resolve':
