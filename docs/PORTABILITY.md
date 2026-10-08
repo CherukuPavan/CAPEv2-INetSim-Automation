@@ -77,9 +77,13 @@ Check and record (while redacting sensitive information in shared logs):
 
 **Release gate:** Manual success on SSL-55 alone does **not** establish portable automation. Only independently tested deployment and isolation evidence can justify describing a supported configuration as production-ready.
 
+## ACPI-specific machine variation discovered in Step 5
+
+See [ACPI_REPLACEMENTS.md](ACPI_REPLACEMENTS.md). The manual SSL-55 substitution of nine `<WOOT>` values with `DELL` is **not** a universal mapping: source inspection shows different fields for tablet, disks, SeaBIOS and ACPI. `BXPC` can be derived cautiously from a four-character ACPI candidate when one is unambiguous; the other eight fields require verified contextual replacement values. A production-grade fully automatic profile selection remains to be designed and validated. The guarded Python module is an early tested **draft**, not the final no-input installer. The Ubuntu fresh-host bootstrap must check/install Python 3 and `acpica-tools` where actually needed; raw DSDT header reading is possible without disassembly, so do not force unnecessary packages.
+
 ## Current status
 
-- Steps 1–4 (host inventory, `cpu-checker` installation, KVM checks, Git availability and CAPEv2 source clone) have user-supplied terminal evidence.
+- Steps 1–5 (host inventory, `cpu-checker`, KVM, Git/CAPEv2 source clone, and ACPI inspection + nine-variable installer edit) have user-supplied terminal evidence.
 - The existing host/KVM script is read-only and remains an unverified draft on SSL-55.
 - `scripts/bootstrap_cape_source.sh` is a separate **installer draft**: it bootstraps a missing Git package on an Ubuntu host, clones with normal user privileges, checks Git origin and HEAD and rejects unexpected pre-existing state. Its unit-like tests used a synthetic Git repository with simulated Ubuntu metadata, **not** SSL-55 or a verified clean Ubuntu test host. The missing-Git APT path remains untested.
 - The original SSL-55 `sudo git clone` may produce a root-owned checkout. Future automation will not assume user ownership or silently change it.
