@@ -1,5 +1,8 @@
 # Automation roadmap (provisional)
 
+> **LATEST CHECKPOINT — PRE-VM STEPS 1–11D (2026-10-08/09):** A partial Command-1 entrypoint (`scripts/command1_pre_vm.sh`), consolidated read-only host/runtime audit (`scripts/audit_pre_vm_stages.py`), explicit basic package bootstrap (`scripts/bootstrap_pre_vm_prereqs.sh`), synthetic tests and GitHub Actions workflow now exist on **development**. See [coverage ledger](AUTOMATION_COVERAGE_STEPS_1_11.md). The complete CAPEv2/QEMU/VM/INetSim deployment and portability release gates **remain incomplete**. Historical sections below retain their original step-time understanding; do not interpret them as current status.
+
+
 The final target is a portable **three-command** workflow, derived from user-verified manual installation rather than guessed from an existing host.
 
 1. **Command 1:** Bootstrap necessary dependencies and deploy CAPEv2 with the first Windows analysis VM.
