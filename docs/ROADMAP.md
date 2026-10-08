@@ -123,3 +123,10 @@ The completed read-only alias review in [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_RE
 - **Power mask policy:** Four persistent sleep/suspend/hibernate masks affect every login. Their restoration may be appropriate for normal workstation usage, but it must follow admin-approved baseline policy and a reviewed change plan; do not leave them disabled solely for CAPE by assumption, or unmask them blindly.
 - **Malware boundary:** Do not run live samples on the shared college host or default NAT; require a college-approved dedicated or explicitly segregated analysis environment, verified negative guest egress and isolation, and no risk to student/LAN resources.
 - Update future three-command installer preflight to detect/ask about **shared-host designation, multiuser sessions, authorization, existing workloads, rollback/reboot impact and power-management policy**, and fail closed if constraints cannot be met. [Step 7F context](STEP7F_POWER_POLICY.md).
+
+## CAPEv2 installation permission clarified on shared SSL-55 (2026-10-09)
+
+- User states CAPEv2 installation under **`charan`** is permitted at the college, with prior CAPEv2 installations on other machines. **Continue** the canonical manual CAPEv2 installation/evidence workflow on SSL-55; shared student logins do not automatically bar installation. Do not repeatedly ask whether CAPEv2 installation itself is permitted.
+- **Separate blast-radius gates:** Assess existing users/processes and coordinate host-wide power, reboot, service, and network changes; do not change all four masks or run disruptive upstream `kvm-qemu.sh all` again without reviewed impact. No claim that such disruptions are authorized by the installation permission alone.
+- **Malware-analysis gate:** The existing transient `default` libvirt network is NAT and not malware-safe. No live malware on SSL-55/college LAN until institution-approved containment and negative IPv4/IPv6 egress tests, preferably on a dedicated host, are independently verified.
+- Preserve the existing Step 7F diagnostic outcome and continue toward the three-command portable installer, which must ask/detect shared-machine constraints on future hosts.
