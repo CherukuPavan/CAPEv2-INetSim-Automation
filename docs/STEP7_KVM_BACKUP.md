@@ -60,3 +60,7 @@ The source remained `root:root` mode `0644`. Read-only `modprobe --showconfig` c
 - [STEP7_FINAL_DIAGNOSTICS.md](STEP7_FINAL_DIAGNOSTICS.md) — prior runtime/network findings.
 - [STEP7_POSTBUILD_AUDIT.md](STEP7_POSTBUILD_AUDIT.md) — working libvirt/QEMU baseline and host safety concerns.
 - [PORTABILITY.md](PORTABILITY.md) — fresh-machine acceptance gates.
+
+## Step 7E — Post-correction effective policy confirmed (2026-10-09)
+
+Later user-run [Step 7E evidence](STEP7E_KVM_POLICY.md) confirmed `modprobe --showconfig` parsing PASSED, and `kvm_intel`/`kvm` remain loaded for the running kernel. The valid `blacklist kvm` is still effective, with `ignore_msrs=Y` and `report_ignored_msrs=N` options defined separately in `kvm.conf`. Regular and blacklist-aware dry runs succeeded. **No reboot or module reload was performed; do not reinterpret these results as verified future boot autoload.** This update is diagnostic, not authorization to change the blacklist.
