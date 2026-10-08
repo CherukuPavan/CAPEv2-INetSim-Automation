@@ -15,18 +15,27 @@ Modes:
   plan-prereqs            Read-only missing-package plan.
   apply-prereqs           Explicitly install only known-safe missing base packages.
   bootstrap-source        Fresh-host Git clone, or verify existing owned checkout.
+  plan-virt               Read-only distro virtualization package preflight (Steps 6-9).
+  apply-virt              Controlled distro QEMU/libvirt install (not custom build).
+  plan-optionals          Inspect CAPE service-account optional dependencies.
+  apply-optionals         Explicit, lockfile-gated optional dependency install.
   coverage                Show human-reviewed automation coverage/status documentation.
 
 Examples:
   bash scripts/command1_pre_vm.sh audit
   bash scripts/command1_pre_vm.sh plan-prereqs
+  bash scripts/command1_pre_vm.sh plan-virt
+  bash scripts/command1_pre_vm.sh plan-optionals
+  # Explicit application commands require user review:
+  bash scripts/command1_pre_vm.sh apply-virt
+  bash scripts/command1_pre_vm.sh apply-optionals --expected-sha256 <SHA>
   bash scripts/command1_pre_vm.sh apply-prereqs
   bash scripts/command1_pre_vm.sh bootstrap-source --revision <SHA40>
 
 This PARTIAL command implements only verified, low-risk portions of Steps 1-11.
 It WILL NOT silently run kvm-qemu.sh all, cape2.sh base, make ACPI changes,
 edit sysctl/GRUB/modprobe, alter host networking, create VM guests, reset
-services, start malware or install optional packages into a wrong account.
+services, start malware or silently install optional packages into the wrong account.
 See docs/AUTOMATION_COVERAGE_STEPS_1_11.md for gaps and release gates.
 HELP
 }
@@ -55,6 +64,20 @@ case "$MODE" in
     ;;
   bootstrap-source)
     exec bash "$HERE/bootstrap_cape_source.sh" "$@"
+    ;;
+  plan-virt)
+    exec bash "$HERE/bootstrap_virtualization_stack.sh" --plan "$@"
+    ;;
+  apply-virt)
+    exec bash "$HERE/bootstrap_virtualization_stack.sh" --apply "$@"
+    ;;
+  plan-optionals)
+    command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
+    exec python3 "$HERE/install_cape_optional_deps.py" --mode plan "$@"
+    ;;
+  apply-optionals)
+    command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
+    exec python3 "$HERE/install_cape_optional_deps.py" --mode apply "$@"
     ;;
   coverage)
     (($# == 0)) || { usage >&2; exit 2; }
