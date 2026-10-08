@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Read-only host outbound-interface discovery for CAPEv2 deployment preflight.
 
-No network packets are sent, no commands or config files are modified, and
-this NEVER authorizes an analysis VM to use the host uplink.
+No network packets are sent; no networking settings are modified. A private
+report file may be created if requested. NEVER authorizes guest uplink access.
 """
 import argparse
 import ipaddress
 import json
+import os
 import re
 import subprocess
 import sys
@@ -150,7 +151,8 @@ def main():
     print(out)
     if args.report:
         try:
-            with open(args.report, 'x', encoding='utf-8') as f:
+            fd = os.open(args.report, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
                 f.write(out + '\n')
         except OSError:
             print('Cannot create requested report without overwriting', file=sys.stderr)
