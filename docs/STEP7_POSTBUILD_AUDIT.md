@@ -36,9 +36,11 @@ This is user-run read-only evidence, not commands executed by the assistant. The
 - Verified source file hashes (Git blob) in the repository: auditor `209b7297e03222f5969e6e644e8a72bb68880799`; tests `6c07c0cd125152ed4d8bdce6a086101a8a8c73f3`. The committed files match those tested locally.
 - No claim of guest network isolation, fresh-Ubuntu compatibility, Windows VM bootability or overall CAPEv2/INetSim deployment is warranted.
 
-## Suggested next user-led step
+## Follow-up completed — final diagnostic report supplied
 
-Gather a **read-only targeted report** of the network XML/bridge and remaining settings before manual repairs:
+The user subsequently supplied the requested read-only network XML/bridge/routing, groups, modprobe, sysctl and power-target diagnostics. **Those checks are now recorded in [STEP7_FINAL_DIAGNOSTICS.md](STEP7_FINAL_DIAGNOSTICS.md).** It confirms that the libvirt default network has `<forward mode='nat'>`; the two host default routes have different metrics; SYN cookies are persistently disabled; group membership exists in the account database but not in the existing session; and the KVM module policy file is malformed. These results do **not** establish guest containment or reboot survivability.
+
+The commands originally requested, retained for historical context, were:
 - `sudo virsh -c qemu:///system net-info default`
 - `sudo virsh -c qemu:///system net-dumpxml default`
 - `ip -br link`, `ip -4 -br addr show virbr0` (if present), `ip -4 route`
