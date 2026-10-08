@@ -1,6 +1,6 @@
 # Step 7C — SSL-55 SYN-cookie sysctl identity review
 
-**Date:** 2026-10-09. **Input:** User-uploaded `SSL55_Step7C_SysctlReview_DeiDOi9A.txt` (32 physical lines, 33 indexed lines). **Result:** read-only inspection COMPLETE; configuration **NOT YET CHANGED**. Do not commit the raw report with host identities.
+**Step 7C historical observation (2026-10-09):** User-uploaded `SSL55_Step7C_SysctlReview_DeiDOi9A.txt` (32 physical lines, 33 indexed lines) confirmed a disabled setting and linked paths **before** the repair. **CURRENT STATUS: Step 7D successfully executed and verified later the same day.** The baseline `0` findings below are historical evidence, not the current known host setting. Do not commit raw host-specific reports.
 
 ## Verified evidence
 
@@ -10,6 +10,16 @@
 - Both names resolve to **`/etc/sysctl.conf`**; `stat -L` reported device `66306`, inode `56754617` for both paths. **This is one underlying file, not two independent sysctl definitions.**
 - The recursive grep printed two identical matches only because it traversed both names. Do **not** change both names independently, break/recreate the symlink, or append extra duplicate settings.
 - No other setting was found in the directories queried by that user's command (`/etc/sysctl.conf`, `/etc/sysctl.d`, `/usr/lib/sysctl.d`, `/run/sysctl.d`). This report alone does not prove every possible config source or future policy override has been inspected.
+
+## Step 7D — Successful correction verified (2026-10-09)
+
+- **Input:** User-supplied `SSL55_Step7D_SynCookies_20261009_032549_1d5Iozfo.txt` (17 lines); this is **post-change terminal evidence**, not an assistant-driven host operation.
+- **Historical note:** The first `bash <<'BASH'` confirmation attempt was cancelled without modification. The corrected saved-script approach subsequently completed successfully.
+- **Verified preflight and backup:** `Preflight: PASSED`, `Configuration sources: PASSED`, a protected canonical `/etc/sysctl.conf` backup under `/root/SSL55_Sysctl_Backup_JKE7DZRE/sysctl.conf` with matching SHA-256 `8ee4db587d87f7377768678f2c93a68bdd624fa311b29e9b9a838e2d32d83749` for original and backup, followed by `Backup verification: PASSED`.
+- **Exact authorized change:** Only the canonical `net.ipv4.tcp_syncookies` assignment at line 77 changed from `0` to `1`. The script compared the full edited file to an expected transformation of the backup, preserved `root:root 0644`, and checked that the original sysctl symlink still resolved to the canonical source. `Persistent configuration: PASSED`.
+- **Verified runtime:** `sudo sysctl -w net.ipv4.tcp_syncookies=1` followed by read-back equals `1`; the report shows `Runtime configuration: PASSED` and `STEP 7D SUCCESS`. No reboot or service restart occurred.
+- **Acceptance:** **Step 7D successful: current active setting = `1`, persistent configuration verified = `1`.** Post-reboot reapplication remains unverified. Do not claim the separate KVM module blacklist, host power masks, hypervisor persistence or NAT guest isolation have been repaired.
+- **Automation portability:** The existing read-only `audit_sysctl_alias.py` had 15 passed synthetic tests including `value=1` and linked-file checks; no run of that module against the changed SSL-55 host was reported. The future installation workflow must discover real system policy, check alias/precedence, apply one approved key-only change and confirm both persistent and live states. Never copy SSL-55's device/inode or line number to a fresh host.
 
 ## Security and correction intent
 
