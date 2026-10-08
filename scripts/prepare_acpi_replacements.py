@@ -28,6 +28,9 @@ DEVICE_VARS = tuple(x for x in VARS if x != 'BXPC_REPLACER')
 ASSIGNMENT = re.compile(r"^(?P<key>[A-Z][A-Z0-9_]*)='(?P<value>[^'\r\n]*)'$", re.M)
 SAFE_VALUE = re.compile(r'^[A-Za-z0-9]{2,8}$')
 DEFAULT_DSDT = '/sys/firmware/acpi/tables/DSDT'
+# Known generic/virtual identifier tokens cannot establish genuine host hardware
+# provenance, even when their length fits the four-byte BXPC replacement.
+REJECTED_GENERIC_IDS = frozenset({'PNP0', 'QEMU', 'BXPC', 'VBOX', 'ACPI'})
 
 class Refusal(Exception):
     pass
@@ -65,6 +68,10 @@ def bxpc_candidate(fields):
     choices = set(candidates.values())
     if not choices:
         die('Neither DSDT OEM field is an exact 4-character ASCII identifier; manual review required')
+    generic = {name: value for name, value in candidates.items()
+               if value.upper() in REJECTED_GENERIC_IDS}
+    if generic:
+        die(f'Generic/virtual ACPI identifier is not reliable hardware provenance: {generic}; manual review required')
     if len(choices) > 1:
         die(f'Conflicting 4-character ACPI candidates {candidates}; manual review required')
     return choices.pop(), list(candidates)
