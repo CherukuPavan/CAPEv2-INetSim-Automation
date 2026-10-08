@@ -287,6 +287,17 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Correction to the *procedure*:** Use an explicit controlling terminal for interactive confirmation (`read ... </dev/tty`) and preferably write a privately permissioned temporary script with a heredoc, validate it using `bash -n`, then execute that saved script so it does not consume its own source as stdin. Keep all Step 7C alias/inode/metadata guards, a root-only backup, exact line diff and one-key-only `sysctl -w`. Do not blindly rerun a partially applied remediation; confirm state first.
 - **No automatic host edits** were performed by the assistant. Await a user-executed corrected procedure and TXT report before marking Step 7D passed.
 
+### Step 7D — Successful approved retry, TCP SYN-cookie protection enabled (2026-10-09)
+
+- **Source:** User-uploaded `SSL55_Step7D_SynCookies_20261009_032549_1d5Iozfo.txt` (17 lines). This is an **executed user-controlled manual correction**; the assistant did not execute commands on SSL-55. The earlier cancelled attempt remains recorded immediately above for chronology.
+- **Guarded preflight:** `Preflight: PASSED`, `Configuration sources: PASSED`; the approved script checked the observed SSL-55 canonical sysctl file identity/metadata, its `/etc/sysctl.d/99-sysctl.conf` symlink, the single original `net.ipv4.tcp_syncookies = 0` assignment, and the prior active kernel value.
+- **Protected backup:** `/root/SSL55_Sysctl_Backup_JKE7DZRE/sysctl.conf`. File and backup SHA-256 both `8ee4db587d87f7377768678f2c93a68bdd624fa311b29e9b9a838e2d32d83749`; script printed **`Backup verification: PASSED`** before applying the edit. Preserve this root-only backup; do not publish its full sysctl contents.
+- **Persistent change verified:** Script updated **only** line 77 of canonical `/etc/sysctl.conf`, from `net.ipv4.tcp_syncookies = 0` to `net.ipv4.tcp_syncookies = 1`, compared the modified file byte-for-byte against applying the same narrow edit to the backed-up original, checked `root:root 0644` and verified the sysctl symlink still targets `/etc/sysctl.conf`. Report prints `Persistent configuration: PASSED`.
+- **Runtime change verified:** Script executed single-key `sudo sysctl -w net.ipv4.tcp_syncookies=1` and verified `sysctl -n net.ipv4.tcp_syncookies` equals `1`; report prints `Runtime configuration: PASSED` and `STEP 7D SUCCESS`.
+- **Reboot/services:** Report says **no reboot or service restart**. Post-reboot persistence remains **untested**, though the current durable config and live setting were verified.
+- **Status: Step 7D PASSED.** The earlier disabled-SYN-cookie finding is **resolved for current verified state**. Still unresolved: valid `blacklist kvm` policy/autoload after restart; masked sleep targets; transient `default` libvirt NAT network; safe dedicated Windows/INetSim network and negative guest-isolation testing. No malware-execution readiness claim.
+- **Automation:** Current read-only [`scripts/audit_sysctl_alias.py`](../scripts/audit_sysctl_alias.py) includes synthetic tests of enabled and disabled settings but has **not** been run against the post-change SSL-55 host. Future authorized installer should capture equivalent protected backups, guarded one-key change, current-state verification and reboot checks, discovering paths/inodes afresh instead of hardcoding SSL-55.
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
