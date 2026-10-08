@@ -17,6 +17,7 @@ Modes:
   bootstrap-source        Fresh-host Git clone, or verify existing owned checkout.
   plan-virt               Read-only distro virtualization package preflight (Steps 6-9).
   apply-virt              Controlled distro QEMU/libvirt install (not custom build).
+  audit-installers        Static risk audit of local upstream installer scripts.
   plan-optionals          Inspect CAPE service-account optional dependencies.
   apply-optionals         Explicit, lockfile-gated optional dependency install.
   coverage                Show human-reviewed automation coverage/status documentation.
@@ -70,6 +71,17 @@ case "$MODE" in
     ;;
   apply-virt)
     exec bash "$HERE/bootstrap_virtualization_stack.sh" --apply "$@"
+    ;;
+  audit-installers)
+    (($# == 0)) || { usage >&2; exit 2; }
+    command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
+    SOURCE="${HOME:?}/CAPEv2/installer"
+    OUT=$(mktemp "${HOME}/CAPEv2_InstallerRisk_$(date +%Y%m%d_%H%M%S)_XXXXXXXX.json")
+    rm -f -- "$OUT"
+    exec python3 "$HERE/audit_upstream_installers.py" \
+      --kvm "$SOURCE/kvm-qemu.sh" \
+      --cape "$SOURCE/cape2.sh" \
+      --report "$OUT"
     ;;
   plan-optionals)
     command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
