@@ -85,11 +85,13 @@ case "$MODE" in
     ;;
   plan-optionals)
     command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
-    exec python3 "$HERE/install_cape_optional_deps.py" --mode plan "$@"
+    REPORT="${HOME:?}/CAPEv2_OptionalPlan_$(date +%Y%m%d_%H%M%S)_$_R.json"
+    exec python3 "$HERE/install_cape_optional_deps.py" --mode plan --report "$REPORT" "$@"
     ;;
   apply-optionals)
     command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
-    exec python3 "$HERE/install_cape_optional_deps.py" --mode apply "$@"
+    REPORT="${HOME:?}/CAPEv2_OptionalApply_$(date +%Y%m%d_%H%M%S)_$_R.json"
+    exec python3 "$HERE/install_cape_optional_deps.py" --mode apply --report "$REPORT" "$@"
     ;;
   coverage)
     (($# == 0)) || { usage >&2; exit 2; }
