@@ -33,7 +33,38 @@ bash scripts/command1_pre_vm.sh plan-prereqs
 # bash scripts/command1_pre_vm.sh bootstrap-source --revision FULL_SHA40
 ```
 
-Each audit/plan saves one private TXT report in the user's home. Inspect reports
+## Expanded automation modules (added after Step 11D review)
+
+The partial Command-1 entrypoint also provides these modes:
+
+```bash
+bash scripts/command1_pre_vm.sh plan-virt
+bash scripts/command1_pre_vm.sh audit-installers
+bash scripts/command1_pre_vm.sh plan-optionals
+```
+
+- `plan-virt` evaluates a conservative distro QEMU/libvirt/virt-manager
+  installation on Ubuntu 24.04. `apply-virt` explicitly installs only missing
+  packages **if** no source-managed custom builds or APT removals/upgrades
+  conflict. This is not a substitute for verifying CAPE/QEMU compatibility.
+- `audit-installers` scans the locally edited upstream `kvm-qemu.sh`
+  and `cape2.sh` for dangerous host-policy actions **without executing either**
+  and produces a private JSON report.
+- `plan-optionals` detects dependencies under the **actual** `cape` service
+  account using the correct Poetry interpreter. `apply-optionals` is
+  explicitly gated: it verifies the requirements SHA-256, runs pip
+  `--dry-run` first, blocks core `poetry.lock` conflicts, and then uses
+  the service-account interpreter. Do not run it without reviewing the plan.
+  An install can still fail or leave partial pip changes.
+
+**Still not implemented:** safe idempotent end-to-end replacements for the
+custom QEMU/SeaBIOS/libvirt source build and the host-wide CAPE `base`
+installer. The new code does not silently invoke either risky upstream
+installer. Those two substantial gaps—and real-machine testing—prevent a
+claim that Steps 1–11 are fully automatable on a fresh Ubuntu host today.
+See [the detailed coverage ledger](docs/AUTOMATION_COVERAGE_STEPS_1_11.md).
+
+Plan/audit modules either create a private report or print a sanitized summary; review for sensitive data before sharing. Inspect reports
 for sensitive site values before uploading. Use `sudo -v` separately if
 you need `audit` to inspect the `cape` service account's Python venv;
 noninteractive permission failure is reported as **UNKNOWN**, not a broken
