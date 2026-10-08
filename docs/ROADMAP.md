@@ -72,5 +72,11 @@ The initial `scripts/check_host_virtualization.sh` is deliberately **read-only**
 ## Step 7A — Verified KVM configuration backup (2026-10-09)
 
 - User made a protected root-only backup of `/etc/modprobe.d/blacklist-kvm.conf`; `cmp` and matching SHA-256 confirm it matches the 37-byte original. Modules `kvm_intel`/`kvm` remained loaded. The first line `-e blacklist kvm_intel` is malformed, while `blacklist kvm` is a **separate valid** directive.
-- A **guarded manual first-line correction is proposed but has not been executed**: require source/backup hash and byte-for-byte match, comment only the malformed line, retain the valid blacklist pending policy review, verify result and modprobe parser. Do not restart/reboot.
+- **Step 7B correction is now user-executed and verified:** the protected source/backup preflight passed, only the malformed first line was commented, valid `blacklist kvm` preserved, `root:root 0644` verified and `modprobe --showconfig` parsing passed without warnings. Loaded KVM modules remained present. **No reboot/module reload; blacklist policy review remains pending.**
 - See [STEP7_KVM_BACKUP.md](STEP7_KVM_BACKUP.md). Future portable installer must inspect machine-specific policy rather than hardcode SSL-55's backup, SHA or blacklist assumptions.
+
+## Step 7B — KVM syntax repair verified (2026-10-09)
+
+- User's report `SSL55_Step7B_KVM_Correction_2icT1bAB.txt` shows guarded precheck, exact first-line fix, unchanged `blacklist kvm`, `root:root 0644`, successful modprobe parse and loaded `kvm`/`kvm_intel`. **Step 7B complete; wider Step 7 host acceptance remains open.**
+- New read-only KVM modprobe policy checker [`scripts/audit_kvm_modprobe.py`](../scripts/audit_kvm_modprobe.py) and [14 synthetic tests](../scripts/test_audit_kvm_modprobe.py) committed, hashes matching tested files. It correctly refuses to treat valid KVM blacklisting as automatically approved, and never edits configs or certifies post-reboot loading.
+- Next independent blockers: inspect the remaining valid blacklist against intended admin policy, restore SYN-cookie protections with a verified sysctl alias/precedence plan, review masked sleep targets, and use a dedicated isolated analysis network rather than existing transient NAT default. See [STEP7_KVM_BACKUP.md](STEP7_KVM_BACKUP.md).
