@@ -84,9 +84,17 @@ See [ACPI_REPLACEMENTS.md](ACPI_REPLACEMENTS.md). The manual SSL-55 substitution
 
 **2026-10-09 supplementary examples:** The supplied screenshots confirm variable-length DSDT fields (`Custom` is six characters), generic `PNP0` hardware IDs, and different four-character OEM ID/Table ID values (`DELL` versus `CBX3`) on some Dell models. The early draft rejects generic/virtual four-character markers and stops on competing candidates instead of inventing precedence. Five regression cases were added; selector rules passed nine targeted synthetic cases. This **does not** complete automatic hardware-profile discovery or establish fresh-machine support. See [ACPI_REPLACEMENTS.md](ACPI_REPLACEMENTS.md).
 
+## Step 6 — libvirt host and network portability warning
+
+See [LIBVIRT_NETWORK_STEP6.md](LIBVIRT_NETWORK_STEP6.md) for the complete manual evidence and verified upstream configuration variable uses. The standard libvirt `default` network is NAT, **not** isolated malware traffic; CAPE analysis Windows guests and INetSim must use a separately verified isolated network with guest-negative connectivity checks. Do **not** auto-start, auto-destroy, or auto-reconfigure an unrelated default network, or allow libvirt XML alone to satisfy the release gate. Unknown `INTERNET_IFACE` values like the observed `eno1` must be flagged; discover interfaces and default routes on the actual host rather than hardcoding them.
+
+Check/repair missing or unsuitable libvirt packages only as part of an authorized installer after APT source/OS and version/conflict audits. SSL-55's APT lists mixed `noble` and `focal` repositories and a malformed KVM module configuration, requiring diagnosis before sensitive virtualization operations. Protect passwords supplied in installer settings: never include them in source control, logs, shell history or diagnostics; rotate any exposed value.
+
+The read-only [`scripts/audit_libvirt_cape_network.py`](../scripts/audit_libvirt_cape_network.py) is a **draft** with 11 synthetic tests passing; it never certifies live malware safety. Fresh Ubuntu, SSL-55, kernel, firewall and guest tests are pending.
+
 ## Current status
 
-- Steps 1–5 (host inventory, `cpu-checker`, KVM, Git/CAPEv2 source clone, and ACPI inspection + nine-variable installer edit) have user-supplied terminal evidence.
+- Steps 1–6 (host checks, packages, Git/CAPEv2 source, ACPI source edit, libvirt install and CAPE settings) have user-supplied terminal evidence.
 - The existing host/KVM script is read-only and remains an unverified draft on SSL-55.
 - `scripts/bootstrap_cape_source.sh` is a separate **installer draft**: it bootstraps a missing Git package on an Ubuntu host, clones with normal user privileges, checks Git origin and HEAD and rejects unexpected pre-existing state. Its unit-like tests used a synthetic Git repository with simulated Ubuntu metadata, **not** SSL-55 or a verified clean Ubuntu test host. The missing-Git APT path remains untested.
 - The original SSL-55 `sudo git clone` may produce a root-owned checkout. Future automation will not assume user ownership or silently change it.
