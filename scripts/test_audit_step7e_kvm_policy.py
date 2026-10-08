@@ -77,5 +77,4 @@ class Step7EReportTests(unittest.TestCase):
         text=SAMPLE.replace('kvm_intel             540672  0','kvm_amd             540672  0').replace('Testing: kvm_intel','Testing: kvm_amd').replace('kvm-intel.ko.zst','kvm-amd.ko.zst')
         self.assertEqual(analyze(text)['status'], 'BASIC_KVM_CHECKS_PASS_POLICY_REVIEW')
 
-if __name__ == '__main__':
-    unittest.main(verbosity=2)
+if __name__ == '__main__': unittest.main(verbosity=2)
