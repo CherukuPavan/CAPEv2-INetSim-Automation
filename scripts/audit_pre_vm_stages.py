@@ -88,6 +88,40 @@ def apt_release_mix() -> str:
     return ",".join(sorted(found)) if found else "unknown"
 
 
+
+# Historical installer error signatures from verified SSL-55 manual steps.
+# Only report presence/absence; never copy lines or secrets into the report.
+LOG_SIGNATURES = {
+    "cape2-base.log": (
+        ("dnspython uninstall metadata", r"Cannot uninstall dnspython"),
+        ("missing optional env glob", r"cannot stat.*conf/default/\\*\\.env"),
+        ("Suricata service start", r"Job for suricata\\.service failed"),
+        ("package alternatives warning", r"update-alternatives: error: no alternatives for upx"),
+    ),
+    "kvm-qemu-all.log": (
+        ("pip uninstall conflict", r"(?i)(cannot uninstall|RECORD file not found)"),
+        ("firmware package overwrite", r"(?i)(force-overwrite|trying to overwrite)"),
+        ("malformed modprobe syntax", r"(?i)(libkmod|blacklist-kvm\\.conf)"),
+    ),
+}
+
+
+def count_log_signatures(path: Path, checks: tuple[tuple[str, str], ...]) -> dict[str, int] | None:
+    """Stream log without returning sensitive text. Large files capped at 20 MiB."""
+    try:
+        if not path.is_file() or path.stat().st_size > 20 * 1024 * 1024:
+            return None
+        patterns = [(name, re.compile(pattern)) for name, pattern in checks]
+        found = {name: 0 for name, _ in patterns}
+        with path.open(encoding="utf-8", errors="replace") as stream:
+            for line in stream:
+                for name, pattern in patterns:
+                    if pattern.search(line):
+                        found[name] += 1
+        return found
+    except (OSError, UnicodeError):
+        return None
+
 class Audit:
     def __init__(self) -> None:
         self.rows: list[tuple[str, str, str, str]] = []
@@ -209,6 +243,31 @@ class Audit:
         rc, pg = run(["pg_isready", "-h", "127.0.0.1", "-p", "5432"])
         self.add("10", "PostgreSQL readiness", "PASS" if rc == 0 else "PENDING",
                  "accepting local connections" if rc == 0 else "not confirmed")
+        # Historical logs are indicators, not proof that the current failure persists.
+        historical = {
+            "cape2-base.log": [Path.home() / "cape2-base.log"],
+            "kvm-qemu-all.log": [Path.home() / "CAPEv2/installer/kvm-qemu-all.log",
+                                Path.home() / "kvm-qemu-all.log"],
+        }
+        for name, locations in historical.items():
+            current = next((p for p in locations if p.is_file()), None)
+            if current is None:
+                self.add("10" if name.startswith("cape2") else "07",
+                         "Historical installer log", "UNKNOWN", name + " not found at known locations")
+                continue
+            matches = count_log_signatures(current, LOG_SIGNATURES[name])
+            if matches is None:
+                self.add("10" if name.startswith("cape2") else "07",
+                         "Historical installer log", "UNKNOWN", name + " not safely readable")
+                continue
+            for label, hits in matches.items():
+                self.add("10" if name.startswith("cape2") else "07",
+                         "Log signature: " + label, "WARN" if hits else "PASS",
+                         "historical matches=" + str(hits) + " (not necessarily current)")
+        rc, packaged_poetry = run(["poetry", "--version"])
+        version = re.search(r"Poetry \\(version ([0-9]+(?:\\.[0-9]+)+)\\)", packaged_poetry)
+        self.add("11", "Invoking-user Poetry", "PASS" if rc == 0 and version else "UNKNOWN",
+                 "version=" + version.group(1) if rc == 0 and version else "unavailable")
         self.add("11", "Poetry binary for cape", "PASS" if Path("/etc/poetry/bin/poetry").is_file() else "PENDING",
                  "present" if Path("/etc/poetry/bin/poetry").is_file() else "not found")
         self.check_cape_venv()
