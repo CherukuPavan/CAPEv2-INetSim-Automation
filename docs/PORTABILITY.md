@@ -92,6 +92,14 @@ Check/repair missing or unsuitable libvirt packages only as part of an authorize
 
 The read-only [`scripts/audit_libvirt_cape_network.py`](../scripts/audit_libvirt_cape_network.py) is a **draft** with 11 synthetic tests passing; it never certifies live malware safety. Fresh Ubuntu, SSL-55, kernel, firewall and guest tests are pending.
 
+## Dynamic networking adjustment after Step 6 (2026-10-09)
+
+The user corrected the previously hardcoded/nonexistent `INTERNET_IFACE=eno1` to `INTERNET_IFACE=enp0s31f6` on SSL-55 after verifying that the IPv4 route to `1.1.1.1` selects the Ethernet interface. This is **route selection evidence only**, not confirmed Internet connectivity or guest isolation. See [DYNAMIC_NETWORK_DISCOVERY.md](DYNAMIC_NETWORK_DISCOVERY.md).
+
+Our [read-only route detector](../scripts/discover_host_uplink.py) now validates destination-specific routes, host interface state and IPv4 source, multiple default route entries, policy routing, VPN/virtual links and conflicting operator override. **19 synthetic tests passed** and the files committed on `development` match the tested Git blobs. It does not install packages or change SSL-55. A fresh-machine bootstrap must check `python3`, `iproute2` and virtualization dependencies as required, installing only missing supported components once authorized.
+
+**Not yet implemented:** Dynamic selection/provisioning of the final non-NAT libvirt analysis network, guest-facing `NETWORK_IFACE`/`IFACE_IP` mapping, and guest isolation/INetSim verification. These must be designed from verified manual steps, executed safely, and tested before release; simply detecting a working host uplink never grants malware guests external access.
+
 ## Current status
 
 - Steps 1–6 (host checks, packages, Git/CAPEv2 source, ACPI source edit, libvirt install and CAPE settings) have user-supplied terminal evidence.
