@@ -150,3 +150,11 @@ The SSL-55 read-only report proves that the two paths `/etc/sysctl.conf` and `/e
 A proposed correction to `1` must be approved and limited to one guarded canonical-file edit with checksum/backup, preserved ownership/mode, restored setting and exact runtime `sysctl -w` for this key alone. Do not run wholesale `sysctl --system` on machines with mixed or unsafe unrelated settings, overwrite administrator policy, break links, or imply reboot readiness from one corrected sysctl.
 
 New [read-only symlink-aware audit](../scripts/audit_sysctl_alias.py) and [15 synthetic tests](../scripts/test_audit_sysctl_alias.py) committed and hash-verified; **not** executed on SSL-55. On different hosts, discover the actual effective sysctl source hierarchy: do not assume Ubuntu alias, file line 77 or SSL-55 values. See [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_REVIEW.md).
+
+## Step 7D — Successful guarded SYN-cookie correction (2026-10-09)
+
+The user supplied an executed follow-up report verifying that Step 7D **passed**: a protected root-only canonical sysctl backup with matching SHA-256, confirmed symlink/source identity, one narrowly scoped edit of `net.ipv4.tcp_syncookies` from `0` to `1`, verified unchanged unrelated contents and file permissions, and read-back of active `net.ipv4.tcp_syncookies=1`. No system-wide `sysctl --system`, reboot or service restart. See [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_REVIEW.md).
+
+This fixes the **current** SYN-cookie protection setting and the persistent file (reboot survival not yet tested). The initial cancelled approval attempt remains documented as a distinct prior event, not the current state.
+
+**Portability requirement:** Different machines may not use SSL-55's exact sysctl file, inode, alias, line number or source precedence. The final installer must inspect runtime and persistent effective values, backup/verify canonical sources, refuse conflicting independent assignments, and apply only approved precise values rather than copying hardcoded paths/inodes from the reference machine. `scripts/audit_sysctl_alias.py` is currently **read-only**, with 15 prior synthetic tests; complete automated remediation and cross-machine validation remain pending. KVM blacklist, power management and dedicated isolated guest network are separate release gates.
