@@ -26,3 +26,6 @@ Distinguish **user reported**, **log verified**, **inferred**, and **not verifie
 - Secure guest networking: no accidental routable internet or corporate LAN path. Validate isolation, not merely configuration.
 - Keep all diagnostic output in consolidated report files when practical.
 - Prior rolled-back QEMU/libvirt installation steps are **historical, not an approved manual build**.
+
+## Fresh-host portability contract
+Every automation module must follow [PORTABILITY.md](PORTABILITY.md): discover required dependencies and versions, reuse compatible existing installations, provision missing supported components **during the authorized installer stage**, then test the actual result. A read-only preflight must **not** install or change anything. Do not assume a package exists because it was present on SSL-55. Stop safely when prerequisites cannot be met; preserve unrelated services and network isolation. Cross-machine deployment success requires tests on independent fresh supported Ubuntu hosts.
