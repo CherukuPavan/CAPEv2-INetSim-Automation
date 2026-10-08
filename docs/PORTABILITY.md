@@ -116,3 +116,11 @@ The upstream source installer uses `SUDO_USER` as its target username; its posit
 The user-supplied Step 7 log shows a QEMU/SeaBIOS/libvirt build with several unresolved package and configuration errors. On a fresh host, a safe installer must check existing package ownership and compatible versions before changing system components. It must not blindly repeat source-installer operations, overwrite distro-owned firmware, globally override Python packages, or change boot and service policies without review.
 
 Use isolated, testable build stages with captured exit statuses, dependency checks, configuration backups and post-install functionality checks. The read-only audit module and tests are linked in [KVM_QEMU_STEP7.md](KVM_QEMU_STEP7.md). The current log is not evidence of a fully verified deployment.
+
+## Step 7 verified host state and persistence requirements
+
+The user-generated post-build report establishes that source-installed QEMU/libvirt can function even when `libvirt-clients` and `libvirt-daemon-system` are absent as Ubuntu packages. Prefer **functional checks plus executable/library/package provenance**, not just `dpkg-query` existence. An active monolithic `libvirtd` service can also legitimately coexist with inactive modular daemons.
+
+The report also exposes **a transient/non-autostart libvirt network**, **account groups listed in the database but not in the current login session**, a **malformed KVM modprobe file and a separate blacklist directive**, disabled TCP SYN cookies, masked sleep/suspend targets and a pending reboot. These are critical post-install invariants for a fresh host. Detect and report unsafe or nonpersistent state, but never automatically destroy/restart networks, remove blacklists, unmask host sleep policy, modify security sysctls or reboot without a separately reviewed and authorized change plan.
+
+See [STEP7_POSTBUILD_AUDIT.md](STEP7_POSTBUILD_AUDIT.md). Read-only post-build parser [`scripts/audit_step7_postbuild.py`](../scripts/audit_step7_postbuild.py) has **14 passing synthetic tests** and classified the report as `REVIEW_REQUIRED`. Real guest networking and reboot survivability remain untested.
