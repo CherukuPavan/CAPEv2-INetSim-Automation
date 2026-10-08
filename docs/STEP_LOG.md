@@ -335,6 +335,15 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Release gate and design:** [LIVE_MALWARE_CONTAINMENT_POLICY.md](LIVE_MALWARE_CONTAINMENT_POLICY.md) describes required approvals, separate INetSim guest, nonforwarding virtual network, Windows NIC restrictions, independent host firewall/routing inspection, guest negative IPv4/IPv6 reachability tests, snapshots and incident handling. The final 3-command automation must block live samples until all gates pass.
 - **No host change:** This is a documentation and planning update only; Step 7F power masks remain unchanged, and post-reboot KVM readiness remains untested.
 
+### Step 8 — Virt-Manager binary/version found; standalone installer not needed (2026-10-09)
+
+- **User-run read-only evidence:** `SSL55_Step8_VirtManager_Check_3j94rYZv.txt` (18 physical lines / 19 indexed). `command -v virt-manager` returned `/usr/local/bin/virt-manager`; `virt-manager --version` returned `5.1.0`; `libvirtd.service` reported `active`.
+- `dpkg-query` found **no Ubuntu `virt-manager` package** and **no `ubuntu-desktop` metapackage**. This is consistent with a **non-dpkg (likely source) installation** in `/usr/local`; it does **not** mean the executable is absent. Do not assume that a missing metapackage proves the machine has no graphical desktop; the metapackage is not necessary for all desktop setups.
+- The upstream `installer/kvm-qemu.sh all` branch conditionally invokes `install_virt_manager` only if `dpkg -l` finds `ubuntu-desktop` (in inspected upstream blob `23b7eaa30bdd13bd9347098fe0d46204550b86f9`); the standalone `virtmanager` case invokes a **source/build installation** and includes system-wide schema/service changes, and the script masks sleep targets at top level even before dispatch.
+- **Decision:** **SKIP** proposed `sudo ./kvm-qemu.sh virtmanager charan 2>&1 | tee ~/kvm-qemu-virtmanager.log`. It is unnecessary given the present working executable/version and could repeat invasive steps on the shared college host. No package installation or source installer was rerun.
+- **Verification limit:** Binary runs with `--version`, but actual Virt-Manager **GUI launch and connection to `qemu:///system` from the current user's graphical login are NOT yet verified**. Next safe manual step: user launches the existing GUI as their **normal account (not sudo)** and confirms libvirt system connection; if it fails, gather error output and diagnose narrowly before changing packages/groups. Do not create or connect a malware VM to existing `default` NAT.
+- **Automation portability:** Inspect `command -v`, `virt-manager --version`, GUI/display/session readiness and `virsh` libvirt access, and distinguish source installations from `dpkg` packages. Do not install or recompile merely because `dpkg-query` finds no `virt-manager` package. Source dependency version/provenance and GUI validation remain open.
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
