@@ -94,14 +94,14 @@ def apt_release_mix() -> str:
 LOG_SIGNATURES = {
     "cape2-base.log": (
         ("dnspython uninstall metadata", r"Cannot uninstall dnspython"),
-        ("missing optional env glob", r"cannot stat.*conf/default/\\*\\.env"),
-        ("Suricata service start", r"Job for suricata\\.service failed"),
+        ("missing optional env glob", r"cannot stat.*conf/default/\*\.env"),
+        ("Suricata service start", r"Job for suricata\.service failed"),
         ("package alternatives warning", r"update-alternatives: error: no alternatives for upx"),
     ),
     "kvm-qemu-all.log": (
         ("pip uninstall conflict", r"(?i)(cannot uninstall|RECORD file not found)"),
         ("firmware package overwrite", r"(?i)(force-overwrite|trying to overwrite)"),
-        ("malformed modprobe syntax", r"(?i)(libkmod|blacklist-kvm\\.conf)"),
+        ("malformed modprobe syntax", r"(?i)(libkmod|blacklist-kvm\.conf)"),
     ),
 }
 
@@ -265,7 +265,7 @@ class Audit:
                          "Log signature: " + label, "WARN" if hits else "PASS",
                          "historical matches=" + str(hits) + " (not necessarily current)")
         rc, packaged_poetry = run(["poetry", "--version"])
-        version = re.search(r"Poetry \\(version ([0-9]+(?:\\.[0-9]+)+)\\)", packaged_poetry)
+        version = re.search(r"Poetry \(version ([0-9]+(?:\.[0-9]+)+)\)", packaged_poetry)
         self.add("11", "Invoking-user Poetry", "PASS" if rc == 0 and version else "UNKNOWN",
                  "version=" + version.group(1) if rc == 0 and version else "unavailable")
         self.add("11", "Poetry binary for cape", "PASS" if Path("/etc/poetry/bin/poetry").is_file() else "PENDING",
