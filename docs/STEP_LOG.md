@@ -1,6 +1,6 @@
 # SSL-55 canonical manual installation log
 
-**Status:** Steps 1–4 reported with terminal evidence. CAPEv2 upstream **source checkout** was performed in Step 4; CAPEv2 runtime installation, Windows VMs and INetSim deployment remain unverified/not reported.
+**Status:** Steps 1–5 reported with terminal evidence. CAPEv2 upstream **source checkout** (Step 4) and local installer nine-variable edit (Step 5) were performed. CAPEv2 runtime installation, QEMU/SeaBIOS build, Windows VMs, and INetSim deployment remain unverified/not reported.
 
 **Evidence provenance:** The user supplied a terminal transcription on 2026-10-08. Commands were **not** independently executed by the assistant on SSL-55, and exact execution timestamps were not supplied. "Terminal-evidenced" below means supported by the supplied output, not separately re-tested. Exact site-specific private IP addresses are intentionally **redacted from this GitHub record**; the original user-provided transcript remains in the conversation.
 
@@ -125,10 +125,44 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Related automation:** `scripts/bootstrap_cape_source.sh` **draft**. It has an optional full-commit `--revision` pin, checks Git availability, installs missing Git with APT under explicit execution, clones as an unprivileged user, validates origin/HEAD on existing checkouts and refuses mismatches. This differs intentionally from the historical `sudo git clone` for safe fresh-host behavior.
 - **Automation testing evidence:** Bash syntax validation passed; local sandbox tests of cloning from a **synthetic repository** with a **simulated Ubuntu OS identity** passed for initial clone, second-run no-op, and safe refusal of origin/revision mismatches. **No SSL-55 test, actual upstream clone test or Git-missing installation test was performed**. Draft is not production-ready.
 
-## Automation status after Steps 1–4
+## Step 5 — ACPI firmware analysis and replace nine installer placeholders
+
+- **Reported date:** 2026-10-08 (exact execution time not independently established).
+- **Performed by:** User on SSL-55, terminal `charan@CSE-SSL-55`.
+- **Objective:** Extract DSDT firmware information and replace CAPEv2 installer QEMU/SeaBIOS identification placeholders using the selected host identifier.
+- **Exact manual commands as supported by terminal evidence:**
+  ```bash
+  cd ~/CAPEv2/installer
+  ls -lh
+  sudo apt install acpica-tools -y
+  sudo sh -c 'acpidump > acpidump.out'
+  sudo acpixtract -a acpidump.out
+  sudo iasl -d dsdt.dat
+  cat dsdt.dsl | grep "Hardware ID"
+  grep -n "OEM Table ID" dsdt.dsl
+  grep -n "DSDT" dsdt.dsl | head
+  sudo sed -i 's/<WOOT>/DELL/g' kvm-qemu.sh
+  grep -n "<WOOT>\\|DELL" kvm-qemu.sh
+  ```
+  The `sudo sed -i 's/<WOOT>/895C/g' kvm-qemu.sh` command supplied in the surrounding explanatory text is from an **older reference/example**, **not an observed SSL-55 terminal command**.
+- **GUI actions:** None reported.
+- **Packages:** APT newly installed `acpica-tools` version `20230628-1`. `0 upgraded, 1 newly installed, 0 removed, 192 not upgraded`; no `apt autoremove`.
+- **Existing local source evidence:** `installer/kvm-qemu.sh` was listed as ~57K and root-owned, consistent with Step 4 using `sudo git clone`.
+- **ACPI evidence:** `acpixtract` reported writing numerous ACPI tables, including `dsdt.dat` (652906 bytes). `iasl` produced `dsdt.dsl` (~4.7 MB), reported `DefinitionBlock ("", "DSDT", 2, "DELL  ", "Dell Inc", 0x00000002)`. This means **OEM ID = `DELL  `** and **OEM Table ID = `Dell Inc`**. The user's selected `DELL` was derived from the padded OEM ID, **not** the OEM Table ID. The many `_HID` entries (e.g. `PNP*`) are device IDs, not the DSDT OEM ID.
+- **Warnings:** iASL warned about unresolved external control methods, possible need for additional ACPI/SSDT files, and potential inability to recompile the resulting DSL. Disassembly still completed; do not report warning-free firmware compilation. APT reported 192 not upgraded, without a mandate for system-wide upgrade.
+- **Files/settings changed:** `acpica-tools` was installed; firmware dump `acpidump.out`, extracted `*.dat` and `dsdt.dsl` were generated inside the CAPEv2 installer directory; `kvm-qemu.sh` was changed in place by `sudo sed -i`. These dumps may contain sensitive firmware information. **No backup was shown before the manual sed**.
+- **Observed post-edit check:** Exactly the **nine named replacement assignments** appeared set to `DELL` at lines 116, 127, 130, 133, 136–138, 141 and 144, and the grep result showed **no remaining `<WOOT>`**. A `DELL` comment on line 140 was also returned. No original-file diff, exact source SHA, QEMU/SeaBIOS compilation, or guest behavior verification was supplied.
+- **Verification status:** **Terminal-evidenced PASS** for package installation, DSDT disassembly output, and nine-variable text modification; **with iASL warning and unverified runtime compatibility**. No evidence of QEMU/SeaBIOS installed or running merely from these commands.
+- **Technical caveat discovered via upstream source inspection:** The nine variables affect different QEMU/SeaBIOS identification surfaces. **Eight are disk/tablet/BIOS-related and cannot safely be inferred from an ACPI header alone**; the `BXPC` identifier is four characters and may accept an appropriate OEM candidate. A generic one-value-for-all shortcut (as in the historical PDF) is not a verified universal solution.
+- **Automation:** [`scripts/prepare_acpi_replacements.py`](../scripts/prepare_acpi_replacements.py), a **draft** with read-only default, raw binary DSDT header checks, fail-closed OEM selection, reviewed per-field profile requirement for non-ACPI variables, source hash pin, guarded diff, secure backup, idempotence checks, and atomic changes only with explicit `--apply`. Python must be provisioned separately by the eventual bootstrap; this module does not install packages. See [`docs/ACPI_REPLACEMENTS.md`](ACPI_REPLACEMENTS.md).
+- **Tests:** 13 synthetic local unit tests passed. The exact tested files were committed to `development` and their Git blob SHA values verified. **No test performed on SSL-55**, no real firmware binary provided to the assistant, and no actual Ubuntu fresh-host integration or QEMU/SeaBIOS compilation run.
+- **Portability:** Do not hardcode DELL/895C/PNP0 or copy a host ACPI ID into unrelated device branding; reject missing/invalid/ambiguous ACPI input, unknown source structure or profile and unsupported runtime. Build/test on each claimed supported host class before certification. No automatic host modifications without explicit user authorization.
+
+## Automation status after Steps 1–5
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
 - `scripts/bootstrap_cape_source.sh` is a separate **Git/source bootstrap draft** based on Step 4; it would modify a host **only if intentionally executed** as an installer component. It is not one of the three final commands and is not yet release-ready.
-- The user reported a successful CAPEv2 **source clone**, not CAPEv2 runtime installation. No Windows VM, INetSim VM, isolated network or full three-command deployment automation has been installed or validated as part of this canonical build.
+- The user reported a successful CAPEv2 **source clone and nine-variable installer edit**, not CAPEv2 runtime installation. No Windows VM, INetSim VM, isolated network or full three-command deployment automation has been installed or validated as part of this canonical build.
+- `scripts/prepare_acpi_replacements.py` is an early **conditional** draft: inspection is read-only and mutation requires `--apply`, reviewed values and source pin. It is not validated on SSL-55.
 - **Do not** run installation or environment changes on SSL-55 without explicit user direction.
 - Next manual step is chosen and executed by the user.
