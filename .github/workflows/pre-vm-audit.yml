@@ -41,6 +41,7 @@ jobs:
         run: |
           bash -n scripts/bootstrap_pre_vm_prereqs.sh
           bash -n scripts/command1_pre_vm.sh
-          bash -n scripts/bootstrap_virtualization_stack.sh      - name: No accidental host provisioning during tests
+          bash -n scripts/bootstrap_virtualization_stack.sh
+      - name: No accidental host provisioning during tests
         run: |
           echo 'The CI suite is offline-only; no apt, pip, libvirt or malware execution.'
