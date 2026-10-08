@@ -45,3 +45,9 @@ The user subsequently clarified that **CSE-SSL-55 is a college-owned workstation
 CAPE malware execution on the shared host, especially using its NAT `default` network and institutional uplinks, is outside the current safety gate. Prefer a dedicated college-approved isolated malware lab rather than sharing host runtime with unrelated student users.
 
 **Status:** Step 7F read-only audit complete; shared-host policy and permissions awaiting clarification; no masks changed.
+
+## Subsequent user clarification — CAPEv2 installation permitted (2026-10-09)
+
+The user confirmed that **installing CAPEv2 via the `charan` account is allowed**, citing earlier installations on other college machines. Thus the shared-host designation does **not** mean CAPEv2 installation is forbidden. Continue controlled, manual, user-executed installation and non-malware verification without demanding the same approval again.
+
+Keep the **separate decision** about the four host-wide sleep masks and any reboot/service interruption. Permission to install CAPEv2 is not evidence that other students' sessions can be disrupted, that all persistent systemd policies can be changed without coordination, or that live malware may run on ordinary institutional NAT/LAN. The power masks remain unchanged pending a specific policy choice; Step 7F technical review is complete.
