@@ -122,6 +122,14 @@ def count_log_signatures(path: Path, checks: tuple[tuple[str, str], ...]) -> dic
     except (OSError, UnicodeError):
         return None
 
+
+def classify_modprobe_lines(lines: list[str]) -> tuple[bool, bool]:
+    """Detect known malformed modprobe syntax and a distinct active KVM blacklist."""
+    malformed = any(re.match(r"^\s*-e\s+blacklist\b", line) for line in lines)
+    blacklist = any(re.match(r"^\s*blacklist\s+kvm\s*(?:#.*)?$", line) for line in lines)
+    return malformed, blacklist
+
+
 class Audit:
     def __init__(self) -> None:
         self.rows: list[tuple[str, str, str, str]] = []
@@ -209,8 +217,7 @@ class Audit:
             modlines = modprobe.read_text(errors="replace").splitlines()
         except OSError:
             modlines = []
-        malformed = any(re.match(r"^\\s*-e\\s+blacklist\\b", line) for line in modlines)
-        disabled_auto = any(re.match(r"^\\s*blacklist\\s+kvm\\s*(?:#.*)?$", line) for line in modlines)
+        malformed, disabled_auto = classify_modprobe_lines(modlines)
         self.add("07", "KVM modprobe syntax", "BLOCKED" if malformed else "PASS",
                  "malformed -e blacklist line found" if malformed else "no known malformed line")
         self.add("07", "KVM autoload blacklist", "WARN" if disabled_auto else "PASS",
