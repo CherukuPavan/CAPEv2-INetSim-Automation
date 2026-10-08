@@ -35,3 +35,13 @@ This does **not** authorize a reboot or certify post-reboot KVM loading, libvirt
 - The verifier and tests were developed/tested in a separate environment, **not** deployed on SSL-55. The final three-command automation must not impose upstream's top-level `systemctl mask` on every fresh Ubuntu host, and must treat an operator-approved no-sleep policy separately from virtualization dependency readiness.
 
 Related: [STEP_LOG.md](STEP_LOG.md), [ROADMAP.md](ROADMAP.md), [PORTABILITY.md](PORTABILITY.md), [STEP7E_KVM_POLICY.md](STEP7E_KVM_POLICY.md).
+
+## Shared-college-workstation clarification (2026-10-09)
+
+The user subsequently clarified that **CSE-SSL-55 is a college-owned workstation with other login accounts used by students**. This rules out assuming it is a dedicated always-on analysis server, and it materially changes the risk/approval context for the four persistent masks. The masks affect the host globally, including students using other logins; they are **not per-user**. The currently observed technical state (four `/etc/systemd/system/* -> /dev/null` masks) remains unchanged.
+
+**Decision:** Prefer preserving/restoring normal shared-workstation power functionality **if that is the actual approved institutional policy**, but neither preserve the masks indefinitely for CAPE nor blindly unmask them without college IT/system administrator approval, backup/rollback plan and a maintenance window. The user has **not** yet confirmed authorization or the actual institution's intended suspend policy. No modifying commands should be supplied until that is resolved; no reboot has been authorized. An existing `sudo` membership is not, by itself, proof of institutional approval.
+
+CAPE malware execution on the shared host, especially using its NAT `default` network and institutional uplinks, is outside the current safety gate. Prefer a dedicated college-approved isolated malware lab rather than sharing host runtime with unrelated student users.
+
+**Status:** Step 7F read-only audit complete; shared-host policy and permissions awaiting clarification; no masks changed.
