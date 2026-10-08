@@ -10,7 +10,7 @@ Cross-cutting requirements: Ubuntu compatibility checks; resources and CPU virtu
 
 ## Current implementation status — 2026-10-08
 
-- Canonical manual **Steps 1–6 recorded** in `docs/STEP_LOG.md`: host/interface baseline, installation of `cpu-checker`, KVM evidence, pre-existing Git availability, and successful CAPEv2 **source checkout**. A source checkout is not CAPEv2 installation.
+- Canonical manual **Steps 1–7 recorded** in `docs/STEP_LOG.md`: host/interface baseline, installation of `cpu-checker`, KVM evidence, pre-existing Git availability, and successful CAPEv2 **source checkout**. A source checkout is not CAPEv2 installation.
 - `scripts/check_host_virtualization.sh` is an **initial read-only draft**, not one of the three deployment commands. It does not install packages, modify networking or configure KVM.
 - `scripts/bootstrap_cape_source.sh` is a **separate draft installer component**, not a final entrypoint: detect/install missing Git on an Ubuntu host, clone CAPEv2 as the intended non-root user, verify existing checkouts without replacing them, optionally pin a full commit SHA. It has not been executed on SSL-55.
 - Draft underwent Bash syntax validation and a negative-path smoke test in a separate restricted environment; it has **not** been run or validated on SSL-55. The restricted environment lacks a usable KVM device, so it cannot establish host readiness.
@@ -41,6 +41,14 @@ Cross-cutting requirements: Ubuntu compatibility checks; resources and CPU virtu
 - [`scripts/discover_host_uplink.py`](../scripts/discover_host_uplink.py) was added as a **read-only preflight draft**, alongside [19 synthetic unit tests](../scripts/test_discover_host_uplink.py), all passing locally. It inspects selected routes, IPv4 source, interface existence/state, default route ambiguity, VPN/container links, policy rules and explicit overrides. Committed Git blobs were checked against tested files.
 - A route-to-target candidate is **not evidence of Internet reachability** or safe guest networking. The CLI never changes routes, enables NAT/forwarding, or authorizes malware guest access. Its separate-environment smoke test is **not an SSL-55 verification**.
 - Dedicated libvirt network auto-discovery, non-forwarded network provisioning, CAPEv2 guest-facing configuration and cross-VM/INetSim negative-isolation verification remain **not implemented/untested**, and are required release gates. Full requirements: [DYNAMIC_NETWORK_DISCOVERY.md](DYNAMIC_NETWORK_DISCOVERY.md).
+
+## Step 7 — Custom hypervisor build (partial, unverified)
+
+- User ran `sudo ./kvm-qemu.sh all charan 2>&1 | tee kvm-qemu-all.log`. Supplied **9,154-line log excerpt** begins mid-QEMU build, ends after virt-manager build/install output and lacks original installer exit status. Custom QEMU 9.2.2 and SeaBIOS 1.16.3 stages completed; libvirt-python 11.1.0 was installed; `kvm-ok`/many virt-host-validate checks passed. **Overall runtime success is NOT verified**.
+- Source inspection showed `username=$SUDO_USER`, while reading `$2` for username is commented out. Non-root Ubuntu user must be explicitly validated by future automation. `--help` is **not a read-only operation** in this upstream installer: global sleep-target `systemctl mask` precedes command dispatch.
+- **Serious blockers:** distro libvirt packages purged/held, malformed `blacklist-kvm.conf`, pip conflict uninstalling distro cryptography, DPKG force-overwrite of OVMF/QEMU firmware, cross-release Python 2 dependencies, SeaBIOS patch/build warnings and global GRUB/sysctl/power management changes. Do **not** rerun upstream `all`, reboot or automatically repair the host.
+- New read-only [`scripts/audit_kvm_build_step7.py`](../scripts/audit_kvm_build_step7.py) and [10 tests](../scripts/test_audit_kvm_build_step7.py) committed; all synthetic tests passed and the real uploaded excerpt classified `UNVERIFIED_WITH_ERRORS` (nine distinct findings). **NOT** a production installer; no runtime checks on SSL-55. See [KVM_QEMU_STEP7.md](KVM_QEMU_STEP7.md).
+- Future deployment needs controlled, version-pinned and idempotent QEMU, SeaBIOS, libvirt and virt-manager stages, dependency/ownership checks, validated effective username, `pipefail`/per-stage status, strict failure handling and tested host compatibility before promotion to main.
 
 ## Cross-machine release gate
 
