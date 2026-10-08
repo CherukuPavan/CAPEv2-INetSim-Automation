@@ -327,6 +327,14 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Containment boundary:** **Do not execute live malware on this shared college workstation or connect it to the institution LAN via NAT as an analysis guest.** Prefer a dedicated college-approved machine/segregated lab under explicit institutional security policy with verified IPv4/IPv6 isolation and negative egress tests; SSL-55 can be kept only as a non-malware documentation/installation reference until authorization and safety are established.
 - **Outcome:** Step 7F read-only inspection COMPLETE; **policy change and reboot NOT authorized**. **Next: confirm the user's authorization and college IT's approved role for SSL-55** before issuing any modifying terminal commands. No additional host changes have been made by the assistant.
 
+### Live-malware execution target confirmed (2026-10-09)
+
+- **User states the final goal is running real malware inside CAPEv2 Windows analysis VMs**, not simply installing/testing the software. This intent was confirmed **after** the user's separate statement that CAPEv2 installation through `charan` is allowed on a shared college computer. These are **different authorization scopes**; explicit institutional permission for live malware on SSL-55 has not yet been confirmed.
+- **Safety hold:** Existing `default` libvirt network is `<forward mode='nat'>` and not malware-safe, no dedicated isolated CAPE/INetSim network or negative IPv4/IPv6 egress verification exists; other students use accounts on the physical host. **Do not start real malware samples on SSL-55**, and do not use ordinary college LAN, NAT, WiFi or Docker/VPN paths as a sample network.
+- **Continue approved platform development and non-malware diagnostics/manual setup.** Prefer a dedicated college-approved analysis workstation with separately validated security boundaries for the live phase; college security/IT must specifically approve live malware use and risk on a shared physical host if that is proposed.
+- **Release gate and design:** [LIVE_MALWARE_CONTAINMENT_POLICY.md](LIVE_MALWARE_CONTAINMENT_POLICY.md) describes required approvals, separate INetSim guest, nonforwarding virtual network, Windows NIC restrictions, independent host firewall/routing inspection, guest negative IPv4/IPv6 reachability tests, snapshots and incident handling. The final 3-command automation must block live samples until all gates pass.
+- **No host change:** This is a documentation and planning update only; Step 7F power masks remain unchanged, and post-reboot KVM readiness remains untested.
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
