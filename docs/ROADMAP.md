@@ -31,10 +31,16 @@ Cross-cutting requirements: Ubuntu compatibility checks; resources and CPU virtu
 
 ## Step 6 — Libvirt installation and network safety (2026-10-09)
 
-- Manual installation evidence shows **51 newly installed + 2 upgraded packages**, active libvirt `default` network on `virbr0`, and upstream `cape2.sh` settings changed. The configured `eno1` interface was not in observed host inventory. Secret provided in output is **redacted** in project artifacts.
+- Manual installation evidence shows **51 newly installed + 2 upgraded packages**, active libvirt `default` network on `virbr0`, and upstream `cape2.sh` settings changed. The initial `INTERNET_IFACE=eno1` was **corrected by the user** to `enp0s31f6`, supported by the provided destination-specific `ip -4 route get 1.1.1.1` output. The configured password is **redacted** in project artifacts; this is not proof of general Internet connectivity.
 - **Safety blocker:** libvirt's default network is ordinarily **NAT**, not safe malware isolation. XML/firewall and guest-negative-connectivity evidence have not been collected; do not use it as a live analysis network. A dedicated verified isolated network must be built separately and tested before any malware analysis.
 - **System warnings:** APT mixed `noble`/`focal` sources, duplicated VirtualBox entries, and invalid `/etc/modprobe.d/blacklist-kvm.conf` contents reported by libkmod. No repairs, upgrades, firewall edits or network reconfiguration authorized or executed by us.
 - **Automation:** [`scripts/audit_libvirt_cape_network.py`](../scripts/audit_libvirt_cape_network.py), read-only and password-redacting; **11 synthetic tests passed**. Real SSL-55 execution, fresh-host package bootstrap, actual bridge isolation, and installer integration are **untested**. Full details: [LIBVIRT_NETWORK_STEP6.md](LIBVIRT_NETWORK_STEP6.md).
+
+## Dynamic network discovery — Step 6 correction (2026-10-09)
+
+- [`scripts/discover_host_uplink.py`](../scripts/discover_host_uplink.py) was added as a **read-only preflight draft**, alongside [19 synthetic unit tests](../scripts/test_discover_host_uplink.py), all passing locally. It inspects selected routes, IPv4 source, interface existence/state, default route ambiguity, VPN/container links, policy rules and explicit overrides. Committed Git blobs were checked against tested files.
+- A route-to-target candidate is **not evidence of Internet reachability** or safe guest networking. The CLI never changes routes, enables NAT/forwarding, or authorizes malware guest access. Its separate-environment smoke test is **not an SSL-55 verification**.
+- Dedicated libvirt network auto-discovery, non-forwarded network provisioning, CAPEv2 guest-facing configuration and cross-VM/INetSim negative-isolation verification remain **not implemented/untested**, and are required release gates. Full requirements: [DYNAMIC_NETWORK_DISCOVERY.md](DYNAMIC_NETWORK_DISCOVERY.md).
 
 ## Cross-machine release gate
 
