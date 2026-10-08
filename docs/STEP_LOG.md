@@ -309,6 +309,16 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Automation:** [`scripts/audit_step7e_kvm_policy.py`](../scripts/audit_step7e_kvm_policy.py) safely parses a consolidated text report without touching the host or outputting raw host data. **14 synthetic cases passed** in the separate test environment, and running on the actual uploaded report yielded `BASIC_KVM_CHECKS_PASS_POLICY_REVIEW` with no basic-check blockers but the existing blacklist flagged. The script always sets `boot_autoload_verified=false`, `guest_isolation_verified=false`, `authorizes_reboot_or_malware_execution=false`. Committed module and tests match tested blob hashes.
 - **Detailed evidence:** [STEP7E_KVM_POLICY.md](STEP7E_KVM_POLICY.md).
 
+### Step 7F — Read-only power-management mask audit COMPLETE (2026-10-09)
+
+- **User uploaded:** `SSL55_Step7F_PowerPolicy_20261009_033421_F3D5iOPz.txt`, 93 physical lines (94 indexed). Inspected without any host-side changes by assistant.
+- **Persistent masks confirmed:** Four systemd targets `sleep.target`, `suspend.target`, `hibernate.target`, `hybrid-sleep.target` all have `is-enabled=masked`, `LoadState=masked` and `UnitFileState=masked`. Root-owned `/etc/systemd/system/<target>` symlinks point to `/dev/null`; no direct `/run/systemd/system/<target>` runtime override was reported. These are **persistent host-wide masks**, not transient runtime changes.
+- **Installer behavior confirmed in local source:** `~/CAPEv2/installer/kvm-qemu.sh` line 76 contains `systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target`, which likely produced the masks. The report cannot prove that the administrator did not separately authorize the policy. Reboot-required marker still present.
+- **Impact:** These masks prevent normal activation of the sleep/hibernate systemd targets. They may suit a dedicated always-on analysis host but may be disruptive on an ordinary workstation. **Do not automatically unmask (or remask) them until the owner confirms desired policy and approval.** No unmask/mask, daemon restart, host edits or reboot occurred in the Step 7F inspection.
+- **Status:** Step 7F **diagnostic passed**, and **power policy decision remains PENDING**. This is not a virtualization installation failure by itself and is not permission to reboot or run malware. KVM `blacklist kvm` autoload intent and separate dedicated guest-isolation network remain unresolved.
+- **Automation:** [`scripts/audit_step7f_power_policy.py`](../scripts/audit_step7f_power_policy.py) parses this offline user report without emitting host identifiers. **14 synthetic unit tests passed**, and the actual report classified `PERSISTENT_MASKS_VERIFIED_REVIEW_REQUIRED` with all four `PERSISTENTLY_MASKED`; no parsing errors. Both Git blobs match the locally tested versions. This is read-only preflight, **not** power-policy implementation.
+- **Technical details:** [STEP7F_POWER_POLICY.md](STEP7F_POWER_POLICY.md).
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
