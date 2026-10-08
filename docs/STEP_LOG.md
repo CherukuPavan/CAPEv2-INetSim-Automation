@@ -298,6 +298,17 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Status: Step 7D PASSED.** The earlier disabled-SYN-cookie finding is **resolved for current verified state**. Still unresolved: valid `blacklist kvm` policy/autoload after restart; masked sleep targets; transient `default` libvirt NAT network; safe dedicated Windows/INetSim network and negative guest-isolation testing. No malware-execution readiness claim.
 - **Automation:** Current read-only [`scripts/audit_sysctl_alias.py`](../scripts/audit_sysctl_alias.py) includes synthetic tests of enabled and disabled settings but has **not** been run against the post-change SSL-55 host. Future authorized installer should capture equivalent protected backups, guarded one-key change, current-state verification and reboot checks, discovering paths/inodes afresh instead of hardcoding SSL-55.
 
+### Step 7E — Read-only KVM boot-policy and module availability review VERIFIED (2026-10-09)
+
+- **User-generated report:** `SSL55_Step7E_KVM_Policy_20261009_032931_nSxfpAHQ.txt` (66 lines), obtained with no changes to config/modules/libvirt and no reboot.
+- **Kernel/module state:** On kernel `7.0.0-34-generic`, `kvm_intel` and `kvm` remain loaded, `/dev/kvm` exists, and the respective `kvm-intel.ko.zst` and `kvm.ko.zst` files were present. The libvirt service was **active**; `modprobe --showconfig` parsing **PASSED** after Step 7B.
+- **Effective modprobe rules:** One `blacklist kvm` from `/etc/modprobe.d/blacklist-kvm.conf`, plus `options kvm ignore_msrs=Y` and `options kvm report_ignored_msrs=N` from `/etc/modprobe.d/kvm.conf`. These options can alter guest-MSR behavior and logging; future automation must validate intended use rather than universally impose them. No other matching rules appeared in the user-scanned directories; absence of entries in `/etc/modules` and modules-load files is **not** proof that KVM will fail to load at boot.
+- **Dry-run:** `modprobe --dry-run --verbose kvm`, `... kvm_intel`, and blacklist-aware `... --use-blacklist kvm_intel` all indicated **SUCCESS**. Dry runs did **not load** modules, and already-loaded modules limit what can be inferred. **Do not mark boot-time autoload/persistence verified.**
+- **Security cross-check:** Step 7D's `net.ipv4.tcp_syncookies=1` was independently observed again.
+- **Acceptance:** **Step 7E diagnostic COMPLETED**; current basic KVM/libvirt runtime is healthy, but valid `blacklist kvm` remains **policy review required**. No justification to remove it blindly; no reboot, service restart, network modification or VM deployment authorized. Guest isolation remains unverified.
+- **Automation:** [`scripts/audit_step7e_kvm_policy.py`](../scripts/audit_step7e_kvm_policy.py) safely parses a consolidated text report without touching the host or outputting raw host data. **14 synthetic cases passed** in the separate test environment, and running on the actual uploaded report yielded `BASIC_KVM_CHECKS_PASS_POLICY_REVIEW` with no basic-check blockers but the existing blacklist flagged. The script always sets `boot_autoload_verified=false`, `guest_isolation_verified=false`, `authorizes_reboot_or_malware_execution=false`. Committed module and tests match tested blob hashes.
+- **Detailed evidence:** [STEP7E_KVM_POLICY.md](STEP7E_KVM_POLICY.md).
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
