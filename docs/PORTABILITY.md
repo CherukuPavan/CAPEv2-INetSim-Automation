@@ -188,3 +188,13 @@ A production workflow must first identify whether the host is shared, what workl
 The user clarified that **CAPEv2 installation with the `charan` college login is permitted**, consistent with prior college deployments. A host being multiuser is **not by itself** a prohibition on authorized software installation; continue the user's staged, manual CAPEv2 installation on SSL-55 with the established verification/backup workflow.
 
 The final installer must distinguish (a) permission to install/operate CAPEv2, (b) permission to change system-wide power, kernel, reboot, shared services, and networks, and (c) separate operational authorization and **demonstrated containment** before using real malware samples. These are distinct gates; do not infer one from another. Check for student-session/workload impact, use maintenance/recovery planning for disruptive operations, and never route uncontained malware over the ordinary institution LAN or NAT. Do not assume the existing masks should remain or be removed without knowing institutional policy.
+
+## Real malware operating mode and host eligibility gate (2026-10-09)
+
+The user clarified that the software is intended to run **actual malware samples inside CAPEv2 Windows VMs**, potentially on a college-owned shared Ubuntu host. Permission to install CAPEv2 through `charan` does **not** by itself confirm approval for the distinct high-impact activity of executing live samples on a multi-user college workstation.
+
+The eventual installer must discover host role, accountable administrator, shared users/workloads, network segments, hardware virtualization controls, firmware/QEMU/libvirt provenance, reboot and cleanup constraints; **fail closed** when risk/approval is unresolved. Prefer college-approved dedicated hardware for real samples. Do not ship a workflow that implicitly assumes a normal NAT libvirt network, a host-only bridge with unrestricted host services, or an unverified INetSim guest is isolated.
+
+Every analysis VM, including parallel guests, must use only an explicitly approved dedicated nonforwarding analysis network; INetSim must not have a fallback uplink. Enforce and test IPv4 **and** IPv6 negative reachability to Internet, campus gateways/student networks and management-plane services, accounting for actual routing, firewall, Docker bridges, WiFi, VPN, unintended secondary NICs, DNS/proxies and host-side forwarding. Validate safe snapshots/rollback and host recovery. Nonmalicious functional tests may continue separately from real-sample release.
+
+See [LIVE_MALWARE_CONTAINMENT_POLICY.md](LIVE_MALWARE_CONTAINMENT_POLICY.md). No change to SSL-55 was performed by this documentation update; existing real-sample isolation gate is **not passed**.
