@@ -64,6 +64,7 @@ bash scripts/command1_pre_vm.sh bootstrap-source --revision <VERIFIED_FULL_SHA40
 
 ## Regression coverage
 
+- **Latest confirmed GitHub Actions run:** [pre-VM checks #37857879371](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/37857879371) on `development` completed **successfully** (Python compilation, offline unittest and Bash syntax). The tests are synthetic and do NOT prove installation, fresh-host portability or guest isolation.
 - New offline regression tests in `scripts/test_audit_pre_vm_stages.py` cover
   libvirt NAT/route identification, absent forwarding **without promising true
   containment**, package state, custom MongoDB unit, service-account permission
