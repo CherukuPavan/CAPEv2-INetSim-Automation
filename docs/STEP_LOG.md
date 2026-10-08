@@ -1,6 +1,6 @@
 # SSL-55 canonical manual installation log
 
-**Status:** Steps 1–5 reported with terminal evidence. CAPEv2 upstream **source checkout** (Step 4) and local installer nine-variable edit (Step 5) were performed. CAPEv2 runtime installation, QEMU/SeaBIOS build, Windows VMs, and INetSim deployment remain unverified/not reported.
+**Status:** Steps 1–6 reported with terminal evidence. CAPEv2 upstream source checkout (Step 4), nine-variable installer edit (Step 5), and libvirt/bridge installation plus CAPE installer settings (Step 6) were performed manually. Windows VMs, INetSim, guest isolation and CAPEv2 runtime remain unverified/not reported.
 
 **Evidence provenance:** The user supplied a terminal transcription on 2026-10-08. Commands were **not** independently executed by the assistant on SSL-55, and exact execution timestamps were not supplied. "Terminal-evidenced" below means supported by the supplied output, not separately re-tested. Exact site-specific private IP addresses are intentionally **redacted from this GitHub record**; the original user-provided transcript remains in the conversation.
 
@@ -158,11 +158,45 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Tests:** 13 synthetic local unit tests passed. The exact tested files were committed to `development` and their Git blob SHA values verified. **No test performed on SSL-55**, no real firmware binary provided to the assistant, and no actual Ubuntu fresh-host integration or QEMU/SeaBIOS compilation run.
 - **Portability:** Do not hardcode DELL/895C/PNP0 or copy a host ACPI ID into unrelated device branding; reject missing/invalid/ambiguous ACPI input, unknown source structure or profile and unsupported runtime. Build/test on each claimed supported host class before certification. No automatic host modifications without explicit user authorization.
 
-## Automation status after Steps 1–5
+## Step 6 — Install libvirt clients/daemon, inspect default network and edit CAPE settings
+
+- **Reported date:** 2026-10-09 (exact execution time not supplied). Performed by user on SSL-55.
+- **Objective:** Make `virsh` available, install system libvirt/QEMU dependencies, identify `virbr0`, and update four values in upstream CAPEv2 `cape2.sh`.
+- **Commands evidenced in user's terminal transcript:**
+  ```bash
+  sudo apt update
+  sudo apt install -y libvirt-clients libvirt-daemon-system
+  sudo virsh net-list --all
+  ifconfig
+  cd ~/CAPEv2/installer
+  sudo sed -i 's/^NETWORK_IFACE=.*/NETWORK_IFACE=virbr0/' cape2.sh
+  sudo sed -i 's/^IFACE_IP=.*/IFACE_IP="192.168.122.1"/' cape2.sh
+  sudo sed -i 's/^INTERNET_IFACE=.*/INTERNET_IFACE=eno1/' cape2.sh
+  # A further sudo sed command changed PASSWD to a literal secret; intentionally redacted.
+  grep -E '^(NETWORK_IFACE|IFACE_IP|INTERNET_IFACE|PASSWD)=' cape2.sh
+  ```
+- **Reference versus actual commands:** User-provided screenshot described `sudo virsh net-start default` and `sudo virsh net-autostart default`, but these **were not executed in the uploaded terminal transcript**. `virsh net-list --all` already showed `default active / autostart yes / persistent yes` after APT setup.
+- **Package evidence:** `libvirt-clients` and `libvirt-daemon-system` installed; transaction added **51 packages**, upgraded **2** (`libxml2` for amd64/i386), removed **0**, and left **195 not upgraded**. `libvirt0` **10.0.0-2ubuntu8.19**, Ubuntu `qemu-system-x86` **1:8.2.2+ds-0ubuntu1.18**, `seabios` **1.16.3-2**, `ovmf` **2024.02-2ubuntu0.10** are visible in output. Package triggers regenerated initramfs. No `apt autoremove` performed.
+- **Network evidence:** `default` network active, persistent, autostart enabled. Host `virbr0` assigned `192.168.122.1/24`; existing Ethernet, Wi-Fi, Docker bridges still shown. Specific institutional host addresses, MACs and upload-only secrets are not included here.
+- **Configuration evidence:** `cape2.sh` grep showed `NETWORK_IFACE=virbr0`, `IFACE_IP="192.168.122.1"`, `INTERNET_IFACE=eno1` and `PASSWD=[REDACTED]`. Successful text substitution does **not** establish correct routing, secret handling or malware network isolation. The user's actual secret must never be committed.
+- **Important warnings / blockers:**
+  - `eno1` was absent from the user-provided complete `ip -br addr` inventory and later `ifconfig`. Actual visible uplink candidates are `enp0s31f6` (Ethernet) and `wlp0s20f3` (Wi-Fi). Correct routing selection is **not verified**.
+  - The standard libvirt `default` network uses **NAT** by design, not isolated malware networking. The actual SSL-55 XML/forwarding rules have **not** been supplied: **do not attach live malware analysis guests to it without verified containment**.
+  - The uploaded log includes an apparent live plaintext DB secret. Secret was removed from the documentation. User should rotate it wherever reused.
+  - APT metadata combined `noble` and `focal` Ubuntu release suites (and third-party `jammy` feeds), repeatedly warned about duplicated VirtualBox sources. Do not rewrite repos or blindly upgrade.
+  - Kernel module configuration repeatedly logged `/etc/modprobe.d/blacklist-kvm.conf line 1: ignoring bad line starting with '-e'`. Requires separate read-only verification and approved correction before relying on module behavior.
+  - Ubuntu-packaged QEMU/SeaBIOS now coexist in the intended workflow with planned source-built versions; version/path conflicts must be reviewed.
+- **Verification status:** **Terminal-evidenced PASS** for package configuration, current libvirt network status and setting assignments. **NOT VERIFIED:** default network XML, actual NAT/firewall/forwarding state, guest isolation, correct uplink, QEMU/CAPEv2 source build compatibility, database auth, runtime functionality or Windows/INetSim deployment.
+- **Automation design:** [`docs/LIBVIRT_NETWORK_STEP6.md`](LIBVIRT_NETWORK_STEP6.md) gives complete analysis; new read-only [`scripts/audit_libvirt_cape_network.py`](../scripts/audit_libvirt_cape_network.py) detects NAT, mismatched bridge/IP/interface and redacts `PASSWD` without evaluating installer source. Its **11 synthetic tests passed**; matched GitHub blob SHA after upload. No SSL-55 audit or live malware-isolation tests have run.
+- **Portability:** Missing system packages should be installed only in the authorized deployment stage after checking OS/repo health, package versions and conflicts; preserve existing workloads. Derive actual interface names/routes, use dedicated isolated guest networking with negative-connectivity checks, store credentials securely, and refuse to proceed with malware operations until safety gates pass.
+- **Full evidence:** Original uploaded transcript is retained in the conversation with its confidential information, not copied into GitHub.
+
+## Automation status after Steps 1–6
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
 - `scripts/bootstrap_cape_source.sh` is a separate **Git/source bootstrap draft** based on Step 4; it would modify a host **only if intentionally executed** as an installer component. It is not one of the three final commands and is not yet release-ready.
-- The user reported a successful CAPEv2 **source clone and nine-variable installer edit**, not CAPEv2 runtime installation. No Windows VM, INetSim VM, isolated network or full three-command deployment automation has been installed or validated as part of this canonical build.
+- The user reported CAPEv2 **source clone, nine-variable installer edit, libvirt package installation and CAPE installer settings**, not CAPEv2 runtime installation. No Windows VM, INetSim VM, isolated network or full three-command deployment automation has been installed or validated as part of this canonical build.
 - `scripts/prepare_acpi_replacements.py` is an early **conditional** draft: inspection is read-only and mutation requires `--apply`, reviewed values and source pin. It is not validated on SSL-55.
+- `scripts/audit_libvirt_cape_network.py` is a **read-only** Step 6 diagnostic draft with 11 synthetic tests passed. It deliberately does not assert malware-ready isolation.
 - **Do not** run installation or environment changes on SSL-55 without explicit user direction.
 - Next manual step is chosen and executed by the user.
