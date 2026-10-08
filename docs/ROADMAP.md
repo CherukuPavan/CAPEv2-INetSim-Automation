@@ -115,3 +115,11 @@ The completed read-only alias review in [STEP7_SYSCTL_REVIEW.md](STEP7_SYSCTL_RE
 - **Step 7F diagnostic COMPLETE**, but whether SSL-55 should be always-on or restore normal desktop sleep is an **unresolved owner/admin decision**. Do not unmask or mask automatically. No power policy changes, restart, reboot or VM operations performed.
 - New [`scripts/audit_step7f_power_policy.py`](../scripts/audit_step7f_power_policy.py) and [14 synthetic tests](../scripts/test_audit_step7f_power_policy.py) committed; hashes match locally tested files. The user report classified `PERSISTENT_MASKS_VERIFIED_REVIEW_REQUIRED`, and the audit cannot authorize reboot, unmasking, or guest malware execution.
 - Detailed record: [STEP7F_POWER_POLICY.md](STEP7F_POWER_POLICY.md). Network-isolation and boot-survivability gates remain open.
+
+## Shared college host — new high-priority safety gate (2026-10-09)
+
+- The user clarified that **SSL-55 is a college machine shared by students through multiple login accounts**, not a dedicated CAPEv2 appliance. Previous dedicated-machine assumption is invalid. This does not prove which other users are active right now or whether institutional admin authorization exists.
+- **Pause host-wide edits/reboots/unmasking and further invasive installs** until college IT approves the use case, existing workloads/sessions are assessed, rollback backups are reviewed and a maintenance window is agreed. Avoid disruption to student sessions and lab operations.
+- **Power mask policy:** Four persistent sleep/suspend/hibernate masks affect every login. Their restoration may be appropriate for normal workstation usage, but it must follow admin-approved baseline policy and a reviewed change plan; do not leave them disabled solely for CAPE by assumption, or unmask them blindly.
+- **Malware boundary:** Do not run live samples on the shared college host or default NAT; require a college-approved dedicated or explicitly segregated analysis environment, verified negative guest egress and isolation, and no risk to student/LAN resources.
+- Update future three-command installer preflight to detect/ask about **shared-host designation, multiuser sessions, authorization, existing workloads, rollback/reboot impact and power-management policy**, and fail closed if constraints cannot be met. [Step 7F context](STEP7F_POWER_POLICY.md).
