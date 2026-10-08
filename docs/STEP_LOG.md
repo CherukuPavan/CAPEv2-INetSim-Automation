@@ -381,6 +381,13 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Decision:** User reasonably expects **CAPE/processor missing-`cuckoo1` errors** to disappear after completing the Windows guest + snapshot + CAPE machine configuration; they need not block **safe onward setup**. This expectation **does not** resolve the independently failed Suricata service or prove network containment. **Step 10B read-only service diagnosis COMPLETE**; CAPEv2 overall runtime still **PARTIALLY CONFIGURED**. Do not rerun `cape2.sh base`. Next user document command should be reviewed before execution; avoid attaching sample VMs to the transient NAT `default` network or running real malware.
 - Detail: [STEP10_BASE_POSTRUN_AUDIT.md](STEP10_BASE_POSTRUN_AUDIT.md).
 
+### Step 11 — Poetry and optional Python dependency installation evidenced (2026-10-08/09)
+
+- **User-pasted 663-line terminal transcript:** `cd /opt/CAPEv2`; `sudo apt install python3-poetry -y` installed Ubuntu Noble's `python3-poetry 1.8.2+dfsg-1ubuntu2` plus **23 packages**, then `poetry run pip3 install -r extra/optional_dependencies.txt` reported successfully built 14 wheels and ended `Successfully installed ...` and normal terminal prompt. **Do not rerun either command without evidence of a failure.**
+- **Environment nuance:** The optional `pip3` run created `/home/charan/.cache/pypoetry/virtualenvs/non-package-mode-...-py3.12`. Thus optional Python requirements are installed in `charan`'s Poetry environment; **not yet confirmed** visible to `cape`'s running services. Upstream CAPE and processor systemd units specify `User=cape` with `ExecStart=/etc/poetry/bin/poetry run python ...`. Verify the **actual SSL-55 unit contents and distinct Poetry envs** read-only before altering Python dependencies.
+- The Ubuntu packaged Poetry 1.8.2 may coexist with a separately installed `/etc/poetry/bin/poetry`. Presence of one executable and `Successfully installed` does not prove the service virtualenv has the same packages. Do not conflate the two interpreters; do not change host service account or force bulk reinstallation.
+- **Status:** Step 11 reported install success **in a new charan virtualenv**, service-runtime integration **pending one read-only environment check**. Existing first Windows VM dependency and Suricata service issue from Step 10B remain separate. [Detailed record](STEP11_OPTIONAL_PYTHON_DEPENDENCIES.md).
+
 ## Automation status after Steps 1–7
 
 - `scripts/check_host_virtualization.sh` is an early **read-only draft** for Steps 1–3.
