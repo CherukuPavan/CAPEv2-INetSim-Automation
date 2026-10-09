@@ -154,3 +154,38 @@ Even with a rollback plan, Windows unlock on first maintenance boot
 is an observed test, not guaranteed by the previously reported desktop
 access. If BitLocker enters recovery, do not try random keys or alter
 key protectors; stop and restore the previous known working state.
+
+## SSL-55 real-host preservation report — 2026-10-09 22:22 UTC
+
+The user completed the specifically requested **read-only** audit,
+`CAPE_BitLocker_Master_Preservation_20261009_222228_TEsgeuHv.txt`:
+
+- Original `win11` is shut off, current snapshot `finalshutoffversion`.
+- The top disk is `/var/lib/libvirt/images/win11.finalshutoffversion`
+  with **four** QCOW2 backing layers.
+- Original OVMF variables file
+  `/var/lib/libvirt/qemu/nvram/win11_VARS.fd` exists (**540672 bytes**).
+- TPM backend: **libvirt-managed emulator version 2.0**. The standard
+  swtpm root and UUID-specific state directory exist. No TPM contents
+  were inspected or copied.
+- VM interface is on libvirt network `default` with **NAT forwarding**.
+  It is not an isolated malware-analysis network.
+- Approximately **213.96 GiB** free. The independent encrypted 64 GiB
+  `win11_1.qcow2` remains available.
+- The audit performed **no** guest boot, snapshot revert, network,
+  disk, NVRAM, TPM or BitLocker alteration.
+
+**Remaining hard blocker:** existence of the TPM state directory does NOT
+establish an offline backup or a verified restoration procedure. Without
+the 48-digit recovery password, failure of the original TPM/firmware
+pairing could prevent unlocking both the master and any derived image.
+**Do not modify the domain disk pointer, create a working overlay,
+boot Windows for decryption or detach/clone original TPM state until
+its authorized, locally secured preservation and rollback have been
+reviewed and tested.** Backup material must remain private on SSL-55;
+it must never appear in report TXT, ChatGPT uploads or GitHub.
+
+After local preservation is completed, a disposable external disk
+working overlay under the *original domain* and existing TPM pairing
+can be considered, with a NIC-down maintenance boot and post-boot
+`manage-bde -status C:` check. None of those steps has yet been run.
