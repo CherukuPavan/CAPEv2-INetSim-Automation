@@ -171,6 +171,36 @@ class IdentityTests(unittest.TestCase):
                 Path(directory)/"not-yet-created-kvm.conf",
                 ["198.51.100.110"])
 
+    def test_bitlocker_master_blocks_before_any_clone_mutation(self):
+        # A source can be four-layer QCOW2-valid but have encrypted C:.
+        # This gate must fire before export, registry change or virsh define.
+        with patch.object(c.os,"geteuid",return_value=0), \
+             patch.object(c,"virsh",side_effect=lambda *args,**kwargs: (
+                 "shut off" if args[0]=="domstate" else
+                 "win11" if args[0]=="list" else
+                 "Active: yes" if args[0]=="net-info" else "")), \
+             patch.object(c,"check_network",return_value="virbr9"), \
+             patch.object(c,"check_dhcp_conflicts"), \
+             patch.object(c,"check_empty_target_network"), \
+             patch.object(c,"check_cape_static_ip_conflicts"), \
+             patch.object(c,"safe_destinations"), \
+             patch.object(c.export_cold_master_disk,"source_state",
+                          return_value=("/lab/win11.final",[
+                              "/lab/win11.final","/lab/win11.base"],64*1024**3)), \
+             patch.object(c.probe_cold_windows_volume_crypto,
+                 "require_cleartext_candidate",
+                 side_effect=c.probe_cold_windows_volume_crypto.VolumeProbeError(
+                     "BitLocker or unknown Windows volume on cold master: BITLOCKER_BLOCKED")), \
+             patch.object(c.export_cold_master_disk,"export") as export, \
+             patch.object(c,"define") as define, \
+             patch.object(c,"copy_nvram") as nvram:
+            with self.assertRaisesRegex(c.ProvisionError,
+                                        "encryption preflight blocked"):
+                c.preflight(dict(PROFILE),1,"apply")
+        export.assert_not_called()
+        define.assert_not_called()
+        nvram.assert_not_called()
+
     def test_network_nat_blocks(self):
         with patch.object(c,"virsh",
             return_value="<network><name>cape-isolated</name><forward mode='nat'/>"
