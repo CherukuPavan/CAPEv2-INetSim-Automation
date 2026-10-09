@@ -450,3 +450,7 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Network safety:** No guest attached to libvirt's `default` NAT. Dedicated lab-only, nonforwarding network and verified IPv4/IPv6 containment must precede malware execution.
 - **Status:** Step 12 download **STARTED, media authenticity/compatibility not approved, no VM provisioned**. Record deterministic archive provenance and safe inspection in GitHub automation; any guest OS install action remains pending exact trusted media and reviewed VM/network plan.
 
+### Step 12 automation added — inspect downloaded media without executing it
+
+- `scripts/inspect_windows_media.py` (and `scripts/command1_pre_vm.sh inspect-media FILE`) offers a **read-only, non-extracting** SHA256, file size, extension and magic/signature report for an explicitly selected *completed* downloaded archive or ISO. Output is a private 0600 JSON report. Files ending in `.crdownload`/`.part` are refused. SHA256 identifies file bytes but does not attest Microsoft authenticity or confirm the OS is safe.
+- Synthetic tests: `scripts/test_inspect_windows_media.py` covers 7z/ZIP magic, hashes, partial downloads, symlinks, empty files and non-authenticated ISO names. GitHub Actions workflow runs it on `development`. **No ISO or ZIP has been inspected on SSL-55 yet, and no actual guest has been installed.**
