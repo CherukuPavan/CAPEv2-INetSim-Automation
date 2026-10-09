@@ -202,7 +202,7 @@ def preflight(profile: dict, count: int, mode: str) -> tuple[list[dict], str, st
     if free_match is None or count*per_vm > int(free_match.group(1))*1024*0.75:
         raise ProvisionError("Insufficient host RAM for simultaneous requested clones")
     if mode == "apply":
-        for tool in ("qemu-img","virt-win-reg","virsh","apparmor_parser"):
+        for tool in ("qemu-img","virt-win-reg","virsh","apparmor_parser","curl","ping"):
             if not shutil.which(tool):
                 raise ProvisionError(f"Required compatible host tool missing: {tool}")
         if not profile.get("benign_test_only_acknowledged",False):
