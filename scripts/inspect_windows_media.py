@@ -40,13 +40,20 @@ def inspect(path: Path) -> dict[str, object]:
     fd = os.open(path, flags)
     with os.fdopen(fd, "rb") as file:
         first = file.read(8)
+        # ISO9660 primary volume descriptor identifier sits at byte 32769.
+        # This validates a structural marker, NOT Microsoft authenticity.
+        file.seek(16 * 2048 + 1)
+        pvd_identifier = file.read(5)
         file.seek(0)
         digest = hashlib.sha256()
         total = 0
         for block in iter(lambda: file.read(4 * 1024 * 1024), b""):
             total += len(block)
             digest.update(block)
-    if total != info.st_size:
+        final_info = os.fstat(file.fileno())
+    if (total != info.st_size or final_info.st_size != info.st_size
+            or final_info.st_mtime_ns != info.st_mtime_ns
+            or final_info.st_ino != info.st_ino):
         raise ValueError("File changed during hashing; retry on completed download")
     detected = "unknown"
     for magic, label in MAGICS:
@@ -54,12 +61,15 @@ def inspect(path: Path) -> dict[str, object]:
             detected = label
             break
     if detected == "unknown" and lowered.endswith(".iso"):
-        detected = "possible ISO (extension only; signature not authenticated)"
+        detected = ("ISO9660 descriptor detected (not authenticated)"
+                    if pvd_identifier == b"CD001"
+                    else "possible ISO (extension only; signature not authenticated)")
     return {
         "file_basename": name,
         "bytes": total,
         "sha256": digest.hexdigest(),
         "header_format": detected,
+        "iso9660_pvd_detected": pvd_identifier == b"CD001",
         "extension": path.suffix.lower(),
         "trust_status": "UNVERIFIED",
         "contents_examined": False,
