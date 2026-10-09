@@ -105,6 +105,7 @@ class PreflightTests(unittest.TestCase):
             result = exp.export("win11", "cold", self.root / "clone.qcow2", True)
             self.assertFalse(result["executed"])
             self.assertFalse((self.root / "clone.qcow2").exists())
+            self.assertFalse((self.root / "lock").exists())
             calls.assert_not_called()
 
 
