@@ -8,9 +8,9 @@ FAIL-CLOSED: on any error following define, attempt original XML recovery.
 This validates only libvirt metadata restoration, NOT TPM/Windows unlock.
 """
 from __future__ import annotations
-import argparse
 import fcntl
 import os
+import json
 from pathlib import Path
 import stat
 import subprocess
@@ -121,6 +121,15 @@ def main():
              "Current snapshot metadata differs from preserved backup")
         need(Path(NEW).is_file() and not Path(NEW).is_symlink(),
              "Detached maintenance overlay missing")
+        chain=json.loads(run("qemu-img","info","--output=json",
+                             "--backing-chain",NEW))
+        need(isinstance(chain,list) and len(chain)==5 and
+             all(x.get("format")=="qcow2" for x in chain) and
+             chain[0].get("filename")==NEW and
+             chain[0].get("virtual-size")==64*1024**3 and
+             chain[0].get("full-backing-filename")==OLD and
+             chain[1].get("filename")==OLD,
+             "Working overlay no longer points to the verified master disk")
         nvram=Path("/var/lib/libvirt/qemu/nvram/win11_VARS.fd")
         need(nvram.is_file() and not nvram.is_symlink(),
              "Original firmware file missing")
