@@ -183,7 +183,7 @@ def make_candidates(master: dict, count: int, prefix: str,
         name = f"{prefix}{i}"
         if not GUEST_NAME.fullmatch(name):
             _raise(f"Generated guest name invalid: {name}")
-        new_uuid = uuid.uuid5(namespace, f"cape-isolated-clone-v1:{name}")
+        new_uuid = uuid.uuid5(namespace, f"cape-clone:{name}")
         # Locally-administered unicast MAC, stable within this master namespace.
         mac_bytes = hashlib.sha256(f"{namespace}:{name}".encode()).digest()[:5]
         mac = "02:" + ":".join(f"{b:02x}" for b in mac_bytes)
