@@ -37,6 +37,7 @@ on:
       - 'scripts/test_guard_vm_tpm_socket.py'
       - 'scripts/command2_clone_vms.sh'
       - 'scripts/plan_guestfs_dependency_impact.sh'
+      - 'scripts/plan_minimal_hivex_backend.sh'
       - 'config/command2-profile.example.json'
       - 'scripts/test_command2_clone_vms.py'
       - 'scripts/test_command2_lifecycle.py'
@@ -90,6 +91,7 @@ on:
       - 'scripts/test_guard_vm_tpm_socket.py'
       - 'scripts/command2_clone_vms.sh'
       - 'scripts/plan_guestfs_dependency_impact.sh'
+      - 'scripts/plan_minimal_hivex_backend.sh'
       - 'config/command2-profile.example.json'
       - 'scripts/test_command2_clone_vms.py'
       - 'scripts/test_command2_lifecycle.py'
@@ -144,6 +146,7 @@ jobs:
           bash -n scripts/command1_pre_vm.sh
           bash -n scripts/command2_clone_vms.sh
           bash -n scripts/plan_guestfs_dependency_impact.sh
+          bash -n scripts/plan_minimal_hivex_backend.sh
           bash -n scripts/bootstrap_virtualization_stack.sh
           bash -n scripts/diagnose_swtpm_startup.sh
           bash -n scripts/audit_swtpm_localca_access.sh
