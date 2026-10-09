@@ -5,7 +5,7 @@ Ask VM count if omitted. Requires a reviewed JSON deployment profile and
 an existing isolated libvirt network. Apply mode provisions clones from a
 verified COLD master snapshot, personalizes offline, starts only benign
 validation guests, checks host ping + CAPE agent, creates analysis snapshots,
-and updates CAPE machine registration after all guests pass.
+and writes a Command 3 machine handoff only after all guests pass.
 
 NOT a network-isolation certificate or permission to run live malware.
 No automatic host/guest security disablement. Never mutates master disks.
@@ -34,6 +34,7 @@ import guard_vm_tpm_socket
 import guard_vm_backing_access
 import export_cold_master_disk
 import personalize_clone_windows
+import probe_cold_windows_volume_crypto
 import register_cape_clones
 import verify_clone_agent
 
@@ -265,6 +266,19 @@ def preflight(profile: dict, count: int, mode: str) -> tuple[list[dict], str, st
         profile["master"], profile["snapshot"])
     if len(chain) < 2:
         raise ProvisionError("Master does not have expected external snapshots")
+    # Checked before any clone export, definition, NVRAM copy or boot.
+    # A disk may be structurally valid QCOW2 but contain Windows BitLocker
+    # encryption bound to the original swtpm. Such a clone is not suitable
+    # for offline hive-based static IPv4 personalization.
+    if mode == "apply":
+        try:
+            probe_cold_windows_volume_crypto.require_cleartext_candidate(
+                Path(top))
+        except probe_cold_windows_volume_crypto.VolumeProbeError as exc:
+            raise ProvisionError(
+                "Windows master encryption preflight blocked: "
+                + str(exc)
+            ) from exc
     master_xml = virsh("dumpxml", "--inactive", profile["master"])
     root = ET.fromstring(master_xml)
     nvram = root.find("./os/nvram")
