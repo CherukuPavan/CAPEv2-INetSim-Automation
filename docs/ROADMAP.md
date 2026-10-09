@@ -346,3 +346,9 @@ The user explicitly confirmed that the objective includes **executing real malwa
 - User screenshot of `win11 on QEMU/KVM` shows a functioning Windows 11 desktop after guest installation and initial setup; **Windows OS installation is complete**, and Step12H/12P TPM/AppArmor repairs allow this specific VM to boot. The guest remains named **`win11`**.
 - **Next immediate check:** Windows Settings → System → About → Windows specifications, screenshot edition/version/build; expect Windows 11 Pro from installer choice. This is read-only and does not require terminal commands.
 - **Not yet done or demonstrated:** CAPE agent and Windows guest preparation, guest tools/snapshot, reconciling CAPE machinery config's `cuckoo1` with real `win11`, parallel VMs, separate INetSim guest, malware-network isolation, or verified three-command automation on fresh hosts. Avoid claims that full CAPE deployment is ready. Keep user workflow manual-on-SSL-55 and record validated steps in `development`.
+
+### Step 12S — Windows 11 Pro edition, version and OS build confirmed (2026-10-09)
+
+- User screenshot shows `win11` guest Settings/About **Windows 11 Pro**, **version 26H2**, **OS build 26300.9457**, installed **09-10-2026**, running with local Windows account and usable desktop. This verifies OS edition after successful Step12P/12Q TPM startup workaround and Step12R installation completion.
+- Pending after this milestone: read-only KVM guest definition inventory; subsequent supervised Windows guest configuration (guest agent, analysis agent, guest services, software, snapshot); reconcile CAPE guest name `win11`; establish a separate isolated analysis network / INetSim VM and containment gates; eventually test portable three-command installer on another supported fresh machine.
+- Do not claim readiness for CAPE samples or full automation yet. Keep host guest modifications approved/manual and only commit sanitized reproducible code to `development`.
