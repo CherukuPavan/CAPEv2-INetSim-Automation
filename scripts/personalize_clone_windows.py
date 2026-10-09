@@ -173,16 +173,33 @@ def disk_guard(disk: Path) -> None:
     qinfo = json.loads(execute("qemu-img", "info", "--output=json", str(disk)))
     if qinfo.get("format") != "qcow2" or qinfo.get("backing-filename"):
         raise Stop("Clone disk must be a flattened QCOW2 image without any backing")
+    target = str(disk.resolve(strict=True))
     names = execute("virsh", "-c", "qemu:///system", "list", "--all", "--name").splitlines()
     for name in names:
         if not VM.fullmatch(name):
             raise Stop("Invalid libvirt domain name in host inventory")
         xml = ET.fromstring(execute("virsh", "-c", "qemu:///system", "dumpxml", "--inactive", name))
-        for src in xml.findall("./devices/disk/source"):
-            if src.get("file") == str(disk):
-                raise Stop(f"Clone image already attached to libvirt domain {name}")
-    # Remaining limitation: a running QEMU process or unlisted externally
-    # attached image can hold the file; guestfs locking must not be bypassed.
+        for src in xml.findall("./devices/disk[@device='disk']/source"):
+            attached = src.get("file")
+            if not attached:
+                raise Stop(f"Uninspectable storage device in {name}")
+            if target == str(Path(attached).resolve(strict=True)):
+                raise Stop(f"Clone image is already a libvirt domain disk: {name}")
+            # Check ALL QCOW2 backing images, not only active top disks.
+            # Otherwise a standalone master base image could be altered
+            # despite being the backing layer of another VM.
+            chain_json = execute("qemu-img", "info", "--output=json",
+                                 "--backing-chain", attached)
+            try:
+                chain = json.loads(chain_json)
+                referenced = {str(Path(a["filename"]).resolve(strict=True))
+                              for a in chain}
+            except (ValueError, KeyError, TypeError, OSError) as exc:
+                raise Stop("Cannot establish every libvirt VM backing-image path") from exc
+            if target in referenced:
+                raise Stop(f"Image is part of the backing chain for {name}")
+    # External writers not tracked by libvirt are prohibited by operating
+    # policy and QEMU/libguestfs file locks must never be overridden.
 
 
 def prepare(disk: Path, old_ip: str, new_ip: str, hostname: str,
