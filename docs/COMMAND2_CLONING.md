@@ -42,10 +42,14 @@ The requested final behavior is:
    CAPE agent on port 8000. The HTTP response must identify the
    CAPE agent and report administrator privileges. A different
    machine answering at that IP is not an acceptable PASS.
-8. Create a running-state CAPE analysis snapshot; shut down; restart and
-   recheck ping/CAPE agent; restore the fresh clone's analysis snapshot
-   and recheck ping/CAPE agent. This avoids merely assuming that an
-   untested snapshot is reusable.
+8. Explicitly request **external disk plus external RAM** snapshot files
+   for the running clone (never depend on implicit libvirt defaults).
+   Validate the snapshot metadata and paths, then shut down. Generate
+   exact-path AppArmor **read + lock (rk)** permissions for the new
+   read-only QCOW2 backing image before restart. Recheck ping/CAPE
+   agent after restart, then restore the fresh clone's analysis snapshot
+   and verify those same checks again. The image/snapshot semantics must
+   still be validated on the destination libvirt/QEMU version.
 9. Once **every** clone is healthy, write a private Command 3 handoff
    containing verified VM names, IPs, UUIDs, analysis bridge and snapshot
    names. **Do not edit CAPE machinery configuration in Command 2.**
@@ -124,6 +128,13 @@ the operator's account after inspection and redaction.
   occupied target analysis network, malformed/unsupported guest definition,
   unavailable offline Registry backend, missing NVRAM, or NAT/forwarding
   network **blocks apply**.
+- The snapshot creates a new QCOW2 overlay and external guest memory file
+  at predictable, clone-specific paths. The tool refuses to reuse existing
+  paths and verifies the metadata. The new overlay makes the previously
+  active clone disk a backing layer; its file must receive AppArmor
+  `rk` access, reproducing the verified SSL-55 master repair without
+  granting an entire directory. A host unable to parse/reload the
+  narrow policy must stop rather than disable QEMU file locking.
 - The master is required to remain shut off. Export uses native QEMU
   locking; no unsafe `-U` bypass. No disk rebasing on the master.
 - IP personalization is attempted **before any clone is networked**;
