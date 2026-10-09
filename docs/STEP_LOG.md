@@ -476,3 +476,32 @@ Previous assistant-guided QEMU/libvirt installation and rollback were explorator
 - **Independently retrieved Microsoft SHA-256 table:** Microsoft's **Windows 11** download page, `https://www.microsoft.com/en-in/software-download/windows11`, under **Verify your download / English 64-bit**, lists the exact same **`BD4307DF32BC8AF33B39CCECB1174AEB345386630F89A2B86C7A4E36B55EA650`**. The official page's published verification instructions say a matching SHA-256 confirms the downloaded file was not altered relative to Microsoft's ISO. This is an **exact digest match**; hash provenance was independently checked against Microsoft's site in this session. Microsoft page may change as releases rotate; record digest with this verification date rather than silently using for unrelated later ISO versions.
 - **Outcome:** **Step 12A ISO acquisition, bootable media signature, size, and Microsoft checksum verification PASS.** No need to download, rename, hash or revalidate this exact unchanged ISO again.
 - **Separate pending task:** CAPEv2 agent/monitor guest build compatibility, Windows licence, resource allocations, UEFI/TPM, snapshot naming, and dedicated **nonforwarding analysis network** with proven IPv4/IPv6 containment. Do not connect malware-analysis guests to libvirt's default NAT network or run live malware before isolation tests. The ISO is verified; **the Windows VM and malware environment are not yet installed or certified**.
+
+## Step 12B — Windows VM resource and libvirt preflight report (2026-10-09)
+
+**Evidence:** User uploaded `SSL55_Step12B_VMPreflight_20261009_064559_5K3Vyjwp.txt`, produced by a read-only command. It did **not** create VMs, change networks, install packages, restart services, or modify the ISO.
+
+### Confirmed host and virtualization results
+
+- Intel Core **i9-13900 (13th Gen)**, `x86_64`, **32 logical CPUs** (`nproc=32`), Intel **VT-x**. Do not interpret 32 as physical core count.
+- `free -h`: **62 GiB total RAM**, **56 GiB available**, **8 GiB unused swap**.
+- Both `$HOME` and `/var/lib/libvirt/images` currently reside on root filesystem with **289 GiB free** (937 GiB total; 601 GiB used). This is enough for an initial proposed virtual disk, but multi-VM capacity/snapshot growth requires further budgeting.
+- `virsh`, `virt-manager`, `virt-install`, `qemu-system-x86_64`, `qemu-img` all **present**; **`swtpm` absent**. OVMF UEFI code/variable firmware files **present** under `/usr/share/OVMF/`, including `OVMF_CODE_4M.fd`, `OVMF_CODE_4M.secboot.fd`, `OVMF_VARS_4M.fd`.
+- `virsh -c qemu:///system version`: libvirt **11.1.0**, QEMU hypervisor **9.2.2**. `libvirtd.service` **inactive/dead** while **`virtqemud.service` active/running**; modular daemon functioning, so legacy unit inactive alone is **not** a virtualization failure.
+- `virsh list --all`: **zero defined guests**. `cuckoo1`: **not found or not accessible**, consistent with earlier CAPE/processor restart root cause.
+- `virsh net-list --all`: `default` **active, autostart YES, persistent YES** (**changed from earlier observed transient default network**, not an error). Actual XML `forward mode=nat`; default NAT remains **UNSAFE for live malware analysis**, not proof of isolation.
+
+### Required preparation at the user's next manual VM steps
+
+1. **Windows 11 TPM:** `swtpm` executable is **not found**; validate/provision software TPM 2.0 using a compatible supported package as part of the reviewed Windows VM configuration. Do not automatically bypass Windows 11 TPM requirements or alter host firmware.
+2. **ISO permissions:** Verified Microsoft ISO is `/home/charan/Downloads/Win11.iso` (**9,047,330,816 bytes**, official SHA256 PASS in Step12A). `/home/charan` has `drwxr-x---` (0750) and `Downloads` 0755; therefore a libvirt/QEMU service account **may** be unable to traverse the home directory. The actual QEMU process UID/GID and file access have **not** been tested; review at the time of guest creation. Prefer controlled ISO staging to a libvirt-accessible storage area; **do not chmod /home/charan globally** or weaken home confidentiality.
+3. **Networking:** Create/validate a dedicated lab-only analysis network with no external NAT/host/institution LAN path; do not attach a malware-analysis guest to the `default` NAT bridge. Guest-side IPv4 and IPv6 negative egress plus host forwarding/firewall policy must pass before handling real malware.
+4. **Resources and snapshot:** Choose VM vCPU/RAM/disk with reserve for host, additional Windows guests and INetSim; guest EFI/TPM, CAPE agent/monitor, and snapshot correctness require separate verification.
+5. **Services:** The previously identified unrelated Suricata startup failure and six missing optional modules in `cape` Python are still independent follow-ups; do not rerun base installer merely because `cuckoo1` is absent.
+
+**Diagnostic conclusion:** Windows VM hardware/virt-stack preflight **PASS**, pending media access, software TPM, safe network and VM definition. **No more generic host diagnostics needed before user shares the next VM command from their document.**
+
+### Automation
+
+Added `scripts/audit_windows_vm_preflight.py` and synthetic tests `scripts/test_audit_windows_vm_preflight.py` to `development`, integrated via `scripts/command1_pre_vm.sh preflight-windows [--iso ABSOLUTE_PATH]`. This is **read-only**, writes one private 0600 JSON report, identifies NAT/TPM/ISO access-review issues, and never marks malware containment verified. It is **not a provisioning/guest installer**, has **not been run on SSL-55**, and does not replace user-executed Step12B evidence.
+
