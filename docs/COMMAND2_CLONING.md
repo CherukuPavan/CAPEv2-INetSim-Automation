@@ -29,11 +29,19 @@ The requested final behavior is:
    the IP registry result. This is a **clone-only** modification, never
    a change to `win11`.
 6. Guest NIC attaches only to the explicitly approved nonforwarding
-   libvirt network. Libvirt graphics ports are automatically allocated
-   and USB redirection is stripped to protect the shared host.
+   libvirt network. Libvirt graphics ports are automatically allocated,
+   and USB redirection plus the SPICE clipboard channel are omitted to
+   protect the shared host. Immediately after defining the clone,
+   libvirt's actual UUID, disk, MAC, NIC, NVRAM and emulated TPM are
+   read back and compared with the intended configuration. A per-clone
+   swtpm AppArmor socket exception is validated **before** boot.
 7. Boot the clone for harmless connectivity checks. Ubuntu must
-   successfully ping its new IP and obtain a genuine JSON CAPE agent
-   response on port 8000 indicating administrator privileges.
+   successfully ping the new IP **via the selected analysis bridge**,
+   verify that its IPv4 ARP neighbor MAC matches the exact clone's
+   assigned MAC, and run a direct **curl --interface** request to the
+   CAPE agent on port 8000. The HTTP response must identify the
+   CAPE agent and report administrator privileges. A different
+   machine answering at that IP is not an acceptable PASS.
 8. Create a running-state CAPE analysis snapshot; shut down; restart and
    recheck ping/CAPE agent; restore the fresh clone's analysis snapshot
    and recheck ping/CAPE agent. This avoids merely assuming that an
@@ -111,21 +119,27 @@ the operator's account after inspection and redaction.
 
 - A missing/uncertain snapshot, changing source, incomplete image chain,
   insufficient conservative disk/RAM resources, duplicate VM names/IPs,
-  malformed/unsupported guest definition, unavailable offline Registry
-  backend, missing NVRAM, or NAT/forwarding network **blocks apply**.
+  existing CAPE IP registrations, libvirt DHCP pools/reservations, an
+  occupied target analysis network, malformed/unsupported guest definition,
+  unavailable offline Registry backend, missing NVRAM, or NAT/forwarding
+  network **blocks apply**.
 - The master is required to remain shut off. Export uses native QEMU
   locking; no unsafe `-U` bypass. No disk rebasing on the master.
 - IP personalization is attempted **before any clone is networked**;
   the old static IPv4 is never deliberately enabled in parallel.
-- If guest ping/CAPE agent verification fails, no other clone is started
-  and the failed new guest is force-stopped. Its disk and definition are
-  preserved for investigation; the master and earlier clones are not
-  deleted. A partially modified cloned disk may require disposal and
-  recreation, not unsafe in-place retry.
+- If guest ping/CAPE agent verification fails, no other clone is started.
+  The orchestrator attempts to stop only the currently failed new guest
+  **after independently verifying its exact libvirt UUID**. It never
+  destroys the master or other students' VMs. Disks and definitions remain
+  for investigation; a partially modified clone can require disposal and
+  recreation rather than unsafe in-place retry.
 - Crash, SIGKILL, power loss, unexpected libvirt QEMU behavior and partial
-  package updates are **not** fully transactional. Re-running with an
-  existing destination refuses to overwrite it. Durable operator journal
-  entries support recovery but do not certify automatic rollback.
+  package updates are **not** fully transactional. The apply command holds
+  a root-owned nonblocking **flock**, preventing two Command 2 instances
+  from provisioning simultaneously. Each stage writes a private, fsynced,
+  uniquely named journal event, including rapid same-second operations.
+  Re-running with an existing destination refuses to overwrite it.
+  Journal entries support recovery but do not certify automatic rollback.
 - The MAC, UUID, Windows hostname and IP changes intentionally diverge
   from the master. UEFI variable state is copied, while emulated TPM
   runtime state must remain separate. A guest using BitLocker or other
@@ -141,6 +155,29 @@ the operator's account after inspection and redaction.
   network reachability tests and institutional authorization are mandatory
   before live samples. See
   [containment policy](LIVE_MALWARE_CONTAINMENT_POLICY.md).
+
+
+### Per-clone TPM/AppArmor access
+
+SSL-55's completed `win11` originally needed a narrow AppArmor
+allowance for its `swtpm` Unix socket. The cloned domains use distinct
+`*-win11_N-swtpm.sock` socket names, so a new guarded
+`scripts/guard_vm_tpm_socket.py` creates a per-clone-named, exact-suffix
+read/write socket path allowance and syntax-checks the policy before
+a benign test boot. It refuses conflicts, missing include mechanisms
+or changed VM UUIDs, and attempts to remove its own rule if validation
+fails. The permission is stored in the **shared** QEMU abstraction even
+though the allowed socket *path* names only one clone. Shared policy
+isolation must be assessed before real malware deployment: the rule
+is not equivalent to a fully separate per-VM AppArmor profile.
+
+### Operator default
+
+`bash scripts/command2_clone_vms.sh` now defaults to the **read-only
+`--plan`** mode. Only an explicit `--apply`, after an approved
+isolated network and host-specific dependency tests, can create a
+new VM. It always asks for a count, then uses names `win11_1`,
+`win11_2`, and so forth.
 
 ## Known blockers on SSL-55 right now
 
