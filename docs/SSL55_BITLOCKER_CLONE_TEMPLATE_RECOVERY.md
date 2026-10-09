@@ -357,3 +357,35 @@ devices are present on this machine.
 The SSL-55 host report confirms that the inactive maintenance domain definition was accepted, contained no network interface/USB redirection/guest channels, and was immediately returned to the original backed-up definition. Current cold snapshot and TPM/NVRAM metadata remained unchanged; no Windows boot or BitLocker operation occurred. This proves an offline *domain-definition* roundtrip, not actual BitLocker recovery.
 
 An additional development-only guarded startup component was drafted at `scripts/start_win11_isolated_bitlocker_maintenance.py`. It stages the same original-TPM/no-network working-overlay definition, checks the live domain while paused, and resumes Windows only after validation. It does not decrypt Windows. This new startup code has not yet been tested on SSL-55; all host deployment remains subject to review.
+
+## First isolated original-TPM Windows maintenance boot succeeded — 2026-10-09 22:58 UTC
+
+Operator uploaded `CAPE_Win11_Isolated_Maintenance_Boot_20261009_225805_suxbkrGs.txt`
+and confirmed the Windows 11 desktop/login screen appears in virt-manager.
+
+Host log confirms:
+- Temporary inactive maintenance definition accepted with no guest NIC.
+- QEMU initially started paused, live XML was validated with **no network
+  interface or USB redirection**, and Windows was resumed.
+- Result `ISOLATED_MAINTENANCE_VM_RUNNING`.
+- Working disk is
+  `/var/lib/libvirt/images/win11.cape-bitlocker-maintenance.qcow2`,
+  backed by the unchanged original cold QCOW2 chain.
+- Original virtual TPM and NVRAM pairing retained. The maintenance
+  domain is **still defined**, so do not restore the original definition
+  while the guest is running.
+- No BitLocker changes were performed by the host script.
+
+Next guest-side gate (read only): operator logs into Windows, opens
+**elevated Command Prompt** and runs `manage-bde -status C:` to check
+Conversion Status, Percentage Encrypted, Protection Status, and Lock
+Status. No `manage-bde -off` until the user reports these values and
+the decryption/write-capacity plan is confirmed. Do not request or
+upload any BitLocker recovery key, TPM contents or private state.
+
+**Critical state:** `win11` is now running **in maintenance mode**.
+Do NOT reboot into NAT, restore the original libvirt XML live, run a
+snapshot revert, delete the maintenance overlay or forcibly halt the
+VM. The local root-private preservation backup remains intact.
+Windows desktop appearance indicates TPM unlock may have succeeded
+but does not yet establish the C: volume's actual BitLocker state.
