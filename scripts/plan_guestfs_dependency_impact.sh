@@ -1,53 +1,76 @@
 #!/usr/bin/env bash
-# Read-only plan for libguestfs package dependencies on Ubuntu 24.04.
-# No apt update, package install, removal, daemon restart or VM operation.
+# Read-only libguestfs dependency impact analysis. Never install packages.
+# For CAPE hosts using custom QEMU/libvirt, any virtualization-stack
+# transaction is a hard-stop rather than an automatic dependency repair.
 set -Eeuo pipefail
 umask 077
+
 OUT="${1:-$HOME/cape_guestfs_dependency_plan_$(date +%Y%m%d_%H%M%S)_$$.txt}"
-if [[ "$OUT" != /* ]]; then
-  echo "Output path must be absolute" >&2
-  exit 2
+[[ "$OUT" == /* ]] || { echo "Absolute report path required" >&2; exit 2; }
+[[ ! -e "$OUT" && ! -L "$OUT" ]] || {
+  echo "Report exists; refusing overwrite: $OUT" >&2; exit 2;
+}
+for tool in apt-get apt-cache dpkg-query awk mktemp; do
+  command -v "$tool" >/dev/null || { echo "Missing $tool" >&2; exit 2; }
+done
+
+# Operate exclusively on local cached APT package metadata.
+SIMLOG=$(mktemp)
+trap 'rm -f -- "$SIMLOG"' EXIT
+SIM_EXIT=0
+apt-get -s --no-install-recommends install guestfs-tools >"$SIMLOG" 2>&1 || SIM_EXIT=$?
+
+BLOCKED=0
+if [[ "$SIM_EXIT" -ne 0 ]]; then BLOCKED=1; fi
+# New QEMU/libvirt packages may overlap with custom /usr binaries or ABI,
+# even when apt reports no removals. Filesystem conflicts may be unseen in -s.
+if grep -Eq '^(Inst|Remv|Purg) (qemu[^ ]*|libvirt[^ ]*|libvirt0|seabios)( |$)' "$SIMLOG"; then
+  BLOCKED=1
 fi
-if [[ -e "$OUT" || -L "$OUT" ]]; then
-  echo "Report already exists; refusing overwrite: $OUT" >&2
-  exit 2
+if grep -Eq '^([0-9]+ upgraded, .* [1-9][0-9]* to remove|Remv |Purg )' "$SIMLOG"; then
+  BLOCKED=1
 fi
-if ! command -v apt-get >/dev/null || ! command -v dpkg-query >/dev/null; then
-  echo "APT or dpkg-query unavailable; not an Ubuntu APT host" >&2
-  exit 2
-fi
-exec 3>"$OUT"
-chmod 0600 "$OUT"
+
 {
-  echo "=== CAPE guestfs dependency PREVIEW ONLY ==="
+  echo "=== CAPE guestfs host dependency transaction — READ ONLY ==="
   date -Is
+  echo "Operator action: NEVER run apt install from this preview."
   echo
-  echo "== OS =="
+  echo "=== OS ==="
   grep -E '^(ID|VERSION_ID|PRETTY_NAME)=' /etc/os-release || true
   echo
-  echo "== current guestfs tools =="
-  for t in virt-win-reg guestfish qemu-img virsh; do
-    if command -v "$t" >/dev/null; then
-      echo "$t: $(command -v "$t")"
-    else
-      echo "$t: MISSING"
-    fi
+  echo "=== Guestfs/QEMU/libvirt binaries ==="
+  for tool in virt-win-reg guestfish qemu-img qemu-system-x86_64 virsh swtpm; do
+    command -v "$tool" || echo "$tool: MISSING"
   done
   echo
-  echo "== package candidates (local apt metadata only; no apt update) =="
-  apt-cache policy guestfs-tools libguestfs-tools guestfish libguestfs0t64 || true
+  echo "=== Package holds ==="
+  apt-mark showhold 2>/dev/null || true
   echo
-  echo "== simulated minimal dependency transaction =="
-  # Apt simulation does not execute dpkg, download data, or update sources.
-  set +e
-  apt-get -s --no-install-recommends install guestfs-tools
-  RESULT=$?
-  set -e
+  echo "=== Package candidates (read-only) ==="
+  apt-cache policy guestfs-tools libguestfs-tools libvirt0 qemu-system-x86 qemu-utils || true
   echo
-  echo "APT_SIMULATION_EXIT_CODE=$RESULT"
-  echo "== package transaction summary =="
-  echo "Review all Inst/Remv/Conf lines before authorizing installation."
-} >&3 2>&3
-exec 3>&-
+  echo "=== Complete APT simulation ==="
+  cat "$SIMLOG"
+  echo
+  echo "=== Potentially dangerous virtualization changes ==="
+  grep -E '^(Inst|Remv|Purg) (qemu[^ ]*|libvirt[^ ]*|seabios)( |$)' "$SIMLOG" || true
+  echo
+  echo "APT_SIMULATION_EXIT_CODE=$SIM_EXIT"
+  if [[ "$BLOCKED" -ne 0 ]]; then
+    echo "DEPENDENCY_DECISION=BLOCKED"
+    echo "Reason: failed simulation or host virtualization stack package transaction."
+    echo "No installation authorized. Choose an isolated/verified customization method."
+  else
+    echo "DEPENDENCY_DECISION=REVIEW_REQUIRED"
+    echo "Not automatic installation approval; inspect all packages and host ABI."
+  fi
+  echo "No software, network, VM or snapshot changes performed."
+} >"$OUT"
+
 echo "Read-only dependency report: $OUT"
-echo "No packages, VM disks, networks, or system settings were changed."
+if [[ "$BLOCKED" -ne 0 ]]; then
+  echo "BLOCKED: dependency plan touches QEMU/libvirt/firmware or has errors." >&2
+  exit 2
+fi
+echo "No automatic installation authorized; manual compatibility review required."
