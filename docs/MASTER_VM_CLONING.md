@@ -34,7 +34,11 @@ It uses `sudo -n virsh` only for **read-only** operations and never calls
 
 It records the persistent VM's storage, network, TPM and guest-agent
 configuration, libvirt snapshot state/parents/memory/disk metadata,
-VM-attached networks and whether NAT/forwarding is configured. When the
+VM-attached networks and whether NAT/forwarding is configured. It also
+reads only allowlisted CAPE KVM machine fields (name, label, IP, snapshot,
+platform, interface) from recognized installation paths, never passwords or
+complete config contents. If none of the paths is accessible, it records
+that as unverified rather than guessing. When the
 VM is **running**, it intentionally skips `qemu-img info` on the active
 disk to avoid touching a potentially in-use image; if shut off, it attempts
 a read-only backing-chain inspection. Any CAPE machine list or static
