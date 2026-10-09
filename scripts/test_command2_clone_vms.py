@@ -89,6 +89,44 @@ class IdentityTests(unittest.TestCase):
         with self.assertRaisesRegex(c.ProvisionError,"between"):
             c.candidates(100,PROFILE,set())
 
+    def test_libvirt_dhcp_range_cannot_overlap_static_ip(self):
+        xml=("<network><name>cape-isolated</name><ip address='198.51.100.1'>"
+             "<dhcp><range start='198.51.100.100' end='198.51.100.130'/>"
+             "</dhcp></ip></network>")
+        with patch.object(c,"virsh",return_value=xml):
+            with self.assertRaisesRegex(c.ProvisionError,"DHCP"):
+                c.check_dhcp_conflicts("cape-isolated",["198.51.100.110"])
+
+    def test_libvirt_dhcp_nonoverlap_accepted(self):
+        xml=("<network><name>cape-isolated</name><ip address='198.51.100.1'>"
+             "<dhcp><range start='198.51.100.50' end='198.51.100.80'/>"
+             "</dhcp></ip></network>")
+        with patch.object(c,"virsh",return_value=xml):
+            c.check_dhcp_conflicts("cape-isolated",["198.51.100.110"])
+
+    def test_target_network_must_not_have_any_existing_guest(self):
+        with patch.object(c,"virsh",return_value=(
+            "<domain><devices><interface type='network'>"
+            "<source network='cape-isolated'/></interface></devices></domain>")):
+            with self.assertRaisesRegex(c.ProvisionError,"already has VM"):
+                c.check_empty_target_network("cape-isolated",{"other-student-vm"})
+
+    def test_repeated_reports_in_same_second_have_unique_names(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp:
+            first=c.write_report(Path(tmp),{"journal_event":"START"})
+            second=c.write_report(Path(tmp),{"journal_event":"START"})
+            self.assertNotEqual(first,second)
+            self.assertEqual(len(list(Path(tmp).glob("*.json"))),2)
+
+    def test_failed_owned_guest_uuid_check_prevents_other_vm_shutdown(self):
+        xml="<domain><uuid>289d89be-68ec-4c62-90e1-ea930849266f</uuid></domain>"
+        with patch.object(c,"virsh",return_value="wrong-uuid") as call:
+            with self.assertRaisesRegex(c.ProvisionError,"UUID differs"):
+                c.stop_failed_owned_guest("win11_1",xml)
+        self.assertEqual(call.call_count,1)
+
     def test_network_nat_blocks(self):
         with patch.object(c,"virsh",
             return_value="<network><name>cape-isolated</name><forward mode='nat'/>"
