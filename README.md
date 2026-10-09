@@ -103,9 +103,23 @@ python3 scripts/audit_clone_master.py --vm win11 \\
 
 [Cloning workflow and remaining safety gates](docs/MASTER_VM_CLONING.md).
 
-**Do not run the cloned guests in parallel yet.** The collector does not
-alter VM snapshots, inject guest IPs or create clones, and no clone-deployment
-command is ready for use.
+The supplied final master inventory now establishes a current **shut-off**
+clone-source candidate with four QCOW2 layers, while also detecting legacy
+CAPE machine registration and a NAT guest network. New offline development
+modules:
+
+- `scripts/plan_vm_clones.py`: accepts a user-specified VM count and
+  proposes distinct names, identities and optional IP allocations; it flags
+  resource, snapshot, network and guest-customization blockers.
+- `scripts/export_cold_master_disk.py`: read-only preflight or explicitly
+  requested offline export of one independent flattened QCOW2 disk. It
+  **does not** create or start a guest.
+- [Complete evidence, usage, safety gates and status](docs/MASTER_VM_CLONING.md).
+
+**Do not start clones yet.** The master CAPE mapping, independent guest
+IP/Windows identity modification, per-clone TPM/NVRAM, secure network and
+rollback still require implementation and testing. CI checks are offline
+only, not live deployment certification.
 
 ## Workflow
 
