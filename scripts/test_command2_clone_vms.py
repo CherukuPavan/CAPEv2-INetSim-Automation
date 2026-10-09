@@ -153,7 +153,7 @@ class IdentityTests(unittest.TestCase):
                 "status":"CLONE_SHUT_OFF_READY_FOR_CAPE_REGISTRATION"}
         with patch.object(c,"preflight",return_value=(
                     items,master,"/synthetic/top","virbr2","/synthetic/nvram")), \
-             patch.object(c,"create_one",return_value=result), \\
+             patch.object(c,"create_one",return_value=result), \
              patch.object(c.register_cape_clones,"apply_config") as forbidden:
             outcome=c.run(dict(PROFILE),1,"apply",Path("/tmp/unused"))
         self.assertEqual(outcome["status"],
