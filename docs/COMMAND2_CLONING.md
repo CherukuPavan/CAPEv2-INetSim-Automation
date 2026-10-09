@@ -46,13 +46,13 @@ The requested final behavior is:
    recheck ping/CAPE agent; restore the fresh clone's analysis snapshot
    and recheck ping/CAPE agent. This avoids merely assuming that an
    untested snapshot is reusable.
-9. Once **every** clone is healthy, update CAPE KVM machine registration
-   from a protected, backed-up config file, retaining existing defined
-   machines and removing *undefined stale names from the active list*.
-   The original comments and unrelated sections are preserved.
-10. Leave guests shut off, record a per-step journal and operator report.
-    CAPE service restarts and independent malware containment signoff
-    are a separate operational gate.
+9. Once **every** clone is healthy, write a private Command 3 handoff
+   containing verified VM names, IPs, UUIDs, analysis bridge and snapshot
+   names. **Do not edit CAPE machinery configuration in Command 2.**
+10. Leave guests shut off and save a per-step journal and operator report.
+    Updating `kvm.conf`, removing stale CAPE entries, restarting services
+    and testing the CAPE web UI belong exclusively to **Command 3**.
+    INetSim belongs to **Command 4**.
 
 **No actual SSL-55 clones have yet been created or started.**
 The repository's GitHub Actions tests are synthetic/offline and cannot
@@ -110,8 +110,9 @@ bash scripts/command2_clone_vms.sh --apply
 Command 2 in `--apply` mode is **not a harmless dry-run**: it creates
 independent disk files, updates *clone* Windows registry settings, creates
 libvirt domains/NVRAM, starts benign Windows guests, creates/reverts clone
-snapshots, and updates CAPE machinery configuration. Plan mode does none
-of those changes. Each generated report is under
+snapshots, and writes the private machine handoff for Command 3.
+It deliberately **does not** edit `kvm.conf` or restart CAPE services.
+Plan mode does none of those changes. Each generated report is under
 `/var/log/cape-clone/`, root-readable by default, and can be copied to
 the operator's account after inspection and redaction.
 
@@ -185,9 +186,10 @@ new VM. It always asks for a count, then uses names `win11_1`,
    verified, non-NAT/non-forwarding analysis network was established
    in the latest inventory. Command 2 will refuse to deploy on NAT.
 2. `kvm.conf` still actively lists absent `cuckoo1` while the master is
-   `win11`. The guarded CAPE config renderer can retain valid existing
-   libvirt guests and replace stale active machine IDs *only after*
-   successful clone verification, but has not been tested on SSL-55.
+   `win11`. Command 2 treats existing CAPE IPs as reserved, but will
+   **not** change any machinery entries. Command 3 must reconcile and
+   independently revalidate all machine and snapshot mappings before
+   applying an approved configuration change.
 3. No QEMU Guest Agent channel is available; offline Windows Registry
    changes via `virt-win-reg` are the candidate, not a verified Windows
    guest customization result. `virt-win-reg` compatibility and
@@ -199,5 +201,5 @@ new VM. It always asks for a count, then uses names `win11_1`,
    to run live malware has not been independently documented. Benign
    clone/agent tests only after isolation review.
 
-Do not mark the overall three-command installer complete until Command 2
+Do not mark the overall four-command installer complete until Command 2
 passes a separate, independent host acceptance matrix and end-to-end tests.
