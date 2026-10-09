@@ -1,73 +1,103 @@
 #!/usr/bin/env bash
-# Narrow AppArmor workaround for one guest's swtpm Unix socket /run alias.
-# Default --plan is read only. --apply appends ONE specific AppArmor allow rule
-# to the existing local abstraction, preserving the standard /etc/apparmor.d
-# policy and all other guest profiles; no AppArmor/global daemon restart.
+# Narrow reversible workaround for known libvirt virt-aa-helper /var/run -> /run
+# generated AppArmor rule mismatch. On SSL-55 the static libvirt-qemu abstraction
+# contains "include if exists <abstractions/libvirt-qemu.d>".
 #
-# This is a diagnostic remediation for documented libvirt /var/run -> /run
-# rule-generation mismatch, NOT proof that AppArmor is the only cause of EACCES.
+# --plan (default): no changes.
+# --apply: add only an allow rule for the win11 swtpm socket under the verified
+# included directory. No global disablement or service restart.
+# This policy inclusion is shared across guest profiles, but the added rule
+# matches only filenames ending in -win11-swtpm.sock. Only one VM is allowed.
 set -euo pipefail
 umask 077
+
 MODE=plan
-VM=win11
-while (($#)); do
- case "$1" in
-   --plan) MODE=plan; shift ;;
-   --apply) MODE=apply; shift ;;
-   --vm) (($#>=2)) || exit 2; VM=$2; shift 2 ;;
-   -h|--help) echo "Usage: $0 [--plan|--apply] [--vm win11]"; exit 0 ;;
-   *) echo "Unknown option $1" >&2; exit 2 ;;
- esac
-done
-# No broad wildcard guest names accepted: reviewed fix is for the user's win11 only.
-[[ "$VM" == "win11" ]] || { echo "Only reviewed win11 guest is supported." >&2; exit 2; }
-[[ $EUID -ne 0 ]] || { echo "Run from regular user; sudo will be scoped." >&2; exit 2; }
+case "${1:---plan}" in
+  --plan) MODE=plan ;;
+  --apply) MODE=apply ;;
+  -h|--help)
+    printf 'Usage: bash %s [--plan|--apply]\n' "$0"
+    exit 0 ;;
+  *) echo "Invalid argument (use --plan or --apply)" >&2; exit 2 ;;
+esac
+(( $# <= 1 )) || { echo 'Too many arguments' >&2; exit 2; }
+[[ $EUID -ne 0 ]] || { echo 'Run as regular user; sudo is scoped.' >&2; exit 2; }
 sudo -v
-REPORT=$(mktemp "${HOME:?}/SSL55_TPMSocket_AA_${MODE}_$(date +%Y%m%d_%H%M%S)_XXXXXXXX.txt")
+
+DIR=/etc/apparmor.d/abstractions/libvirt-qemu.d
 BASE=/etc/apparmor.d/abstractions/libvirt-qemu
-LOCAL=/etc/apparmor.d/local/abstractions/libvirt-qemu
-RULE='/run/libvirt/qemu/swtpm/*-win11-swtpm.sock rw,'
-{
- echo "Mode=$MODE, guest=$VM"
- state=$(virsh -c qemu:///system domstate win11)
- echo "Guest state=$state"
- [[ "$state" == "shut off" ]] || { echo "STOP: VM must be shut off."; exit 3; }
- [[ $(sudo cat /sys/module/apparmor/parameters/enabled 2>/dev/null || true) == Y ]] || { echo "STOP: AppArmor module not enabled."; exit 3; }
- [[ $(sudo awk '/^[[:space:]]*security_driver[[:space:]]*=/{gsub(/[ \t\"]/, "", $3); print $3}' /etc/libvirt/qemu.conf 2>/dev/null | tail -1) == apparmor ]] || {
-  echo "STOP: explicit AppArmor libvirt driver not established."; exit 3;
- }
- sudo test -f "$BASE" || { echo "STOP: standard abstraction missing."; exit 3; }
- sudo grep -Eq '^[[:space:]]*(#include[[:space:]]+|include[[:space:]]+if[[:space:]]+exists[[:space:]]+)<local/abstractions/libvirt-qemu>' "$BASE" || {
-  echo "STOP: static abstraction does not include local override."; exit 3;
- }
- sudo test -d /etc/apparmor.d/local/abstractions || { echo "STOP: local overrides directory absent."; exit 3; }
- if sudo test -L "$LOCAL"; then echo "STOP: local policy path is symlink."; exit 3; fi
- if sudo test -e "$LOCAL" && ! sudo test -f "$LOCAL"; then echo "STOP: local policy is not regular file."; exit 3; fi
- if sudo test -f "$LOCAL" && sudo grep -Fxq "  $RULE" "$LOCAL"; then
-   echo "ALREADY PRESENT; no change needed."
-   exit 0
- fi
- echo "Planned additional allow path: $RULE"
- echo "Only applies to the win11-named TPM socket, dynamic numeric prefix."
- echo "This AppArmor local abstraction is included by all guests: other guest-specific paths not allowed by this rule."
- if [[ "$MODE" == plan ]]; then echo "PLAN ONLY. No change."; exit 0; fi
- command -v apparmor_parser >/dev/null || { echo "STOP: apparmor_parser missing."; exit 3; }
- # Create private rollback copy of existing local override before changes.
- BACKUP=$(mktemp "${HOME}/SSL55_AA_LocalBackup_$(date +%Y%m%d_%H%M%S)_XXXXXXXX.txt")
- if sudo test -e "$LOCAL"; then
-   sudo cat "$LOCAL" > "$BACKUP"
- else
-   printf '' > "$BACKUP"
- fi
- chmod 600 "$BACKUP"
- echo "Previous local policy saved in private local backup $BACKUP"
- # Only one append, scoped exactly to this reviewed allow line.
- printf '\n# CAPEv2 win11 swtpm /run socket path allow (reviewed Step 12L)\n  %s\n' "$RULE" |
-    sudo tee -a "$LOCAL" >/dev/null
- echo "Applied only reviewed win11 socket path rule to local AppArmor abstraction."
- # Deliberately NO broad apparmor daemon reload/restart: libvirt's next VM
- # start regenerates/loads win11-specific profile and includes local policies.
- echo "No AppArmor reload or libvirt restart attempted."
- echo "Retry win11 start once and capture any error. Existing policy backup retained."
-} > "$REPORT" 2>&1
+POLICY=$DIR/90-cape-win11-swtpm
+RULE='  /run/libvirt/qemu/swtpm/*-win11-swtpm.sock rw,'
+REPORT=$(mktemp "${HOME:?}/SSL55_Step12P_AppArmor_${MODE}_$(date +%Y%m%d_%H%M%S)_XXXXXXXX.txt")
+
+set +e
+(
+  set -euo pipefail
+  echo "========== WIN11 SWTPM APPARMOR LOCAL RULE =========="
+  echo "Mode: $MODE"
+  echo "Virtual domain: win11"
+  echo "Target: $POLICY"
+  state=$(virsh -c qemu:///system domstate win11)
+  echo "win11 state: $state"
+  [[ "$state" == 'shut off' ]] || { echo 'BLOCKED: win11 must be shut off'; exit 3; }
+
+  mapfile -t names < <(virsh -c qemu:///system list --all --name | sed '/^[[:space:]]*$/d')
+  [[ ${#names[@]} -eq 1 && "${names[0]}" == win11 ]] || {
+    echo "BLOCKED: Expected only win11 on this libvirt system."; exit 3;
+  }
+  sudo test -f "$BASE" && ! sudo test -L "$BASE" || {
+    echo "BLOCKED: Original AppArmor abstraction missing or symlinked."; exit 3;
+  }
+  sudo grep -Eq '^[[:space:]]*include[[:space:]]+if[[:space:]]+exists[[:space:]]+<abstractions/libvirt-qemu\.d>[[:space:]]*$' "$BASE" || {
+    echo "BLOCKED: Expected Step12O directory include not present."; exit 3;
+  }
+  if sudo test -L "$DIR"; then
+    echo "BLOCKED: include path is a symlink."; exit 3
+  fi
+  if sudo test -e "$DIR" && ! sudo test -d "$DIR"; then
+    echo "BLOCKED: include path is not a directory."; exit 3
+  fi
+  if sudo test -e "$POLICY" || sudo test -L "$POLICY"; then
+    if sudo test -f "$POLICY" && [[ $(sudo cat "$POLICY") == "$RULE" ]]; then
+      echo "RULE ALREADY PRESENT: idempotent, no change."
+      exit 0
+    fi
+    echo "BLOCKED: existing local policy differs; no overwrite."
+    exit 3
+  fi
+
+  echo "Proposed rule: $RULE"
+  echo "Other system guest profiles would also include this file, but the path pattern is restricted to win11."
+  [[ "$MODE" == apply ]] || { echo "PLAN ONLY: no change."; exit 0; }
+
+  command -v apparmor_parser >/dev/null 2>&1 || {
+    echo "BLOCKED: AppArmor parser unavailable."; exit 3;
+  }
+  created_dir=no
+  if ! sudo test -d "$DIR"; then
+    sudo install -d -o root -g root -m 0755 "$DIR"
+    created_dir=yes
+  fi
+  tmp=$(mktemp)
+  trap 'rm -f -- "$tmp"' EXIT
+  printf '%s\n' "$RULE" > "$tmp"
+  sudo install -o root -g root -m 0644 "$tmp" "$POLICY"
+
+  echo "Validating policy syntax without loading AppArmor profiles..."
+  if ! sudo apparmor_parser -Q -T -K /etc/apparmor.d/libvirt/TEMPLATE.qemu >/dev/null 2>&1; then
+    echo "VALIDATION FAILED. Removing only the policy file just installed."
+    sudo rm -f -- "$POLICY"
+    if [[ "$created_dir" == yes ]]; then
+      sudo rmdir -- "$DIR" 2>/dev/null || true
+    fi
+    exit 4
+  fi
+  echo "VALIDATION PASS: apparmor_parser skip-kernel-load."
+  echo "Rule file installed: $POLICY"
+  echo "No AppArmor disablement, no system-wide service restart, no VM start."
+  echo "Next: attempt starting win11 once in virt-manager. If it still fails, report rather than broaden the policy."
+) > "$REPORT" 2>&1
+rc=$?
 echo "Private report: $REPORT"
+echo "Exit status: $rc"
+exit "$rc"
