@@ -6,8 +6,12 @@ Private **development** work for a portable three-command malware-analysis lab:
 3. Separate Ubuntu INetSim VM and **independently tested, isolated** guest network.
 
 **CURRENT STATUS: NOT A COMPLETED INSTALLER. Do not use for live malware.**
-No Windows VM or INetSim guest has been provisioned on the canonical SSL-55
-reference host; `default` libvirt NAT is not a safe analysis network.
+SSL-55 now has a **manually configured** Windows 11 master `win11` with
+external snapshots (`Afterfull` → `basicinstallwinsnapshot` → `win11.qcow2`).
+The AppArmor read/lock backing-image startup repair is verified on SSL-55,
+including shutdown/restart; Windows guest rollback and CAPE integration are
+**not yet independently verified**. INetSim and portable multi-VM deployment
+are not finished; `default` libvirt NAT is not a safe analysis network.
 
 ## What exists today (manual Steps 1–11)
 
@@ -74,6 +78,14 @@ installation.
 runs new offline regression tests. See the GitHub workflow for CI checks.
 **Neither CI success nor fresh-host/SSL-55 validation is claimed without a
 result.**
+
+## External-snapshot access guard (development only)
+
+The portable, non-destructive `scripts/guard_vm_backing_access.py` handles
+per-destination QCOW2 chain discovery and narrowly scoped AppArmor `rk` backing
+permissions. It has plan/apply/verify modes and offline tests. It is **not**
+a clone creator or a containment-qualified VM starter. Read
+[the design, safety limits and integration requirements](docs/VM_BACKING_ACCESS_GUARD.md).
 
 ## Workflow
 
