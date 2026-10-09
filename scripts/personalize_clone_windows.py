@@ -133,7 +133,7 @@ def find_interface(exported: str, expected_old: str) -> tuple[str, dict]:
 
 
 def patch_contents(controlset: int, guid: str, hostname: str, ip: str, mask: str,
-                   gateway: str | None) -> str:
+                   gateway: str | None, dns: str | None = None) -> str:
     if not GUID.fullmatch(guid) or not HOSTNAME.fullmatch(hostname):
         raise Stop("Unsafe Windows interface GUID or hostname")
     path = f"HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet{controlset:03d}"
@@ -146,6 +146,9 @@ def patch_contents(controlset: int, guid: str, hostname: str, ip: str, mask: str
     ]
     if gateway is not None:
         lines.append(f'"DefaultGateway"={multi_literal([gateway])}')
+    if dns is not None:
+        ipaddress.IPv4Address(dns)
+        lines.append(f'"NameServer"="{dns}"')
     lines.extend([
         "",
         f"[{path}\\Control\\ComputerName\\ComputerName]",
@@ -183,7 +186,7 @@ def disk_guard(disk: Path) -> None:
 
 
 def prepare(disk: Path, old_ip: str, new_ip: str, hostname: str,
-            mask: str, gateway: str | None, mode: str) -> dict:
+            mask: str, gateway: str | None, mode: str, dns: str | None = None) -> dict:
     if not HOSTNAME.fullmatch(hostname):
         raise Stop("Windows hostname must be 1-15 letters/digits/hyphens")
     validate_addresses(old_ip, new_ip, mask, gateway)
@@ -197,7 +200,7 @@ def prepare(disk: Path, old_ip: str, new_ip: str, hostname: str,
     guid, entry = find_interface(interfaces, old_ip)
     if entry["original_mask"] != mask:
         raise Stop("Proposed subnet mask differs from master; review network relocation")
-    content = patch_contents(index, guid, hostname, new_ip, mask, gateway)
+    content = patch_contents(index, guid, hostname, new_ip, mask, gateway, dns)
     result = {"status": "PLAN_ONLY", "disk": str(disk), "hostname": hostname,
               "old_ip": old_ip, "new_ip": new_ip, "prefix_controlset": index,
               "interface_guid": guid, "changes": ["IPv4", "hostname"],
@@ -227,11 +230,12 @@ def main(argv=None):
     parser.add_argument("--hostname", required=True)
     parser.add_argument("--mask", required=True)
     parser.add_argument("--gateway")
+    parser.add_argument("--dns")
     parser.add_argument("--mode", choices=("plan", "apply"), default="plan")
     args = parser.parse_args(argv)
     try:
         info = prepare(args.disk, args.old_ip, args.new_ip, args.hostname,
-                       args.mask, args.gateway, args.mode)
+                       args.mask, args.gateway, args.mode, args.dns)
         print(json.dumps(info, indent=2, sort_keys=True))
         return 0
     except (Stop, ValueError, OSError, ET.ParseError, json.JSONDecodeError) as exc:
