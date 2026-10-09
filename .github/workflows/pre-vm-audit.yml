@@ -53,6 +53,8 @@ on:
       - 'scripts/audit_win11_bitlocker_working_overlay.py'
       - 'scripts/prepare_win11_bitlocker_working_overlay.py'
       - 'scripts/plan_win11_maintenance_xml.py'
+      - 'scripts/drill_win11_offline_definition_restore.py'
+      - 'scripts/test_drill_win11_offline_definition_restore.py'
       - 'scripts/test_plan_win11_maintenance_xml.py'
       - 'scripts/test_prepare_win11_bitlocker_working_overlay.py'
       - 'scripts/test_audit_win11_bitlocker_working_overlay.py'
@@ -118,6 +120,8 @@ on:
       - 'scripts/audit_win11_bitlocker_working_overlay.py'
       - 'scripts/prepare_win11_bitlocker_working_overlay.py'
       - 'scripts/plan_win11_maintenance_xml.py'
+      - 'scripts/drill_win11_offline_definition_restore.py'
+      - 'scripts/test_drill_win11_offline_definition_restore.py'
       - 'scripts/test_plan_win11_maintenance_xml.py'
       - 'scripts/test_prepare_win11_bitlocker_working_overlay.py'
       - 'scripts/test_audit_win11_bitlocker_working_overlay.py'
@@ -142,7 +146,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile Python module (syntax only)
-        run: python3 -m py_compile scripts/audit_pre_vm_stages.py scripts/test_audit_pre_vm_stages.py scripts/install_cape_optional_deps.py scripts/test_install_cape_optional_deps.py scripts/audit_upstream_installers.py scripts/test_audit_upstream_installers.py scripts/inspect_windows_media.py scripts/test_inspect_windows_media.py scripts/audit_windows_vm_preflight.py scripts/test_audit_windows_vm_preflight.py scripts/guard_vm_backing_access.py scripts/test_guard_vm_backing_access.py scripts/audit_clone_master.py scripts/test_audit_clone_master.py scripts/plan_vm_clones.py scripts/test_plan_vm_clones.py scripts/export_cold_master_disk.py scripts/test_export_cold_master_disk.py scripts/personalize_clone_windows.py scripts/test_personalize_clone_windows.py scripts/command2_clone_vms.py scripts/clone_domain_xml.py scripts/test_clone_domain_xml.py scripts/register_cape_clones.py scripts/verify_clone_agent.py scripts/test_verify_clone_agent.py scripts/test_command2_clone_vms.py scripts/guard_vm_tpm_socket.py scripts/test_guard_vm_tpm_socket.py scripts/test_command2_lifecycle.py scripts/command1_master_checkpoint.py scripts/test_command1_master_checkpoint.py scripts/audit_command12_acceptance.py scripts/test_audit_command12_acceptance.py scripts/inspect_standalone_windows_hive.py scripts/test_inspect_standalone_windows_hive.py scripts/probe_cold_windows_volume_crypto.py scripts/test_probe_cold_windows_volume_crypto.py scripts/audit_win11_bitlocker_working_overlay.py scripts/test_audit_win11_bitlocker_working_overlay.py scripts/prepare_win11_bitlocker_working_overlay.py scripts/test_prepare_win11_bitlocker_working_overlay.py scripts/plan_win11_maintenance_xml.py scripts/test_plan_win11_maintenance_xml.py
+        run: python3 -m py_compile scripts/audit_pre_vm_stages.py scripts/test_audit_pre_vm_stages.py scripts/install_cape_optional_deps.py scripts/test_install_cape_optional_deps.py scripts/audit_upstream_installers.py scripts/test_audit_upstream_installers.py scripts/inspect_windows_media.py scripts/test_inspect_windows_media.py scripts/audit_windows_vm_preflight.py scripts/test_audit_windows_vm_preflight.py scripts/guard_vm_backing_access.py scripts/test_guard_vm_backing_access.py scripts/audit_clone_master.py scripts/test_audit_clone_master.py scripts/plan_vm_clones.py scripts/test_plan_vm_clones.py scripts/export_cold_master_disk.py scripts/test_export_cold_master_disk.py scripts/personalize_clone_windows.py scripts/test_personalize_clone_windows.py scripts/command2_clone_vms.py scripts/clone_domain_xml.py scripts/test_clone_domain_xml.py scripts/register_cape_clones.py scripts/verify_clone_agent.py scripts/test_verify_clone_agent.py scripts/test_command2_clone_vms.py scripts/guard_vm_tpm_socket.py scripts/test_guard_vm_tpm_socket.py scripts/test_command2_lifecycle.py scripts/command1_master_checkpoint.py scripts/test_command1_master_checkpoint.py scripts/audit_command12_acceptance.py scripts/test_audit_command12_acceptance.py scripts/inspect_standalone_windows_hive.py scripts/test_inspect_standalone_windows_hive.py scripts/probe_cold_windows_volume_crypto.py scripts/test_probe_cold_windows_volume_crypto.py scripts/audit_win11_bitlocker_working_overlay.py scripts/test_audit_win11_bitlocker_working_overlay.py scripts/prepare_win11_bitlocker_working_overlay.py scripts/test_prepare_win11_bitlocker_working_overlay.py scripts/plan_win11_maintenance_xml.py scripts/test_plan_win11_maintenance_xml.py scripts/drill_win11_offline_definition_restore.py scripts/test_drill_win11_offline_definition_restore.py
       - name: Run isolated unit tests
         run: |
           python3 -m unittest discover -s scripts -p 'test_audit_pre_vm_stages.py' -v
@@ -166,6 +170,7 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_audit_win11_bitlocker_working_overlay.py' -v
           python3 -m unittest discover -s scripts -p 'test_prepare_win11_bitlocker_working_overlay.py' -v
           python3 -m unittest discover -s scripts -p 'test_plan_win11_maintenance_xml.py' -v
+          python3 -m unittest discover -s scripts -p 'test_drill_win11_offline_definition_restore.py' -v
           python3 -m unittest discover -s scripts -p 'test_export_cold_master_disk.py' -v
       - name: Bash syntax only
         run: |
