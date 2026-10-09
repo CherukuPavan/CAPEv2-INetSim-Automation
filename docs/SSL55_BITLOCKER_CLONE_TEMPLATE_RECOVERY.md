@@ -223,3 +223,51 @@ the libvirt XML should be preserved rather than globally changing
 permissions.
 See https://www.libvirt.org/formatdomain.html and
 https://www.qemu.org/docs/master/specs/tpm.html.
+
+## Local cold-state backup verified — 2026-10-09 22:31 UTC
+
+The operator executed the guarded local preservation command and uploaded
+`CAPE_Win11_Preservation_Backup_20261009_223109_AKvulefU.txt`.
+Result: **LOCAL PRESERVATION BACKUP VERIFIED**.
+
+- Backup was created exclusively on SSL-55:
+  `/var/backups/cape-win11-preservation/win11-state-92POdfNc`.
+  This directory contains secret TPM state and MUST NOT be uploaded.
+- The original domain XML and snapshot metadata were saved.
+- The original UEFI NVRAM and swtpm state were copied with local
+  ownership/permission-preserving operations and compared byte-for-byte
+  to the originals, according to the host report.
+- The VM was not booted, BitLocker unchanged, and no original QCOW2
+  disk was copied. **No actual restoration test was performed.**
+
+**Next independent, low-risk staging step:** create a fresh QCOW2 *working
+overlay* over the original current cold disk, but **do not attach it to
+libvirt or start Windows yet**. This differs from the separate flattened,
+BitLocker-encrypted `win11_1.qcow2` disk created earlier. The overlay
+allows future writes to live in a separate layer while retaining the
+original four QCOW2 image files unchanged. QEMU documents that backing
+files are not modified by ordinary overlay writes, but `qemu-img commit`
+must remain forbidden for this protected master.
+
+The new `scripts/prepare_win11_bitlocker_working_overlay.py` has a
+default read-only `plan` mode and explicit `--mode create` to create
+exactly one new, detached disk at
+`/var/lib/libvirt/images/win11.cape-bitlocker-maintenance.qcow2`.
+It requires a shut-off original master, exact current snapshot,
+consistent four-layer original disk chain, intact root-private backup
+layout, free space for a 64 GiB growing overlay plus 30 GiB reserve,
+and refuses any pre-existing overlay destination. It does not change
+domain XML, snapshot metadata, UEFI NVRAM, swtpm state or BitLocker.
+CI mocks verify that unexpected backing dependencies trigger refusal
+and cleanup of the unfinished new file.
+
+**Still blocked:** defining/starting the maintenance guest,
+any TPM/UEFI restoration, changing guest NIC, and BitLocker decryption.
+Those require separately reviewed original-domain XML update,
+strictly disconnected guest NIC, and a genuine manual recovery plan.
+A copied TPM backup is not a proven recovery procedure, particularly
+without the recovery password.
+
+Relevant upstream references:
+- https://www.qemu.org/docs/master/tools/qemu-img.html
+- https://www.libvirt.org/manpages/virsh.html
