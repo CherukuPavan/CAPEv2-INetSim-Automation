@@ -280,3 +280,43 @@ final no-backing property, file owner/permissions, source-image metadata
 and available disk capacity. Refuse overwrite/symlink targets and do not
 use QEMU's `-U` unsafe shared-image option. Failure cleanup must touch
 only the new incomplete export, never the master or snapshot chain.
+
+## First independent Windows 11 image exported — 2026-10-09 21:50 UTC
+
+The operator uploaded the completed export report
+`CAPE_First_Clone_Export_20261009_215054_QqsqRl7U.txt`. The guarded
+export succeeded using the shut-off `win11` source at its
+`finalshutoffversion` snapshot and validated all four backing layers.
+
+- New detached flattened disk:
+  `/var/lib/libvirt/images/cape-clones-staging/win11_1.qcow2`.
+- QCOW2 image virtual capacity **64 GiB**; actual allocated storage
+  **29.53 GiB**; remaining host filesystem space **211.6 GiB**.
+- Conversion completed in **37.7 seconds**.
+- `qemu-img check` succeeded; the output reported **NO backing
+  dependencies**.
+- No new libvirt VM was defined or started, and the source `win11`
+  disk and snapshots were not intentionally modified.
+
+**Critical release boundary:** the exported image is not yet safe to
+start on the network. It still has the master's Windows static IPv4,
+hostname, machine identity and other disk-stored properties. It has
+no independently generated per-clone UUID, UEFI NVRAM or TPM state.
+Its Windows network interface configuration has not been inspected
+or changed by Hivex. The master must remain shut off until further
+staged inspections are approved.
+
+**Next authorization gate:** any QEMU-NBD based read-only inspection
+may load an NBD kernel module, attach a block device and mount NTFS
+through host filesystem parsers. QEMU specifically warns that mounting
+untrusted VM images may trigger kernel/filesystem vulnerabilities.
+Even with read-only flags, this affects temporary host kernel/mount
+state and therefore requires explicit operator approval on a shared
+machine. It must target only the detached, flattened clone and
+must have guaranteed disconnect/unmount cleanup. Do not attach or
+mount the master image or its backing layers.
+
+A root-private, non-network-boot, no-write clone hive inspection is a
+possible next step **after operator approval and review**. Any actual
+Registry write-back and analysis-guest boot remain blocked by the
+independent guest IP and isolation acceptance gates.
