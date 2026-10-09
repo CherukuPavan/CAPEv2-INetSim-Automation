@@ -48,6 +48,28 @@ class VMParserTests(unittest.TestCase):
         self.assertEqual(snap["memory"]["snapshot"], "external")
         self.assertEqual(snap["disks"][0]["snapshot"], "external")
 
+    def test_cape_parser_reads_mapping_but_never_secrets(self):
+        src = """[kvm]
+machines = win11,win11_1
+password = confidential
+[win11]
+label = win11
+ip = 192.0.2.11
+snapshot = analysis-ready
+token = confidential2
+[win11_1]
+label = win11_1
+ip = 192.0.2.12
+snapshot = analysis-ready
+"""
+        result = audit.cape_kvm_summary(src)
+        self.assertEqual(result["sections"]["win11"]["snapshot"], "analysis-ready")
+        self.assertEqual(result["sections"]["win11_1"]["ip"], "192.0.2.12")
+        self.assertNotIn("password", repr(result))
+        self.assertNotIn("confidential", repr(result))
+        self.assertNotIn("token", repr(result))
+
+
     def test_network_nat_is_detectable(self):
         network = ET.fromstring("<network><name>default</name><forward mode='nat'/><bridge name='virbr0'/></network>")
         self.assertEqual(audit.network_summary(network)["forward_mode"], "nat")
