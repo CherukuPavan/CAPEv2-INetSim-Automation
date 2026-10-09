@@ -1,3 +1,96 @@
+## 2026-10-09 — actual master inventory results
+
+The operator supplied a final read-only inventory. **Source selection is now
+evidence-based:** the VM was shut off, `finalshutoffversion` was current,
+and the recorded state was `shutoff` with no saved RAM in that snapshot.
+Its disk is the top of a **four-layer** QCOW2 chain:
+
+```
+finalshutoffversion -> Afterfull -> basicinstallwinsnapshot -> win11.qcow2
+    current cold      parent RAM snapshot     older layer          base
+```
+
+The running-state `Afterfull` snapshot has an external memory file.
+**Do not** use it as an ordinary cold-copy disk or delete that RAM file.
+The snapshot state and clean guest shutdown make `finalshutoffversion`
+the *candidate* for a consistent clone source, but the image requires a
+controlled, read-only integrity and independent export check. A disk
+snapshot does **not** automatically include swtpm private state or UEFI
+NVRAM; future clones need their own valid state.
+
+Other observed facts (without committing host-private identifiers):
+
+- `/opt/CAPEv2/conf/kvm.conf` still lists `cuckoo1` and contains no entry
+  for the actual master `win11`. Two legacy machine sections refer to the
+  same guest IP. Correct CAPE machine/snapshot mapping must be validated
+  before deploying additional analysis guests.
+- The guest uses the libvirt `default` **NAT** network. NAT is not an
+  isolation certificate; automatic analysis-VM startup stays blocked.
+- The VM reports **no QEMU guest agent channel**. CAPE's Python agent is a
+  separate service; no verified command-execution mechanism for guest IP
+  changes is currently available to the automation.
+- The master has 4 vCPUs, 4 GiB RAM, and a 64 GiB virtual disk. The
+  reported destination filesystem had approximately **250 GiB free**
+  during the inventory. As a deliberately conservative upper bound,
+  count × 64 GiB plus a 30 GiB reserve supports only 3 clones on that
+  filesystem. Sparse QCOW2 actual allocations may be less; no capacity
+  relaxation is justified before measured independent-copy testing.
+
+### Initial offline clone-plan module
+
+`scripts/plan_vm_clones.py` is an **offline-only, fail-closed planner**.
+It accepts the private master inventory and either `--count N` or an
+interactive count prompt. It proposes deterministic unique VM names
+(`win11_1`, `win11_2`...), libvirt UUIDs, locally administered MACs,
+and optionally IPv4 addresses on an **explicitly named, inventoried**
+network and subnet. It checks for collisions with the inventory's CAPE IPs,
+existing machine registration, RAM/storage budget, snapshot consistency,
+and NAT/forwarding indicators. It never starts or creates VMs.
+
+For a read-only proposed plan with **no** guest IP allocation:
+
+```bash
+python3 scripts/plan_vm_clones.py \
+  --inventory /PATH/TO/private_master_inventory.txt \
+  --count 2 \
+  --output "$HOME/cape_clone_plan_$(date +%Y%m%d_%H%M%S).json"
+```
+
+A proposed IP range can be supplied **only after** an approved isolated
+network and addressing plan is established (use `--network`,
+`--subnet`, `--first-ip`, `--master-ip`, `--reserved-ip`). Neither
+a plan nor a custom-created network proves containment. An unknown
+network, one marked NAT/forwarding, absent CAPE master mapping or guest
+IP-customization mechanism causes a blocking result.
+
+The plan result will intentionally remain `BLOCKED_NOT_DEPLOYABLE`
+until those remaining release gates are implemented and tested. Candidate
+IDs/IPs are proposals, not actual verified or reserved allocations.
+Future apply mode must reconcile real libvirt definitions, CAPE entries
+and DHCP/ARP/host observations before allocating them. Do not feed this
+plan directly to `virsh define` or start any proposed guest.
+
+### Status of the implementation
+
+**Implemented and offline-tested:** master inventory parsing, snapshot
+metadata/source checks, candidate VM identity and IP planning, collision
+and high-level resource checks, and the separate QCOW2/AppArmor backing
+access guard.
+
+**Not yet implemented:** safe source export, complete clone VM definition,
+UEFI/swtpm duplication/re-initialization, offline Windows hostname/IP
+customization, true isolated network validation, CAPE registration,
+guest snapshot creation, rollback and cross-host validation. The
+three-command installer remains incomplete and is not production-ready.
+
+The user does not need to reconfigure the completed master simply to
+allow *planning*. Any eventual temporary guest access needed to set
+unique static IPs will require a separately verified, guest-specific
+mechanism that cannot expose several identical-IP clones on one network.
+
+
+---
+
 # Windows 11 master-to-clones: evidence collection and release gates
 
 ## Verified origin
