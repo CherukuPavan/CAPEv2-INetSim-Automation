@@ -213,7 +213,10 @@ def generate_plan(inv: dict, count: int, prefix: str = "win11_",
                   network_name: str | None = None, subnet: str | None = None,
                   first_ip: str | None = None, master_ip: str | None = None,
                   reserved: list[str] | None = None,
-                  source_snapshot: str = "finalshutoffversion") -> dict:
+                  source_snapshot: str | None = None) -> dict:
+    source_snapshot = source_snapshot or inv.get("snapshots", {}).get("current")
+    if not isinstance(source_snapshot, str) or not source_snapshot:
+        _raise("No current snapshot identified: --source-snapshot required")
     blockers: list[str] = []
     warnings: list[str] = []
     vm = inv.get("vm") or {}
@@ -298,7 +301,7 @@ def generate_plan(inv: dict, count: int, prefix: str = "win11_",
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inventory", type=Path, required=True)
-    parser.add_argument("--count", type=int, required=True)
+    parser.add_argument("--count", type=int, help="If omitted, prompt on interactive terminal")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--prefix", default="win11_")
     parser.add_argument("--network", dest="network_name")
@@ -306,9 +309,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--first-ip")
     parser.add_argument("--master-ip")
     parser.add_argument("--reserved-ip", action="append", default=[])
-    parser.add_argument("--source-snapshot", default="finalshutoffversion")
+    parser.add_argument("--source-snapshot", default=None,
+                        help="Defaults to currently selected snapshot in inventory")
     args = parser.parse_args(argv)
     try:
+        if args.count is None:
+            if not sys.stdin.isatty():
+                _raise("Clone count missing; pass --count N in noninteractive mode")
+            try:
+                args.count = int(input("How many additional Windows VMs? ").strip())
+            except (ValueError, EOFError) as exc:
+                _raise("Expected a whole-number VM count") from exc
         report = read_inventory(args.inventory)
         plan = generate_plan(report, args.count, args.prefix,
                              args.network_name, args.subnet,
