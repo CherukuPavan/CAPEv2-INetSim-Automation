@@ -28,7 +28,7 @@ class Tests(unittest.TestCase):
                  "installed":False,"path":None,"version":None}), \
              patch.object(a,"read_value",return_value="0"), \
              patch.object(a.audit_clone_master,"virsh",
-                          return_value={"ok":True,"stdout":"isolated\\n"}):
+                          return_value={"ok":True,"stdout":"isolated\n"}):
             value=a.collect("win11")
         self.assertEqual(value["mode"],"READ_ONLY")
         self.assertEqual(value["libvirt_network_names"],["isolated"])
