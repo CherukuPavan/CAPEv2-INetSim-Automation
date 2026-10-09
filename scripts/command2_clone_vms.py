@@ -441,6 +441,11 @@ def stop_failed_owned_guest(name: str, master_xml: str) -> str:
 
 def write_report(reportdir: Path, data: dict) -> Path:
     reportdir.mkdir(mode=0o700,parents=True,exist_ok=True)
+    if reportdir.is_symlink():
+        raise ProvisionError("Refusing symlinked clone report directory")
+    info = reportdir.stat()
+    if (info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) & 0o077):
+        raise ProvisionError("Private clone report directory must be owned by caller, mode 0700 or stricter")
     # Never reuse the same report filename when successive state changes
     # occur within one second (the old name caused an EEXIST abort).
     path=reportdir / ("cape_command2_"+datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")+"_"+str(os.getpid())+"_"+str(time.time_ns())+".json")
