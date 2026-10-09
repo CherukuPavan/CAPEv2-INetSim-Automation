@@ -1,0 +1,17 @@
+{
+  "schema": "cape-command2-profile-v1",
+  "master": "win11",
+  "snapshot": "finalshutoffversion",
+  "network": "REPLACE_WITH_APPROVED_NONFORWARDING_NETWORK",
+  "disk_dir": "/var/lib/libvirt/images/cape-clones",
+  "nvram_dir": "/var/lib/libvirt/qemu/nvram",
+  "old_ipv4": "198.51.100.105",
+  "first_ipv4": "198.51.100.110",
+  "mask": "255.255.255.0",
+  "gateway": "198.51.100.1",
+  "dns": "198.51.100.1",
+  "reserved_ipv4": [],
+  "cape_config": "/opt/CAPEv2/conf/kvm.conf",
+  "snapshot_name": "cape_clean",
+  "benign_test_only_acknowledged": false
+}
