@@ -69,8 +69,9 @@ declare -A BIN=(
  [virtinst]=virt-install
  [ovmf]=
  [swtpm]=swtpm
+ [swtpm-tools]=swtpm_setup
 )
-packages=(qemu-system-x86 qemu-utils libvirt-clients libvirt-daemon-system virt-manager virtinst ovmf swtpm)
+packages=(qemu-system-x86 qemu-utils libvirt-clients libvirt-daemon-system virt-manager virtinst ovmf swtpm swtpm-tools)
 missing=()
 external=0
 
