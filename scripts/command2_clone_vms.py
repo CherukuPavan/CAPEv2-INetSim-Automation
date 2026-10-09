@@ -30,6 +30,7 @@ import uuid
 import xml.etree.ElementTree as ET
 
 import clone_domain_xml
+import guard_vm_tpm_socket
 import export_cold_master_disk
 import personalize_clone_windows
 import register_cape_clones
@@ -373,6 +374,13 @@ def create_one(item: dict, profile: dict, master_xml: str,
         isolated_network=profile["network"])
     define(rendered)
     record("VM_DEFINED_NOT_STARTED")
+    clone_uuid = str(uuid.uuid5(uuid.UUID(source_uuid),
+                                "cape-clone:" + item["name"]))
+    # The master on SSL-55 needed an AppArmor swtpm socket exception.
+    # Clone names generate different socket paths and must be checked
+    # individually BEFORE start, never by disabling host AppArmor.
+    guard_vm_tpm_socket.prepare(item["name"], clone_uuid, apply=True)
+    record("CLONE_TPM_APPARMOR_ACCESS_VERIFIED")
     # These are ONLY harmless Windows/agent boot-health checks. No samples.
     virsh("start",item["name"],timeout=180)
     record("GUEST_BOOTED_BENIGN_CHECK")
