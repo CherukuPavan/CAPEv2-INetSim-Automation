@@ -244,7 +244,9 @@ def snapshot_running(name: str, snapshot: str) -> None:
     xml=ET.fromstring(virsh("snapshot-dumpxml",name,snapshot))
     if xml.findtext("./name")!=snapshot or xml.findtext("./state")!="running":
         raise ProvisionError(f"Snapshot {snapshot} not confirmed as running-state")
-    # Do not claim rollback is verified just because metadata exists.
+    mem = xml.find("./memory")
+    if mem is None or mem.get("snapshot") == "no":
+        raise ProvisionError("CAPE baseline did not capture running guest memory state")
 
 
 def guest_shutdown(name: str, limit: int=120) -> None:
@@ -304,7 +306,20 @@ def create_one(item: dict, profile: dict, master_xml: str,
     out["agent_verification"]=health
     record("PING_AND_CAPE_AGENT_VERIFIED")
     snapshot_running(item["name"],profile["snapshot_name"])
-    record("RUNNING_STATE_SNAPSHOT_CREATED_REVERT_UNTESTED")
+    record("RUNNING_STATE_SNAPSHOT_CREATED")
+    guest_shutdown(item["name"])
+    record("POST_SNAPSHOT_GRACEFUL_SHUTDOWN")
+    # Restart test reproduces the AppArmor/snapshot issue found on SSL-55.
+    virsh("start", item["name"], timeout=180)
+    verify_clone_agent.wait_for_agent(item["ip"], timeout=240)
+    record("RESTART_PING_AND_CAPE_AGENT_VERIFIED")
+    guest_shutdown(item["name"])
+    # This is a fresh, disposable clone: explicitly test the real CAPE
+    # rollback primitive before registering it as an analysis machine.
+    virsh("snapshot-revert", item["name"], profile["snapshot_name"],
+          "--running", timeout=240)
+    verify_clone_agent.wait_for_agent(item["ip"], timeout=240)
+    record("SNAPSHOT_REVERT_PING_AND_CAPE_AGENT_VERIFIED")
     guest_shutdown(item["name"])
     record("CLONE_SHUT_OFF_READY_FOR_CAPE_REGISTRATION")
     return out
@@ -360,10 +375,10 @@ def run(profile: dict, count: int, mode: str, reportdir: Path) -> dict:
             snapshot=profile["snapshot_name"],interface=bridge)
         saved=register_cape_clones.apply_config(Path(profile["cape_config"]),new_config)
         output["cape_backup"]=str(saved)
-        output["status"]="CLONES_PREPARED_CAPE_CONFIG_UPDATED_MANUAL_ROLLBACK_TEST_PENDING"
+        output["status"]="CLONES_VERIFIED_CAPE_CONFIG_UPDATED_RESTART_PENDING"
         output["ready"]=success
         output["warnings"]=[
-            "Snapshots were captured but rollback must be tested on each guest",
+            "CAPE snapshots were reverted once on fresh clones; periodic recovery tests remain necessary",
             "CAPE services were not restarted; inspect ongoing analyses before restart",
             "No real malware until institutional approval and guest IPv4/IPv6 isolation tests",
             "Windows software remains copied from master; BitLocker/TPM rekey and Windows activation require verification",
@@ -400,7 +415,7 @@ def main(argv=None) -> int:
             print("STOP:",report["failure"],file=sys.stderr)
         return 0 if report["status"] in (
             "PLAN_ONLY_NO_CHANGES",
-            "CLONES_PREPARED_CAPE_CONFIG_UPDATED_MANUAL_ROLLBACK_TEST_PENDING") else 2
+            "CLONES_VERIFIED_CAPE_CONFIG_UPDATED_RESTART_PENDING") else 2
     except (ProvisionError,OSError,ValueError,json.JSONDecodeError) as exc:
         print(f"STOP: {exc}",file=sys.stderr)
         return 2
