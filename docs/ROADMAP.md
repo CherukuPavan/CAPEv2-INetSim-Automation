@@ -214,3 +214,9 @@ The user explicitly confirmed that the objective includes **executing real malwa
 
 - Added `scripts/inspect_windows_media.py` plus offline tests and `command1_pre_vm.sh inspect-media FILE`. These calculate SHA256, file size and magic for a completed local archive/ISO and write a restricted JSON report **without decompressing, mounting or executing downloaded data**.
 - **Limit:** No archive-listing or publisher-authenticity proof is implied; a matching hash against only an untrusted publisher remains insufficient to prove Microsoft image authenticity. Candidate Windows X-Lite 26H1 Canary media is **not approved** as the first CAPEv2 guest; choose trusted Windows media and validate CAPE monitor version before VM creation.
+
+### Step 12 updated — Microsoft official ISO chosen over Windows X-Lite (2026-10-09)
+
+- User supplied screenshot of Microsoft's official Windows 11 download page `https://www.microsoft.com/en-in/software-download/windows11`; selected the **multi-edition Windows 11 ISO for x64 devices** and chose to download it instead of the modified third-party X-Lite archive. Do not infer completed download or ISO validity from the screenshot.
+- Continue only after the official download completes and file signature/size/local SHA-256 are checked against Microsoft's `Verify your download` information for that exact ISO; no extraction required. ISO will be selected as VM install media in the future libvirt/virt-manager provisioning stage, with UEFI/TPM support if required and CAPE agent/monitor validation post-install.
+- Maintain strict analysis-network gate: never attach live malware VMs to libvirt `default` NAT; verify dedicated isolation including IPv4/IPv6 before real samples. Avoid hardcoded expiring Microsoft download URLs; future automation accepts the local verified ISO and stores digest/provenance, not copied full media.
