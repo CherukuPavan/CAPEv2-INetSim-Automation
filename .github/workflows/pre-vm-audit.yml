@@ -49,6 +49,8 @@ on:
       - 'scripts/test_verify_clone_agent.py'
       - 'scripts/personalize_clone_windows.py'
       - 'scripts/inspect_standalone_windows_hive.py'
+      - 'scripts/probe_cold_windows_volume_crypto.py'
+      - 'scripts/test_probe_cold_windows_volume_crypto.py'
       - 'scripts/test_inspect_standalone_windows_hive.py'
       - 'scripts/test_personalize_clone_windows.py'
       - 'scripts/export_cold_master_disk.py'
@@ -106,6 +108,8 @@ on:
       - 'scripts/test_verify_clone_agent.py'
       - 'scripts/personalize_clone_windows.py'
       - 'scripts/inspect_standalone_windows_hive.py'
+      - 'scripts/probe_cold_windows_volume_crypto.py'
+      - 'scripts/test_probe_cold_windows_volume_crypto.py'
       - 'scripts/test_inspect_standalone_windows_hive.py'
       - 'scripts/test_personalize_clone_windows.py'
       - 'scripts/export_cold_master_disk.py'
@@ -126,7 +130,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile Python module (syntax only)
-        run: python3 -m py_compile scripts/audit_pre_vm_stages.py scripts/test_audit_pre_vm_stages.py scripts/install_cape_optional_deps.py scripts/test_install_cape_optional_deps.py scripts/audit_upstream_installers.py scripts/test_audit_upstream_installers.py scripts/inspect_windows_media.py scripts/test_inspect_windows_media.py scripts/audit_windows_vm_preflight.py scripts/test_audit_windows_vm_preflight.py scripts/guard_vm_backing_access.py scripts/test_guard_vm_backing_access.py scripts/audit_clone_master.py scripts/test_audit_clone_master.py scripts/plan_vm_clones.py scripts/test_plan_vm_clones.py scripts/export_cold_master_disk.py scripts/test_export_cold_master_disk.py scripts/personalize_clone_windows.py scripts/test_personalize_clone_windows.py scripts/command2_clone_vms.py scripts/clone_domain_xml.py scripts/test_clone_domain_xml.py scripts/register_cape_clones.py scripts/verify_clone_agent.py scripts/test_verify_clone_agent.py scripts/test_command2_clone_vms.py scripts/guard_vm_tpm_socket.py scripts/test_guard_vm_tpm_socket.py scripts/test_command2_lifecycle.py scripts/command1_master_checkpoint.py scripts/test_command1_master_checkpoint.py scripts/audit_command12_acceptance.py scripts/test_audit_command12_acceptance.py scripts/inspect_standalone_windows_hive.py scripts/test_inspect_standalone_windows_hive.py
+        run: python3 -m py_compile scripts/audit_pre_vm_stages.py scripts/test_audit_pre_vm_stages.py scripts/install_cape_optional_deps.py scripts/test_install_cape_optional_deps.py scripts/audit_upstream_installers.py scripts/test_audit_upstream_installers.py scripts/inspect_windows_media.py scripts/test_inspect_windows_media.py scripts/audit_windows_vm_preflight.py scripts/test_audit_windows_vm_preflight.py scripts/guard_vm_backing_access.py scripts/test_guard_vm_backing_access.py scripts/audit_clone_master.py scripts/test_audit_clone_master.py scripts/plan_vm_clones.py scripts/test_plan_vm_clones.py scripts/export_cold_master_disk.py scripts/test_export_cold_master_disk.py scripts/personalize_clone_windows.py scripts/test_personalize_clone_windows.py scripts/command2_clone_vms.py scripts/clone_domain_xml.py scripts/test_clone_domain_xml.py scripts/register_cape_clones.py scripts/verify_clone_agent.py scripts/test_verify_clone_agent.py scripts/test_command2_clone_vms.py scripts/guard_vm_tpm_socket.py scripts/test_guard_vm_tpm_socket.py scripts/test_command2_lifecycle.py scripts/command1_master_checkpoint.py scripts/test_command1_master_checkpoint.py scripts/audit_command12_acceptance.py scripts/test_audit_command12_acceptance.py scripts/inspect_standalone_windows_hive.py scripts/test_inspect_standalone_windows_hive.py scripts/probe_cold_windows_volume_crypto.py scripts/test_probe_cold_windows_volume_crypto.py
       - name: Run isolated unit tests
         run: |
           python3 -m unittest discover -s scripts -p 'test_audit_pre_vm_stages.py' -v
@@ -146,6 +150,7 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_verify_clone_agent.py' -v
           python3 -m unittest discover -s scripts -p 'test_personalize_clone_windows.py' -v
           python3 -m unittest discover -s scripts -p 'test_inspect_standalone_windows_hive.py' -v
+          python3 -m unittest discover -s scripts -p 'test_probe_cold_windows_volume_crypto.py' -v
           python3 -m unittest discover -s scripts -p 'test_export_cold_master_disk.py' -v
       - name: Bash syntax only
         run: |
