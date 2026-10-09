@@ -143,6 +143,82 @@ def check_network(name: str, desired_ip: str, mask: str) -> str:
     return bridge.get("name")
 
 
+def check_dhcp_conflicts(network_name: str, proposed_ips: list[str]) -> None:
+    """Reject addresses that belong to a DHCP pool or static reservation."""
+    root = ET.fromstring(virsh("net-dumpxml", network_name))
+    protected: set[ipaddress.IPv4Address] = set()
+    pools: list[tuple[ipaddress.IPv4Address, ipaddress.IPv4Address]] = []
+    for host in root.findall("./ip/dhcp/host"):
+        address = host.get("ip")
+        if not address:
+            raise ProvisionError("Malformed libvirt static DHCP reservation")
+        try:
+            protected.add(ipaddress.IPv4Address(address))
+        except ValueError as exc:
+            raise ProvisionError("Invalid DHCP reservation address") from exc
+    for scope in root.findall("./ip/dhcp/range"):
+        try:
+            first = ipaddress.IPv4Address(scope.get("start", ""))
+            last = ipaddress.IPv4Address(scope.get("end", ""))
+        except ValueError as exc:
+            raise ProvisionError("Malformed libvirt DHCP pool") from exc
+        if first > last:
+            raise ProvisionError("Reversed libvirt DHCP range")
+        pools.append((first, last))
+    for item in proposed_ips:
+        ip = ipaddress.IPv4Address(item)
+        if ip in protected or any(begin <= ip <= end for begin, end in pools):
+            raise ProvisionError(f"Proposed clone IP collides with libvirt DHCP: {ip}")
+
+
+def check_empty_target_network(network_name: str, existing: set[str]) -> None:
+    """Require an empty clone network; unknown existing guest IPs are unsafe."""
+    for vm in sorted(existing):
+        if not vm:
+            continue
+        root = ET.fromstring(virsh("dumpxml", "--inactive", vm))
+        for nic in root.findall("./devices/interface"):
+            source = nic.find("source")
+            if (nic.get("type") == "network" and source is not None
+                    and source.get("network") == network_name):
+                raise ProvisionError(
+                    f"Analysis network already has VM {vm}; "
+                    "cannot prove unused Windows static IPs"
+                )
+            if nic.get("type") not in ("network", "user", "bridge", "direct"):
+                raise ProvisionError(
+                    f"Unknown libvirt NIC type in existing domain {vm}"
+                )
+
+
+def check_cape_static_ip_conflicts(config_path: Path, proposed_ips: list[str]) -> None:
+    """Treat every existing CAPE registration IP as reserved, including stale stanzas."""
+    import configparser
+    if config_path.is_symlink() or not config_path.is_file():
+        raise ProvisionError("CAPE machine config is missing or is a symlink")
+    parser = configparser.ConfigParser(interpolation=None, strict=True)
+    try:
+        parser.read_string(config_path.read_text(encoding="utf-8"))
+    except (configparser.Error, UnicodeError) as exc:
+        raise ProvisionError("CAPE machine config cannot be parsed reliably") from exc
+    reserved = set()
+    for section in parser.sections():
+        if not parser.has_option(section, "ip"):
+            continue
+        address = parser.get(section, "ip", raw=True)
+        try:
+            reserved.add(ipaddress.IPv4Address(address.strip()))
+        except ValueError as exc:
+            raise ProvisionError(
+                f"CAPE machine {section} has an invalid IP; refuse allocation"
+            ) from exc
+    for candidate in proposed_ips:
+        if ipaddress.IPv4Address(candidate) in reserved:
+            raise ProvisionError(
+                f"Proposed clone IPv4 {candidate} is already in CAPE configuration"
+            )
+
+
 def safe_destinations(path: Path) -> None:
     if not path.is_absolute() or not path.is_dir() or path.is_symlink():
         raise ProvisionError(f"Root-controlled destination directory required: {path}")
@@ -167,6 +243,10 @@ def preflight(profile: dict, count: int, mode: str) -> tuple[list[dict], str, st
     names = set(virsh("list", "--all", "--name").splitlines())
     items = candidates(count, profile, set(names))
     bridge = check_network(profile["network"], profile["first_ipv4"], profile["mask"])
+    proposed_ips = [item["ip"] for item in items]
+    check_dhcp_conflicts(profile["network"], proposed_ips)
+    check_empty_target_network(profile["network"], names)
+    check_cape_static_ip_conflicts(Path(profile["cape_config"]), proposed_ips)
     if virsh("net-info", profile["network"]).find("Active:") < 0:
         raise ProvisionError("Cannot inspect network state")
     if not re.search(r"^\s*Active:\s+yes\s*$", virsh("net-info", profile["network"]), re.M):
