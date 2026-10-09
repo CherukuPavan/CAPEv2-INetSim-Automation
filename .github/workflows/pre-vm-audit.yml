@@ -16,6 +16,7 @@ on:
       - 'scripts/test_inspect_windows_media.py'
       - 'scripts/audit_windows_vm_preflight.py'
       - 'scripts/test_audit_windows_vm_preflight.py'
+      - 'scripts/diagnose_swtpm_startup.sh'
       - '.github/workflows/pre-vm-audit.yml'
   pull_request:
     paths:
@@ -32,6 +33,7 @@ on:
       - 'scripts/test_inspect_windows_media.py'
       - 'scripts/audit_windows_vm_preflight.py'
       - 'scripts/test_audit_windows_vm_preflight.py'
+      - 'scripts/diagnose_swtpm_startup.sh'
       - '.github/workflows/pre-vm-audit.yml'
 
 permissions:
@@ -57,6 +59,7 @@ jobs:
           bash -n scripts/bootstrap_pre_vm_prereqs.sh
           bash -n scripts/command1_pre_vm.sh
           bash -n scripts/bootstrap_virtualization_stack.sh
+          bash -n scripts/diagnose_swtpm_startup.sh
       - name: No accidental host provisioning during tests
         run: |
           echo 'The CI suite is offline-only; no apt, pip, libvirt or malware execution.'
