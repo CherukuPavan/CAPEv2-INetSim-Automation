@@ -62,6 +62,36 @@ class InspectWindowsMediaTests(TestCase):
             self.assertIn("extension only", data["header_format"])
             self.assertEqual(data["trust_status"], "UNVERIFIED")
 
+    def test_official_expected_digest_matches_when_supplied(self):
+        import json
+        from unittest.mock import patch
+        with TemporaryDirectory() as d:
+            image = Path(d) / "Win11.iso"
+            image.write_bytes(b"fixture")
+            report = Path(d) / "verify.json"
+            sha = hashlib.sha256(b"fixture").hexdigest()
+            with patch("sys.argv", ["inspector", str(image),
+                                     "--expected-sha256", sha, "--report", str(report)]):
+                self.assertEqual(m.main(), 0)
+            data = json.loads(report.read_text())
+            self.assertTrue(data["matches_expected_sha256"])
+            self.assertEqual(data["trust_status"], "MATCHES_SUPPLIED_EXPECTED_DIGEST")
+
+    def test_mismatched_digest_exits_nonzero(self):
+        import json
+        from unittest.mock import patch
+        with TemporaryDirectory() as d:
+            image = Path(d) / "Win11.iso"
+            image.write_bytes(b"fixture")
+            report = Path(d) / "verify.json"
+            with patch("sys.argv", ["inspector", str(image),
+                                     "--expected-sha256", "0" * 64,
+                                     "--report", str(report)]):
+                self.assertEqual(m.main(), 2)
+            data = json.loads(report.read_text())
+            self.assertFalse(data["matches_expected_sha256"])
+            self.assertEqual(data["trust_status"], "MISMATCH_SUPPLIED_EXPECTED_DIGEST")
+
     def test_empty_file_rejected(self):
         with TemporaryDirectory() as d:
             p=Path(d)/"file.7z"
