@@ -19,6 +19,7 @@ on:
       - 'scripts/diagnose_swtpm_startup.sh'
       - 'scripts/audit_swtpm_localca_access.sh'
       - 'scripts/repair_swtpm_localca_owner.sh'
+      - 'scripts/audit_swtpm_socket_access.sh'
       - '.github/workflows/pre-vm-audit.yml'
   pull_request:
     paths:
@@ -38,6 +39,7 @@ on:
       - 'scripts/diagnose_swtpm_startup.sh'
       - 'scripts/audit_swtpm_localca_access.sh'
       - 'scripts/repair_swtpm_localca_owner.sh'
+      - 'scripts/audit_swtpm_socket_access.sh'
       - '.github/workflows/pre-vm-audit.yml'
 
 permissions:
@@ -66,6 +68,7 @@ jobs:
           bash -n scripts/diagnose_swtpm_startup.sh
           bash -n scripts/audit_swtpm_localca_access.sh
           bash -n scripts/repair_swtpm_localca_owner.sh
+          bash -n scripts/audit_swtpm_socket_access.sh
       - name: No accidental host provisioning during tests
         run: |
           echo 'The CI suite is offline-only; no apt, pip, libvirt or malware execution.'
