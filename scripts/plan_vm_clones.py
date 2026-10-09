@@ -319,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 args.count = int(input("How many additional Windows VMs? ").strip())
             except (ValueError, EOFError) as exc:
-                _raise("Expected a whole-number VM count") from exc
+                _raise("Expected a whole-number VM count")
         report = read_inventory(args.inventory)
         plan = generate_plan(report, args.count, args.prefix,
                              args.network_name, args.subnet,
