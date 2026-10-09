@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import fcntl
+import stat
 import ipaddress
 import json
 import os
@@ -37,6 +39,7 @@ SCHEMA = "cape-command2-profile-v1"
 NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,90}\Z")
 RESERVE = 30 * 1024 ** 3
 MAX_COUNT = 32
+DEPLOY_LOCK = Path("/run/lock/cape-command2-deploy.lock")
 
 class ProvisionError(RuntimeError):
     pass
@@ -411,7 +414,25 @@ def main(argv=None) -> int:
             except (ValueError,EOFError) as exc:
                 raise ProvisionError("Enter a whole-number VM count") from exc
         profile=load_profile(a.profile)
-        report=run(profile,a.count,a.mode,a.reportdir)
+        if a.mode == "apply":
+            if os.geteuid() != 0:
+                raise ProvisionError("Apply requires root")
+            if DEPLOY_LOCK.is_symlink():
+                raise ProvisionError("Unsafe deployment coordination lock")
+            fd = os.open(DEPLOY_LOCK, os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW, 0o600)
+            try:
+                stats = os.fstat(fd)
+                if stats.st_uid != 0 or stat.S_IMODE(stats.st_mode) != 0o600:
+                    raise ProvisionError("Deployment lock must be root-owned mode 0600")
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
+                except BlockingIOError as exc:
+                    raise ProvisionError("Another Command 2 deployment is active") from exc
+                report = run(profile, a.count, a.mode, a.reportdir)
+            finally:
+                os.close(fd)
+        else:
+            report = run(profile, a.count, a.mode, a.reportdir)
         path=write_report(a.reportdir,report)
         print("Report:",path)
         print("Result:",report["status"])
