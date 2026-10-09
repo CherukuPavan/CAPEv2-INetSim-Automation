@@ -351,3 +351,61 @@ partitions and check the `Windows/System32/config/SYSTEM` path
 case-insensitively (metadata or hive magic only; no registry data dump).
 Disconnect and unmount in a finally block; do not apply Registry
 changes or create/start guest domains as part of diagnosis.
+
+## Confirmed root cause of inaccessible Windows SYSTEM hive — 2026-10-09 22:03 UTC
+
+The operator uploaded `CAPE_Clone_Layout_ReadOnly_20261009_220342_ErTBFo7k.txt`.
+The independently exported `win11_1.qcow2` is still a detached,
+backing-free 64 GiB disk. During a specifically approved read-only NBD
+inspection its GPT showed:
+
+| Partition | Observed size | Observed filesystem |
+| --- | --- | --- |
+| 1 | 200 MiB | vfat |
+| 2 | 16 MiB | unknown (likely Microsoft reserved) |
+| **3** | **62.9 GiB** | **BitLocker** |
+| 4 | 892 MiB | ntfs (likely Windows Recovery) |
+
+The only readable NTFS partition (partition 4) had no
+`Windows/System32/config/SYSTEM` hive. The main Windows volume
+(partition 3) is **BitLocker-protected**, so the earlier Hivex hive
+inspector did not find an inspectable SYSTEM hive. The command reported
+`CLEANUP: NBD DISCONNECTED` and `FINAL_EXIT_STATUS=0`. No guest was
+defined/started and neither clone Registry nor master was modified.
+
+**No more Hivex installation or unencrypted NTFS path search is
+justified.** The clone disk image and snapshot structure are valid, but
+Windows-volume encryption blocks all proposed offline Registry
+personalization. Moreover the Command 2 VM defines a new per-clone
+swtpm/UEFI identity. Windows BitLocker TPM protectors are not
+automatically portable to a fresh TPM; Windows may ask for a recovery
+password on the first cloned boot. Do not reuse or copy the master TPM
+private state as a shortcut.
+
+**Automated preventive guard:** `probe_cold_windows_volume_crypto.py`
+reads only the GPT and each partition's first sector using
+`qemu-img dd` (no NBD, no mount, no BitLocker keys). Its conservative
+parser recognizes BitLocker `-FVE-FS-` and returns a blocking decision
+for any encrypted or unknown Microsoft basic-data volume. Command 2
+`--apply` now invokes this guard **before exporting any clone disks**.
+Offline synthetic GPT CRC/sector tests and a Command 2 no-mutation
+regression test are in CI. A positive unencrypted NTFS candidate is
+not a license to run malware or proof that Windows boots correctly.
+
+**Safest path to the requested N-clone workflow:** The user must
+confirm that an authorized BitLocker recovery method is available.
+Never request or upload the actual 48-digit recovery password, TPM
+private state or BitLocker key package. If it is available, prepare a
+separate, NIC-disconnected, disposable clone **template**, unlocked
+by the operator locally using the recovery method, and eventually
+decrypt only this independent template if explicitly approved. This
+allows later offline IP customization without modifying original
+`win11` or its snapshot chain. It is still subject to read-only
+preflight, secure firmware/TPM identity and harmless boot tests on
+SSL-55; the initial saved clone is not yet safe to boot on NAT.
+
+If an authorized recovery method is unavailable, do not attempt
+BitLocker circumvention or silently mutate the original Windows VM.
+An independently rebuilt unencrypted template or a separately
+approved original-master reconfiguration is required before claiming
+one-command cloning.
