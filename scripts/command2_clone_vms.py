@@ -31,6 +31,7 @@ import xml.etree.ElementTree as ET
 
 import clone_domain_xml
 import guard_vm_tpm_socket
+import guard_vm_backing_access
 import export_cold_master_disk
 import personalize_clone_windows
 import register_cape_clones
@@ -352,16 +353,49 @@ def define(vm_xml: str) -> None:
         os.unlink(path)
 
 
-def snapshot_running(name: str, snapshot: str) -> None:
+def snapshot_running(name: str, snapshot: str, disk_dir: Path) -> None:
+    """Match the verified master: external running RAM + external QCOW2 disk.
+
+    Libvirt's implicit defaults differ between QEMU versions. Request explicit
+    output paths and reject any unexpected snapshot metadata.
+    """
+    if not NAME.fullmatch(name) or not NAME.fullmatch(snapshot):
+        raise ProvisionError("Invalid clone or snapshot name")
+    overlay = disk_dir / (name + "." + snapshot + ".qcow2")
+    memory = disk_dir / (name + "." + snapshot + ".memory")
+    for dest in (overlay, memory):
+        if dest.exists() or dest.is_symlink():
+            raise ProvisionError(f"Snapshot destination already exists: {dest}")
+    active_xml=ET.fromstring(virsh("dumpxml",name))
+    disks=active_xml.findall("./devices/disk[@device='disk']")
+    if len(disks)!=1:
+        raise ProvisionError("Snapshot expects exactly one writable disk")
+    target=disks[0].find("target")
+    if target is None or not target.get("dev"):
+        raise ProvisionError("Cannot resolve disk target for snapshot")
+    disk_target=target.get("dev")
+    if virsh("domstate",name)!="running":
+        raise ProvisionError("Snapshot requires a running benign-validated guest")
     virsh("snapshot-create-as","--domain",name,"--name",snapshot,
-          "--description","CAPE agent verified; clone clean analysis baseline",
-          "--atomic",timeout=180)
+          "--description","CAPE clone benign agent-verified running baseline",
+          "--memspec",f"file={memory},snapshot=external",
+          "--diskspec",f"{disk_target},snapshot=external,file={overlay}",
+          "--atomic",timeout=300)
     xml=ET.fromstring(virsh("snapshot-dumpxml",name,snapshot))
     if xml.findtext("./name")!=snapshot or xml.findtext("./state")!="running":
         raise ProvisionError(f"Snapshot {snapshot} not confirmed as running-state")
-    mem = xml.find("./memory")
-    if mem is None or mem.get("snapshot") == "no":
-        raise ProvisionError("CAPE baseline did not capture running guest memory state")
+    mem=xml.find("./memory")
+    if mem is None or mem.get("snapshot")!="external" or mem.get("file")!=str(memory):
+        raise ProvisionError("CAPE clone snapshot did not store the requested external RAM")
+    disk_entries=xml.findall("./disks/disk")
+    matched=[d for d in disk_entries if d.get("name")==disk_target]
+    if len(matched)!=1 or matched[0].get("snapshot")!="external":
+        raise ProvisionError("CAPE clone snapshot has wrong disk mode")
+    src=matched[0].find("source")
+    if src is None or src.get("file")!=str(overlay):
+        raise ProvisionError("CAPE clone overlay does not match requested destination")
+    if not overlay.is_file() or not memory.is_file():
+        raise ProvisionError("Expected snapshot disk/memory files are missing")
 
 
 def guest_shutdown(name: str, limit: int=120) -> None:
@@ -431,10 +465,19 @@ def create_one(item: dict, profile: dict, master_xml: str,
         raise
     out["agent_verification"]=health
     record("PING_AND_CAPE_AGENT_VERIFIED")
-    snapshot_running(item["name"],profile["snapshot_name"])
+    snapshot_running(item["name"],profile["snapshot_name"],
+                     Path(profile["disk_dir"]))
     record("RUNNING_STATE_SNAPSHOT_CREATED")
     guest_shutdown(item["name"])
     record("POST_SNAPSHOT_GRACEFUL_SHUTDOWN")
+    # In SSL-55, a second image layer failed with DAC/AppArmor read/lock
+    # errors after shutdown. Prepare explicit rk policy for the clone's
+    # newly read-only backing disk before its restart.
+    guard_vm_backing_access.apply(
+        clone_uuid,
+        guard_vm_backing_access.policy_text([str(disk)]),
+        item["name"])
+    record("BACKING_IMAGE_APPARMOR_READ_LOCK_VERIFIED")
     # Restart test reproduces the AppArmor/snapshot issue found on SSL-55.
     virsh("start", item["name"], timeout=180)
     verify_clone_agent.wait_for_agent(
