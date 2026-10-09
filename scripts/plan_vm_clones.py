@@ -70,7 +70,9 @@ def select_source(inventory: dict, snapshot: str) -> tuple[dict | None, list[str
         issues.append("Cannot establish snapshot memory handling")
     if inventory.get("vm", {}).get("state", "").lower() not in ("shut off", "shutoff"):
         issues.append("Master VM was not shut down during inventory")
-    if inventory.get("snapshots", {}).get("current") != snapshot:
+    current = (inventory.get("snapshots", {}).get("current")
+               or inventory.get("vm", {}).get("current_snapshot"))
+    if current != snapshot:
         issues.append("Selected cold snapshot was not current during inventory")
     disks = snap.get("disks")
     if not isinstance(disks, list) or not any(
@@ -214,13 +216,14 @@ def generate_plan(inv: dict, count: int, prefix: str = "win11_",
                   first_ip: str | None = None, master_ip: str | None = None,
                   reserved: list[str] | None = None,
                   source_snapshot: str | None = None) -> dict:
-    source_snapshot = source_snapshot or inv.get("snapshots", {}).get("current")
-    if not isinstance(source_snapshot, str) or not source_snapshot:
-        _raise("No current snapshot identified: --source-snapshot required")
     if not isinstance(inv, dict) or inv.get("schema") not in (
         "cape-master-offline-inventory-v1", "cape-master-vm-inventory-v1"
     ):
         _raise("Unrecognized master inventory schema")
+    source_snapshot = (source_snapshot or inv.get("snapshots", {}).get("current")
+                       or inv.get("vm", {}).get("current_snapshot"))
+    if not isinstance(source_snapshot, str) or not source_snapshot:
+        _raise("No current snapshot identified: --source-snapshot required")
     blockers: list[str] = []
     warnings: list[str] = []
     vm = inv.get("vm") or {}
@@ -276,7 +279,10 @@ def generate_plan(inv: dict, count: int, prefix: str = "win11_",
     else:
         blockers.append("Destination filesystem capacity could not be assessed")
     memory = vm.get("memory_kib")
-    avail = inv.get("host", {}).get("MemAvailable")
+    host = inv.get("host", {})
+    avail = host.get("MemAvailable")
+    if not isinstance(avail, int) and isinstance(host.get("MemAvailable_kib"), int):
+        avail = host["MemAvailable_kib"]
     if not isinstance(memory, int) or not isinstance(avail, int):
         blockers.append("Host memory budget is incomplete")
     else:
