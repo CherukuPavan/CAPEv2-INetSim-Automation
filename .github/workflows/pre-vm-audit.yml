@@ -29,6 +29,8 @@ on:
       - 'scripts/audit_clone_master.py'
       - 'scripts/plan_vm_clones.py'
       - 'scripts/command2_clone_vms.py'
+      - 'scripts/command2_clone_vms.sh'
+      - 'config/command2-profile.example.json'
       - 'scripts/test_command2_clone_vms.py'
       - 'scripts/clone_domain_xml.py'
       - 'scripts/test_clone_domain_xml.py'
@@ -72,6 +74,8 @@ on:
       - 'scripts/audit_clone_master.py'
       - 'scripts/plan_vm_clones.py'
       - 'scripts/command2_clone_vms.py'
+      - 'scripts/command2_clone_vms.sh'
+      - 'config/command2-profile.example.json'
       - 'scripts/test_command2_clone_vms.py'
       - 'scripts/clone_domain_xml.py'
       - 'scripts/test_clone_domain_xml.py'
@@ -118,6 +122,7 @@ jobs:
         run: |
           bash -n scripts/bootstrap_pre_vm_prereqs.sh
           bash -n scripts/command1_pre_vm.sh
+          bash -n scripts/command2_clone_vms.sh
           bash -n scripts/bootstrap_virtualization_stack.sh
           bash -n scripts/diagnose_swtpm_startup.sh
           bash -n scripts/audit_swtpm_localca_access.sh
