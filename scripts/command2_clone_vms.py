@@ -311,6 +311,31 @@ def copy_nvram(source: str, target: Path) -> None:
         os.fsync(f.fileno())
 
 
+def verify_clone_definition(name: str, intended_xml: str) -> None:
+    """Read back the libvirt definition before starting any new guest."""
+    desired = clone_domain_xml.analyze_static(intended_xml)
+    actual_xml = virsh("dumpxml", "--inactive", name)
+    actual = clone_domain_xml.analyze_static(actual_xml)
+    for key in ("name", "uuid", "network", "disk", "nvram", "mac"):
+        if desired[key] != actual[key]:
+            raise ProvisionError(
+                f"Libvirt changed expected clone {key}; refusing guest startup"
+            )
+    parsed=ET.fromstring(actual_xml)
+    tpms=parsed.findall("./devices/tpm")
+    if len(tpms) != 1:
+        raise ProvisionError("Guest lost required TPM device on define")
+    backend=tpms[0].find("backend")
+    if backend is None or backend.get("type") != "emulator":
+        raise ProvisionError("Guest TPM backend is not independent swtpm")
+    interfaces=parsed.findall("./devices/interface")
+    if len(interfaces) != 1:
+        raise ProvisionError("Guest has unexpected extra NICs")
+    disks=parsed.findall("./devices/disk[@device='disk']")
+    if len(disks) != 1:
+        raise ProvisionError("Guest has unexpected extra writable disks")
+
+
 def define(vm_xml: str) -> None:
     fd,path=tempfile.mkstemp(prefix="cape-clone-",suffix=".xml")
     try:
@@ -375,6 +400,8 @@ def create_one(item: dict, profile: dict, master_xml: str,
         isolated_network=profile["network"])
     define(rendered)
     record("VM_DEFINED_NOT_STARTED")
+    verify_clone_definition(item["name"], rendered)
+    record("LIBVIRT_CLONE_CONFIGURATION_VERIFIED")
     clone_uuid = str(uuid.uuid5(uuid.UUID(source_uuid),
                                 "cape-clone:" + item["name"]))
     # The master on SSL-55 needed an AppArmor swtpm socket exception.
