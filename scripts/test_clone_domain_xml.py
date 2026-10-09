@@ -39,6 +39,19 @@ class Tests(unittest.TestCase):
         self.assertEqual(out.find("devices/graphics").get("autoport"),"yes")
         self.assertEqual(out.find("devices/disk/target").get("bus"),"sata")
 
+    def test_cdrom_kept_but_install_iso_ejected(self):
+        with_iso=MASTER.replace(
+            "<interface type='network'>",
+            "<disk type='file' device='cdrom'>"
+            "<driver type='raw'/><source file='/home/charan/Downloads/Win11.iso'/>"
+            "<target dev='sdb' bus='sata'/></disk>"
+            "<interface type='network'>")
+        root=ET.fromstring(render(with_iso))
+        cdrom=root.find("./devices/disk[@device='cdrom']")
+        self.assertIsNotNone(cdrom)
+        self.assertIsNone(cdrom.find("source"))
+        self.assertEqual(cdrom.find("target").get("dev"), "sdb")
+
     def test_rejects_same_name(self):
         with self.assertRaisesRegex(m.UnsafeDefinition,"name matches"):
             m.render(MASTER,name="win11",uuid_value="a1a1a1a1-1234-4444-8888-bbbbbbbbbbbb",
