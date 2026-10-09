@@ -39,6 +39,14 @@ class Tests(unittest.TestCase):
         self.assertEqual(out.find("devices/graphics").get("autoport"),"yes")
         self.assertEqual(out.find("devices/disk/target").get("bus"),"sata")
 
+    def test_spice_clipboard_and_usb_redirect_not_inherited(self):
+        xml=MASTER.replace("</devices>",
+            "<channel type='spicevmc'><target name='com.redhat.spice.0'/>"
+            "</channel><redirdev bus='usb' type='spicevmc'/></devices>")
+        root=ET.fromstring(render(xml))
+        self.assertEqual(root.findall("./devices/redirdev"),[])
+        self.assertEqual(root.findall("./devices/channel"),[])
+
     def test_cdrom_kept_but_install_iso_ejected(self):
         with_iso=MASTER.replace(
             "<interface type='network'>",
