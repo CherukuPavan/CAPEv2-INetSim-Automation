@@ -125,3 +125,32 @@ consent to do any VM lifecycle or snapshot changes.
 - https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/manage-bde-status
 - https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/manage-bde-off
 - https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/operations-guide
+
+## Operator decision and tested read-only safeguard — 2026-10-09
+
+The operator confirms the original `win11` reaches the Windows desktop
+normally using its existing virtual TPM, while a 48-digit recovery
+password is unavailable. The operator has authorized the safest practical
+path toward unattended analysis VM cloning but has **not** supplied any
+BitLocker recovery credentials. We will not ask for, export or store them.
+
+A dedicated read-only preservation audit is now in
+`scripts/audit_win11_bitlocker_working_overlay.py` with synthetic
+offline tests. It inventories the master cold snapshot, source backing
+layers, firmware variable-store path, emulator TPM backend and NIC
+configuration without reading TPM secrets or changing libvirt state.
+This must pass on the real host before any overlay, guest boot, NIC
+changes or decryption. Its output does **not** certify TPM restoration:
+the swtpm state location requires explicit host-specific verification.
+
+The desired maintenance stage is a temporary working overlay for the
+original guest with its existing TPM, **not** automatic boot of the
+detached `win11_1.qcow2`. Before maintenance, document an actually
+reversible checkpoint of disk pointer, NVRAM and TPM state under a
+root-private local location and verify that it can be restored.
+Unexpected divergence or unavailable rollback is a **hard stop**.
+
+Even with a rollback plan, Windows unlock on first maintenance boot
+is an observed test, not guaranteed by the previously reported desktop
+access. If BitLocker enters recovery, do not try random keys or alter
+key protectors; stop and restore the previous known working state.
