@@ -51,6 +51,7 @@ class LifecycleTests(unittest.TestCase):
             patch.object(c.guard_vm_tpm_socket,"prepare",side_effect=mark("tpm")),
             patch.object(c.verify_clone_agent,"wait_for_agent",side_effect=mark("agent")),
             patch.object(c,"snapshot_running",side_effect=mark("snapshot")),
+            patch.object(c.guard_vm_backing_access,"apply",side_effect=mark("backingrk")),
             patch.object(c,"guest_shutdown",side_effect=mark("shutdown")),
             patch.object(c,"virsh",side_effect=lambda *args,**kwargs: steps.append("virsh:"+args[0])),
         ]
@@ -78,6 +79,8 @@ class LifecycleTests(unittest.TestCase):
         self.assertIn("virsh:snapshot-revert",steps)
         self.assertLess(steps.index("ip"),steps.index("virsh:start"))
         self.assertLess(steps.index("tpm"),steps.index("virsh:start"))
+        self.assertLess(steps.index("snapshot"),steps.index("backingrk"))
+        self.assertLess(steps.index("backingrk"),steps.index("virsh:snapshot-revert"))
         self.assertLess(steps.index("snapshot"),steps.index("virsh:snapshot-revert"))
         self.assertEqual(events[-1],"CLONE_SHUT_OFF_READY_FOR_CAPE_REGISTRATION")
 
