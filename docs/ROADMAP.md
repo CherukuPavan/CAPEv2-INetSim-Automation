@@ -254,3 +254,9 @@ The user explicitly confirmed that the objective includes **executing real malwa
 - User explicitly wants VM name **`win11`** retained. Do **not** rename it to `cuckoo1` as previously assumed. CAPE guest machinery configuration, snapshot name and guest IP will have to be explicitly reconciled to `win11` later; do not automatically edit CAPE yet.
 - Recommended recovery: shut off guest at installer stage; install Ubuntu `swtpm` and `swtpm-tools`; attach **Emulated TPM version 2.0** via virt-manager hardware settings while guest is powered down; reboot installer and proceed without bypass. Confirm actual setup result after user reports back.
 - Development branch package automation and read-only Windows guest preflight now include `swtpm-tools`/`swtpm_setup`; no host scripts or actual VM modifications have been executed by the assistant.
+
+### Step 12E — SSL-55 software TPM packages installed, add TPM in virt-manager next (2026-10-09)
+
+- User successfully ran `sudo apt-get install -y swtpm swtpm-tools` on SSL-55; both Ubuntu Noble packages version **0.7.3-0ubuntu5.24.04.1** configured, `swtpm --version` shows emulator **0.7.3**. No package-manager install error; ignore the non-actionable automatic dependency removal suggestion for now.
+- Screenshot confirms existing `win11` guest is powered off (`Shutoff (Destroyed)`), still Q35/UEFI, and **does not yet show TPM** in hardware devices. Next reviewed GUI action: Add Hardware → TPM → Emulated → Version 2.0 → compatible TIS/default model → Finish. Record the resulting device screenshot before restarting installer.
+- This exact `swtpm` + `swtpm-tools` dependency requirement is **already included in `scripts/bootstrap_virtualization_stack.sh`**, with inventory, simulation, explicit apply and post-APT verification; `audit_windows_vm_preflight.py` checks emulator/setup helper. Do not claim guest TPM provisioning automated until separately implemented and tested.
