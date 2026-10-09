@@ -149,6 +149,11 @@ def preflight() -> tuple:
     require(free>=64*1024**3+RESERVE,"Insufficient space for full overlay growth and reserve")
     return baseline,round(free/1024**3,2)
 
+def check_lock_permissions(fd: int) -> None:
+    st=os.fstat(fd)
+    require(st.st_uid==0 and not st.st_mode & 0o077,
+            "Untrusted export lock mode")
+
 def perform(mode: str) -> dict:
     require(mode in ("plan","create"),"Unknown mode")
     if mode=="plan":
@@ -170,8 +175,7 @@ def perform(mode: str) -> dict:
     fd=os.open(LOCK,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     tmp=None
     try:
-        require(os.fstat(fd).st_uid==0 and not os.fstat(fd).st_mode & 0o077,
-                "Untrusted export lock mode")
+        check_lock_permissions(fd)
         fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
         before,free=preflight()
         # Build a *new* overlay, never modify any original QCOW2 image.
