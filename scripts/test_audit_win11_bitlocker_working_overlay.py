@@ -29,7 +29,7 @@ class LayoutTests(unittest.TestCase):
 
     def test_running_snapshot_blocked(self):
         with self.assertRaisesRegex(pre.AuditFailure,"shut-off"):
-            pre.xml_summary(DOMAIN,SNAP.replace("shutoff","running"))
+            pre.xml_summary(DOMAIN,SNAP.replace("<state>shutoff</state>", "<state>running</state>"))
 
     def test_saved_ram_blocked(self):
         with self.assertRaisesRegex(pre.AuditFailure,"memory"):
