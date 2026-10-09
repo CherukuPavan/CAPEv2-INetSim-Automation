@@ -77,9 +77,9 @@ class Tests(unittest.TestCase):
         import tempfile
         header, entries=make_gpt([crypto.BASIC_DATA,crypto.RECOVERY])
         mbr=bytearray(512)
-        mbr[510:512]=b"\\x55\\xaa"
-        bitlocker=b"\\xeb\\x58\\x90-FVE-FS-"+b"\\x00"*501
-        ntfs=b"\\xeb\\x52\\x90NTFS    "+b"\\x00"*501
+        mbr[510:512]=b"\x55\xaa"
+        bitlocker=b"\xeb\x58\x90-FVE-FS-"+b"\x00"*501
+        ntfs=b"\xeb\x52\x90NTFS    "+b"\x00"*501
         contents={
             (0,1):bytes(mbr),
             (1,1):header,
@@ -98,12 +98,12 @@ class Tests(unittest.TestCase):
             return Result()
         with tempfile.TemporaryDirectory() as td:
             disk=Path(td)/"detached-clone.qcow2"
-            disk.write_bytes(b"QFI\\xfb")
+            disk.write_bytes(b"QFI\xfb")
             with patch.object(crypto.subprocess,"run",side_effect=fake_run):
                 info=crypto.inspect_image(disk)
             self.assertFalse(info["windows_registry_readable"])
             self.assertEqual(info["decision"],"BITLOCKER_BLOCKED")
-            self.assertEqual(disk.read_bytes(),b"QFI\\xfb")
+            self.assertEqual(disk.read_bytes(),b"QFI\xfb")
         self.assertTrue(calls)
         self.assertTrue(all(call[1]=="dd" and "-U" not in call for call in calls))
 
