@@ -271,3 +271,44 @@ without the recovery password.
 Relevant upstream references:
 - https://www.qemu.org/docs/master/tools/qemu-img.html
 - https://www.libvirt.org/manpages/virsh.html
+
+## Working maintenance overlay created — 2026-10-09 22:36 UTC
+
+The operator uploaded `CAPE_Win11_Working_Overlay_20261009_223658_bjsYVWBj.txt`.
+The guarded host command returned `FINAL_EXIT_STATUS=0` and reported
+`WORKING OVERLAY CREATED SUCCESSFULLY`.
+
+- New detached COW overlay:
+  `/var/lib/libvirt/images/win11.cape-bitlocker-maintenance.qcow2`.
+- Expected source backing image:
+  `/var/lib/libvirt/images/win11.finalshutoffversion`.
+- `qemu-img check` and backing path validation passed.
+- The original master remained shut off, cold snapshot unchanged,
+  source top disk pointer unchanged, original TPM/NVRAM/network
+  unchanged, and BitLocker remains enabled.
+- The new overlay is **NOT yet attached** to `win11`. Do not boot it
+  in a new VM or with a different virtual TPM.
+
+### Next review gate before any maintenance boot
+
+A temporary maintenance domain must preserve the **same original
+win11 libvirt UUID, emulator TPM pairing, and original OVMF NVRAM
+path**, redirecting *only* the writable disk to this working overlay.
+For fail-closed network containment, **remove the guest network
+interface entirely** from its temporary domain definition, not just
+link-down on the NAT-connected interface; inspect the readback of
+the proposed/offline and actual domain XML before guest start. The
+original backed-up domain XML restores the original NIC later.
+
+Do not use `virsh snapshot-revert` as a generic rollback mechanism:
+snapshot revert is a destructive operation and its compatibility with
+SSL-55 external snapshots has not been demonstrated. A defined,
+offline XML redefinition must have verified restoration to the
+original backing disk/NIC and must keep the VM shut off on failure.
+Backups of TPM/NVRAM were bytewise verified locally, but actual
+Windows unlock after firmware/TPM state restoration has **not** been
+tested and cannot be guaranteed without a recovery password.
+
+The next requested host action should be **read-only offline
+maintenance XML-delta validation only**. No guest definition, boot,
+BitLocker decrypt, or new network should occur in that check.
