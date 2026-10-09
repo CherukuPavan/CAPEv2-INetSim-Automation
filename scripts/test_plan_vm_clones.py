@@ -52,6 +52,27 @@ class Tests(unittest.TestCase):
         self.assertFalse(errors)
         self.assertEqual(disk["layer_count"], 3)
 
+    def test_four_layer_real_master_layout(self):
+        f=fixture()
+        layers=f["storage"][0]["backing_chain"]
+        old_top=layers[0]
+        old_top["filename"]="/lab/masters/win11.Afterfull"
+        old_top["backing_filename"]="/lab/masters/win11.basicinstallwinsnapshot"
+        layers[1]["filename"]="/lab/masters/win11.basicinstallwinsnapshot"
+        layers[1]["backing_filename"]="/lab/masters/win11.qcow2"
+        layers[2]["filename"]="/lab/masters/win11.qcow2"
+        layers.insert(0,{"filename":"/lab/masters/win11.finalshutoffversion",
+                         "backing_filename":"/lab/masters/win11.Afterfull",
+                         "format":"qcow2","virtual_size":64*1024**3})
+        f["vm"]["disks"][0]["file"]="/lab/masters/win11.finalshutoffversion"
+        f["storage"][0]["path"]="/lab/masters/win11.finalshutoffversion"
+        f["snapshots"]["items"][0]["disks"][0]["source"]="/lab/masters/win11.finalshutoffversion"
+        selected, errors=c.select_source(f,"cold")
+        self.assertFalse(errors)
+        info, errors=c.image_details(f,selected)
+        self.assertFalse(errors)
+        self.assertEqual(info["layer_count"],4)
+
     def test_running_snapshot_refused(self):
         _, issues = c.select_source(fixture(), "running")
         self.assertTrue(any("not marked as shut off" in x for x in issues))
