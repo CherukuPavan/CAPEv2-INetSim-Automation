@@ -22,7 +22,8 @@ Modes:
   preflight-windows       Read-only guest capacity, OVMF/TPM, libvirt NAT & ISO access report.
   plan-optionals          Inspect CAPE service-account optional dependencies.
   apply-optionals         Explicit, lockfile-gated optional dependency install.
-  master-checkpoint       Read-only final Windows master/snapshot handoff (after guest setup).\n  coverage                Show human-reviewed automation coverage/status documentation.
+  master-checkpoint       Read-only final Windows master/snapshot handoff (after guest setup).
+  host-acceptance         Consolidated read-only host + finished-master dependency report.\n  coverage                Show human-reviewed automation coverage/status documentation.
 
 Examples:
   bash scripts/command1_pre_vm.sh audit
@@ -103,6 +104,11 @@ case "$MODE" in
     command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
     REPORT="${HOME:?}/CAPEv2_OptionalApply_$(date +%Y%m%d_%H%M%S)_$_R.json"
     exec python3 "$HERE/install_cape_optional_deps.py" --mode apply --report "$REPORT" "$@"
+    ;;
+  host-acceptance)
+    command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
+    REPORT="${HOME:?}/cape_command12_acceptance_$(date +%Y%m%d_%H%M%S)_$.txt"
+    exec python3 "$HERE/audit_command12_acceptance.py" --output "$REPORT" "$@"
     ;;
   master-checkpoint)
     command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
