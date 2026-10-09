@@ -84,12 +84,25 @@ def inspect(path: Path) -> dict[str, object]:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("file", type=Path, help="Downloaded completed .7z, .zip or .iso file")
+    p.add_argument("--expected-sha256", default=None,
+                   help="Optional trusted publisher SHA-256 for THIS exact image release; not inferred from filenames.")
     p.add_argument("--report", type=Path, default=None,
                    help="New private JSON report path, default under home")
     args = p.parse_args()
     target = args.file.expanduser().absolute()
+    if args.expected_sha256 is not None:
+        expected = args.expected_sha256.strip().lower()
+        if len(expected) != 64 or any(c not in "0123456789abcdef" for c in expected):
+            p.error("--expected-sha256 must be exactly 64 hexadecimal characters")
     try:
         data = inspect(target)
+        if args.expected_sha256 is not None:
+            data["expected_sha256"] = expected
+            data["matches_expected_sha256"] = (data["sha256"] == expected)
+            data["trust_status"] = ("MATCHES_SUPPLIED_EXPECTED_DIGEST" if data["matches_expected_sha256"]
+                                    else "MISMATCH_SUPPLIED_EXPECTED_DIGEST")
+            data["note"] = ("Digest comparison uses a user-supplied expected hash. "
+                            "Verify its provenance independently against the official publisher.")
     except (OSError, ValueError) as exc:
         p.error(type(exc).__name__ + ": " + str(exc))
     if args.report is None:
@@ -105,7 +118,7 @@ def main() -> int:
         json.dump(data, fp, indent=2, sort_keys=True)
         fp.write("\n")
     print("Private media report saved:", out)
-    return 0
+    return 2 if data.get("matches_expected_sha256") is False else 0
 
 
 if __name__ == "__main__":
