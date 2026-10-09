@@ -60,15 +60,14 @@ REPORT=$(mktemp "${HOME:?}/SSL_swtpm_LocalCA_${MODE}_$(date +%Y%m%d_%H%M%S)_XXXX
   fi
   state=$(sudo stat -c '%U:%G:%a' -- "$DIR")
   echo "CA statedir: owner:group:mode=$state"
-  contents=$(sudo find "$DIR" -mindepth 1 -maxdepth 1 -print -quit)
-  [[ -z "$contents" ]] || {
-    echo "BLOCKED: CA statedir contains data; protect existing CA and VMs."; exit 3;
-  }
-  echo "CA statedir: EMPTY (including hidden entries)"
-
   if [[ "$state" == "tss:root:750" ]]; then
-    echo "Already corrected; no action needed."
+    echo "Already corrected; no action needed to CA contents."
   elif [[ "$state" == "swtpm:root:750" ]]; then
+    contents=$(sudo find "$DIR" -mindepth 1 -maxdepth 1 -print -quit)
+    [[ -z "$contents" ]] || {
+      echo "BLOCKED: CA statedir contains data; protect existing CA and VMs."; exit 3;
+    }
+    echo "CA statedir: EMPTY (including hidden entries)"
     if [[ "$MODE" == "apply" ]]; then
       echo "Applying exact, non-recursive ownership correction."
       sudo chown --no-dereference tss:root -- "$DIR"
