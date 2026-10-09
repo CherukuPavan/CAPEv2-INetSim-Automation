@@ -111,6 +111,21 @@ class IdentityTests(unittest.TestCase):
             with self.assertRaisesRegex(c.ProvisionError,"already has VM"):
                 c.check_empty_target_network("cape-isolated",{"other-student-vm"})
 
+    def test_accepted_clone_xml_matches_readback(self):
+        from test_clone_domain_xml import render
+        intended=render()
+        with patch.object(c,"virsh",return_value=intended) as virsh:
+            c.verify_clone_definition("win11_1", intended)
+        virsh.assert_called_once_with("dumpxml","--inactive","win11_1")
+
+    def test_unexpected_network_in_defined_clone_refuses_boot(self):
+        from test_clone_domain_xml import render
+        intended=render()
+        altered=intended.replace('network="cape-isolated"','network="default"')
+        with patch.object(c,"virsh",return_value=altered):
+            with self.assertRaisesRegex(c.ProvisionError,"network"):
+                c.verify_clone_definition("win11_1",intended)
+
     def test_repeated_reports_in_same_second_have_unique_names(self):
         import tempfile
         from pathlib import Path
