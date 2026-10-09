@@ -50,7 +50,12 @@ def render(master_xml: str, *, name: str, uuid_value: str, mac: str,
     _require(parsed_uuid != root.findtext("./uuid"), "Clone UUID matches master")
     _require(not root.findall("./devices/hostdev"), "Host passthrough devices require review")
     _require(not root.findall("./devices/filesystem"), "Host directory shares are forbidden")
-    _require(not root.findall("./devices/redirdev"), "USB redirection to analysis guests is forbidden")
+    # Remove inherited USB redirection channels: they bridge host USB into guests.
+    # This is an intentional containment exception to otherwise cloned hardware.
+    devices = root.find("devices")
+    if devices is not None:
+        for redirect in list(devices.findall("redirdev")):
+            devices.remove(redirect)
     _require(not root.findall("./devices/interface[@type='direct']"), "Direct NIC unsupported")
     _require(not root.findall("./devices/interface[@type='bridge']"), "Host bridge must be inventoried as isolated network")
     _require(not root.findall("./sysinfo"), "Source contains SMBIOS serial settings that might identify duplicate hardware")
