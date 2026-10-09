@@ -42,6 +42,18 @@ class InspectWindowsMediaTests(TestCase):
             with self.assertRaisesRegex(ValueError, "symlink"):
                 m.inspect(link)
 
+    def test_detects_iso9660_cd001_descriptor(self):
+        with TemporaryDirectory() as d:
+            p = Path(d) / "Win11.iso"
+            payload = bytearray(16 * 2048 + 6)
+            payload[16 * 2048 + 1:16 * 2048 + 6] = b"CD001"
+            p.write_bytes(payload)
+            data = m.inspect(p)
+            self.assertTrue(data["iso9660_pvd_detected"])
+            self.assertIn("descriptor detected", data["header_format"])
+            self.assertEqual(data["trust_status"], "UNVERIFIED")
+            self.assertFalse(data["iso_boot_tested"])
+
     def test_iso_extension_is_not_authenticated(self):
         with TemporaryDirectory() as d:
             p=Path(d)/"install.iso"
