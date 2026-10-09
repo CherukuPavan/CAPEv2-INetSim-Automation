@@ -312,3 +312,42 @@ tested and cannot be guaranteed without a recovery password.
 The next requested host action should be **read-only offline
 maintenance XML-delta validation only**. No guest definition, boot,
 BitLocker decrypt, or new network should occur in that check.
+
+## Maintenance XML plan obstacle and approved resolution — 2026-10-09 22:40 UTC
+
+The operator ran a read-only in-memory maintenance XML preflight and
+uploaded `CAPE_Win11_Maintenance_XML_Plan_20261009_224049_4lNl5ao0.txt`.
+
+- **PASSED:** original libvirt definition equals the local protected
+  XML backup.
+- **PASSED:** current snapshot metadata equals the local protected
+  snapshot XML backup.
+- **PASSED:** the detached maintenance disk's **five-layer** QCOW2
+  chain (one new overlay plus four unchanged master layers).
+- **BLOCKED SAFELY:** `Additional host-connected device requires
+  review: redirdev`. The block occurred before any VM mutation.
+
+The libvirt `redirdev` element represents host/client USB redirection,
+typically `bus='usb' type='spicevmc'`; no USB redirect is required for
+BitLocker maintenance. See
+https://www.libvirt.org/formatdomain.html#redirected-devices and
+https://spice.pages.freedesktop.org/spice-space/spice-user-manual.html.
+
+The revised pure offline transformation,
+`scripts/plan_win11_maintenance_xml.py`, retains the master name,
+UUID, existing NVRAM path, and emulator TPM while selecting the already
+created maintenance QCOW2 and **removing** the single NAT NIC,
+`redirdev` USB redirects, optional `redirfilter`, and guest-integration
+`channel` elements from the **proposed XML only**. Unexpected external
+USB redirection types, host-device passthrough, filesystem-sharing,
+VSOCK and externally bound graphics are fail-closed and require review.
+The original domain XML stays in the private preservation backup.
+
+GitHub CI covers expected SPICE USB redirection removal,
+original UUID/NVRAM/TPM preservation, and negative fixtures for
+non-SPICE USB, pass-through, extra NIC, nonlocal graphics, unusual disk
+sources and QEMU command-line modifications. **This does not yet
+authorize an actual redefinition, boot, Windows unlock, or decryption.**
+The operator should run one revised **read-only** host validation and
+return the output so we can confirm no additional host-connected
+devices are present on this machine.
