@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import tempfile
 import subprocess
 import sys
 import uuid as uuidlib
@@ -21,7 +22,7 @@ import xml.etree.ElementTree as ET
 ABSTRACTION = Path("/etc/apparmor.d/abstractions/libvirt-qemu")
 RULEDIR = Path("/etc/apparmor.d/abstractions/libvirt-qemu.d")
 PROFILEDIR = Path("/etc/apparmor.d/libvirt")
-LOCKFILE = Path("/run/lock/cape-qcow2-apparmor-guard.lock")
+LOCKFILE = Path("/run/cape-qcow2-apparmor-guard.lock")
 INCLUDE = re.compile(r"^\s*(?:#include|include)\s+if\s+exists\s+<abstractions/libvirt-qemu\.d>\s*$", re.M)
 SAFE_PATH = re.compile(r"/[A-Za-z0-9_./+@-]{1,4095}\Z")
 SAFE_VM = re.compile(r"[A-Za-z0-9_.-]{1,100}\Z")
@@ -138,6 +139,10 @@ def ensure_supported() -> None:
             raise GuardError("This host lacks the verified libvirt-qemu.d include")
         if RULEDIR.is_symlink() or (RULEDIR.exists() and not RULEDIR.is_dir()):
             raise GuardError("AppArmor override directory is unsafe")
+        if RULEDIR.exists():
+            directory_stat = RULEDIR.stat()
+            if directory_stat.st_uid != 0 or directory_stat.st_mode & 0o022:
+                raise GuardError("AppArmor override directory is not root-controlled")
         if PROFILEDIR.is_symlink() or not PROFILEDIR.is_dir():
             raise GuardError("Missing or unsafe libvirt profile directory")
     except OSError as exc:
@@ -195,13 +200,19 @@ def apply(uuid: str, expected: str, vm: str) -> str:
             return "Already configured; validated without overwriting the policy"
         RULEDIR.mkdir(mode=0o755, parents=False, exist_ok=True)
         created = False
+        temp_name = None
         try:
-            policy_fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
-            created = True
+            policy_fd, temp_name = tempfile.mkstemp(prefix=".cape-qcow2-", dir=str(RULEDIR))
+            os.fchmod(policy_fd, 0o644)
             with os.fdopen(policy_fd, "w") as stream:
                 stream.write(expected)
                 stream.flush()
                 os.fsync(stream.fileno())
+            # An atomic hard link refuses to replace an unrecognized override.
+            os.link(temp_name, target)
+            created = True
+            os.unlink(temp_name)
+            temp_name = None
             parse_profile(uuid)
             return f"Installed and parsed read+lock backing-image rules: {target}"
         except Exception as exc:
@@ -212,6 +223,12 @@ def apply(uuid: str, expected: str, vm: str) -> str:
                 except GuardError as reload_exc:
                     raise GuardError(f"Policy reverted; reload also failed: {reload_exc}") from exc
             raise
+        finally:
+            if temp_name is not None:
+                try:
+                    os.unlink(temp_name)
+                except FileNotFoundError:
+                    pass
     finally:
         os.close(fd)
 
