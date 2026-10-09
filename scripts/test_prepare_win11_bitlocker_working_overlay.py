@@ -3,6 +3,7 @@
 import json
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -38,8 +39,9 @@ class Tests(unittest.TestCase):
         with patch.object(p,"DEST",self.dest), \
              patch.object(p,"LOCK",self.dir/"test.lock"), \
              patch.object(p,"preflight",return_value=(("fingerprint",),213.0)), \
+             patch.object(p,"check_lock_permissions"), \
              patch.object(p,"snapshot_fingerprint",return_value=("fingerprint",)), \
-             patch.object(p.shutil,"disk_usage",return_value=(10**12,0,5*10**11)), \
+             patch.object(p.shutil,"disk_usage",return_value=SimpleNamespace(free=5*10**11)), \
              patch.object(p,"cmd",side_effect=fake):
             result=p.perform("create")
         self.assertEqual(result["status"],"WORKING_OVERLAY_CREATED_NOT_ATTACHED")
@@ -61,6 +63,7 @@ class Tests(unittest.TestCase):
         with patch.object(p,"DEST",self.dest), \
              patch.object(p,"LOCK",self.dir/"test.lock"), \
              patch.object(p,"preflight",return_value=(("fingerprint",),213.0)), \
+             patch.object(p,"check_lock_permissions"), \
              patch.object(p,"cmd",side_effect=fake):
             with self.assertRaisesRegex(p.Block,"backing image"):
                 p.perform("create")
