@@ -286,7 +286,7 @@ def preflight(profile: dict, count: int, mode: str) -> tuple[list[dict], str, st
     if free_match is None or count*per_vm > int(free_match.group(1))*1024*0.75:
         raise ProvisionError("Insufficient host RAM for simultaneous requested clones")
     if mode == "apply":
-        for tool in ("qemu-img","virt-win-reg","virsh","apparmor_parser","curl","ping"):
+        for tool in ("qemu-img","virt-win-reg","virsh","apparmor_parser","curl","ping","ip"):
             if not shutil.which(tool):
                 raise ProvisionError(f"Required compatible host tool missing: {tool}")
         if not profile.get("benign_test_only_acknowledged",False):
@@ -346,12 +346,13 @@ def guest_shutdown(name: str, limit: int=120) -> None:
 
 
 def create_one(item: dict, profile: dict, master_xml: str,
-               master_nvram: str, journal) -> dict:
+               master_nvram: str, bridge: str, journal) -> dict:
     root=ET.fromstring(master_xml)
     source_uuid=root.findtext("uuid")
     if not source_uuid:
         raise ProvisionError("Master UUID missing")
     disk, vars=disk_and_nvram_paths(item,profile)
+    clone_mac=make_mac(source_uuid,item["name"])
     out={"name":item["name"],"ip":item["ip"],"status":"NOT_CREATED"}
     def record(state):
         out["status"]=state
@@ -385,7 +386,8 @@ def create_one(item: dict, profile: dict, master_xml: str,
     virsh("start",item["name"],timeout=180)
     record("GUEST_BOOTED_BENIGN_CHECK")
     try:
-        health=verify_clone_agent.wait_for_agent(item["ip"],timeout=240)
+        health=verify_clone_agent.wait_for_agent(
+            item["ip"],timeout=240,interface=bridge,expected_mac=clone_mac)
     except Exception:
         # The new VM is untrusted or misconfigured: power it off without
         # changing master or continuing to configure other clones.
@@ -402,14 +404,16 @@ def create_one(item: dict, profile: dict, master_xml: str,
     record("POST_SNAPSHOT_GRACEFUL_SHUTDOWN")
     # Restart test reproduces the AppArmor/snapshot issue found on SSL-55.
     virsh("start", item["name"], timeout=180)
-    verify_clone_agent.wait_for_agent(item["ip"], timeout=240)
+    verify_clone_agent.wait_for_agent(
+        item["ip"],timeout=240,interface=bridge,expected_mac=clone_mac)
     record("RESTART_PING_AND_CAPE_AGENT_VERIFIED")
     guest_shutdown(item["name"])
     # This is a fresh, disposable clone: explicitly test the real CAPE
     # rollback primitive before registering it as an analysis machine.
     virsh("snapshot-revert", item["name"], profile["snapshot_name"],
           "--running", timeout=240)
-    verify_clone_agent.wait_for_agent(item["ip"], timeout=240)
+    verify_clone_agent.wait_for_agent(
+        item["ip"],timeout=240,interface=bridge,expected_mac=clone_mac)
     record("SNAPSHOT_REVERT_PING_AND_CAPE_AGENT_VERIFIED")
     guest_shutdown(item["name"])
     record("CLONE_SHUT_OFF_READY_FOR_CAPE_REGISTRATION")
@@ -495,7 +499,7 @@ def run(profile: dict, count: int, mode: str, reportdir: Path) -> dict:
         success=[]
         for item in items:
             current_clone = item["name"]
-            result=create_one(item,profile,master_xml,master_nvram,journal)
+            result=create_one(item,profile,master_xml,master_nvram,bridge,journal)
             success.append(result)
             current_clone = None
         # Every clone is shut off and has a running-state snapshot before
