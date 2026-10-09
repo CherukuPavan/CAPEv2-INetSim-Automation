@@ -87,6 +87,26 @@ permissions. It has plan/apply/verify modes and offline tests. It is **not**
 a clone creator or a containment-qualified VM starter. Read
 [the design, safety limits and integration requirements](docs/VM_BACKING_ACCESS_GUARD.md).
 
+## Configured Windows master → clone automation (in development)
+
+The SSL-55 operator reports a completed/hardened `win11` master, verified
+Ubuntu-to-guest agent connectivity, a CAPE running-state analysis snapshot
+and a separate shut-off backup. A new **read-only** master-inventory helper
+records current VM/snapshot metadata, network attachments, and allowlisted
+CAPE VM mapping fields in one private TXT report:
+
+```bash
+sudo -v
+python3 scripts/audit_clone_master.py --vm win11 \\
+  --report "$HOME/win11_master_clone_inventory_$(date +%Y%m%d_%H%M%S).txt"
+```
+
+[Cloning workflow and remaining safety gates](docs/MASTER_VM_CLONING.md).
+
+**Do not run the cloned guests in parallel yet.** The collector does not
+alter VM snapshots, inject guest IPs or create clones, and no clone-deployment
+command is ready for use.
+
 ## Workflow
 
 User manually performs each SSL-55 installation step, uploads one consolidated
