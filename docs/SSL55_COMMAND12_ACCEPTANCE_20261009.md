@@ -170,3 +170,43 @@ run until an independently reviewed compatible offline guest-IP
 customizer is available, network isolation is checked, and physical
 host acceptance succeeds.
 
+
+## Follow-up APT simulation — 2026-10-09 21:36 UTC
+
+The operator supplied `CAPE_Minimal_Hivex_Check_20261009_213608_0fbBOWoc.txt`:
+
+- All three requested packages are Noble `1.3.23-1build7`:
+  `libhivex0`, `libhivex-bin`, `python3-hivex`.
+- APT simulation: **0 upgraded, 3 newly installed, 0 removed**,
+  exit code **0**. Neither `qemu`, `qemu-utils`, `qemu-system-x86`,
+  nor libvirt packages appear in the installation transaction.
+- The source list still exposes Focal candidates, but the selected
+  three versions were explicitly listed from **Ubuntu 24.04 Noble**.
+- The existing `qemu` package remains held.
+- The kernel `nbd.ko.zst` module exists, but no `/dev/nbd*` device
+  is currently present. Do not `modprobe` or `qemu-nbd --connect`
+  on any original master image.
+- `sudo docker version` reports client/server **29.2.0**. This does
+  not establish a safe, approved container image for guest Registry
+  editing and does not justify broad Docker user permissions.
+
+**Decision:** the three exact-version packages may be considered for
+a **guarded, explicitly authorized, minimal installation**. This
+does not complete the Windows clone personalization backend; Command 2
+still expects `virt-win-reg` and must not be run in apply mode.
+
+The repository now includes `scripts/install_minimal_hivex_guarded.sh`,
+which defaults to a read-only transaction plan. Explicit `--apply`
+requires Ubuntu Noble, a held QEMU package, a successful transaction
+containing only the three pinned Hivex packages and zero removals, and
+verifies that the existing QEMU executables have not changed. It
+captures its transaction and verification in a single private TXT.
+
+Next milestone after installation: implement and independently test a
+Hivex backend that edits an **extracted independent clone-only** SYSTEM
+hive, with rollback-safe backup and post-write checks, then safely
+reintegrate the hive into its *own* powered-off clone disk.
+Do not substitute `hivexregedit` for `virt-win-reg` in an existing
+command without verifying Windows control sets, interface GUIDs and
+IPv4/hostname semantics.
+
