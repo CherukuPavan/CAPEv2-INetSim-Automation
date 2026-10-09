@@ -189,3 +189,37 @@ After local preservation is completed, a disposable external disk
 working overlay under the *original domain* and existing TPM pairing
 can be considered, with a NIC-down maintenance boot and post-boot
 `manage-bde -status C:` check. None of those steps has yet been run.
+
+## Metadata-only backup-readiness audit — 2026-10-09 22:27 UTC
+
+The operator provided `CAPE_TPM_Backup_Readiness_20261009_222740_57HEArPQ.txt`:
+
+- Original `win11` is shut off at `finalshutoffversion`.
+- Standard UUID-scoped swtpm directory exists, owned by UID/GID
+  `0:0`, mode `0711`. Two regular TPM-state files inside it are
+  owned by UID/GID `105:105`. No symlinks or special files were found.
+  Total reported directory size: **20 KiB**.
+- Original UEFI NVRAM file exists, **540672 bytes**, UID/GID `0:1008`,
+  mode `0600`.
+- `/var/backups` parent is UID `0`, mode `0755`; this is an
+  acceptable parent for a *new* UID 0, mode `0700` secret-backup
+  subdirectory. Never store swtpm state directly in `/var/backups`.
+- Available filesystem space: approximately **214 GiB**.
+- No master boot, TPM read/export, snapshot, disk, network, or BitLocker
+  change occurred. **Backup has not yet been created.**
+
+Next approved milestone: a root-authorized, root-private, local-only
+cold-state backup of the *original* domain XML, snapshot XML, NVRAM,
+and original UUID-scoped swtpm directory while the VM remains shut off.
+Backup scripts must not print/export private swtpm or UEFI bytes;
+must not copy data to Github, ChatGPT, or user home; and must verify
+the copies locally using silent comparisons and metadata checks.
+This does **not** prove restoration is safe: a separate documented
+recovery/rollback verification is still required before guest boot.
+
+Official libvirt docs confirm emulator TPM state is private per VM and
+swtpm state is held by the emulator backend. File ownership/modes and
+the libvirt XML should be preserved rather than globally changing
+permissions.
+See https://www.libvirt.org/formatdomain.html and
+https://www.qemu.org/docs/master/specs/tpm.html.
