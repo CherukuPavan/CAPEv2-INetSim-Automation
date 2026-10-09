@@ -142,6 +142,35 @@ class IdentityTests(unittest.TestCase):
                 c.stop_failed_owned_guest("win11_1",xml)
         self.assertEqual(call.call_count,1)
 
+    def test_command2_emits_handoff_without_editing_cape_config(self):
+        from pathlib import Path
+        master=("<domain><name>win11</name>"
+                "<uuid>289d89be-68ec-4c62-90e1-ea930849266f</uuid>"
+                "</domain>")
+        items=[{"name":"win11_1","ip":"198.51.100.110",
+                "windows_hostname":"WIN11-1"}]
+        result={"name":"win11_1","ip":"198.51.100.110",
+                "status":"CLONE_SHUT_OFF_READY_FOR_CAPE_REGISTRATION"}
+        with patch.object(c,"preflight",return_value=(
+                    items,master,"/synthetic/top","virbr2","/synthetic/nvram")), \
+             patch.object(c,"create_one",return_value=result), \\
+             patch.object(c.register_cape_clones,"apply_config") as forbidden:
+            outcome=c.run(dict(PROFILE),1,"apply",Path("/tmp/unused"))
+        self.assertEqual(outcome["status"],
+                         "CLONES_VERIFIED_STAGE3_CAPE_CONFIGURATION_PENDING")
+        self.assertEqual(outcome["stage3_handoff"]["machines"][0]["name"],"win11_1")
+        self.assertEqual(outcome["stage3_handoff"]["machines"][0]["ip"],"198.51.100.110")
+        forbidden.assert_not_called()
+        self.assertNotIn("cape_backup",outcome)
+
+    def test_missing_cape_config_is_allowed_in_command2(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as directory:
+            c.check_cape_static_ip_conflicts(
+                Path(directory)/"not-yet-created-kvm.conf",
+                ["198.51.100.110"])
+
     def test_network_nat_blocks(self):
         with patch.object(c,"virsh",
             return_value="<network><name>cape-isolated</name><forward mode='nat'/>"
