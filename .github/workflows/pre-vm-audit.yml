@@ -34,6 +34,7 @@ on:
       - 'scripts/command2_clone_vms.sh'
       - 'config/command2-profile.example.json'
       - 'scripts/test_command2_clone_vms.py'
+      - 'scripts/test_command2_lifecycle.py'
       - 'scripts/clone_domain_xml.py'
       - 'scripts/test_clone_domain_xml.py'
       - 'scripts/register_cape_clones.py'
@@ -81,6 +82,7 @@ on:
       - 'scripts/command2_clone_vms.sh'
       - 'config/command2-profile.example.json'
       - 'scripts/test_command2_clone_vms.py'
+      - 'scripts/test_command2_lifecycle.py'
       - 'scripts/clone_domain_xml.py'
       - 'scripts/test_clone_domain_xml.py'
       - 'scripts/register_cape_clones.py'
@@ -106,7 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile Python module (syntax only)
-        run: python3 -m py_compile scripts/audit_pre_vm_stages.py scripts/test_audit_pre_vm_stages.py scripts/install_cape_optional_deps.py scripts/test_install_cape_optional_deps.py scripts/audit_upstream_installers.py scripts/test_audit_upstream_installers.py scripts/inspect_windows_media.py scripts/test_inspect_windows_media.py scripts/audit_windows_vm_preflight.py scripts/test_audit_windows_vm_preflight.py scripts/guard_vm_backing_access.py scripts/test_guard_vm_backing_access.py scripts/audit_clone_master.py scripts/test_audit_clone_master.py scripts/plan_vm_clones.py scripts/test_plan_vm_clones.py scripts/export_cold_master_disk.py scripts/test_export_cold_master_disk.py scripts/personalize_clone_windows.py scripts/test_personalize_clone_windows.py scripts/command2_clone_vms.py scripts/clone_domain_xml.py scripts/test_clone_domain_xml.py scripts/register_cape_clones.py scripts/verify_clone_agent.py scripts/test_verify_clone_agent.py scripts/test_command2_clone_vms.py scripts/guard_vm_tpm_socket.py scripts/test_guard_vm_tpm_socket.py
+        run: python3 -m py_compile scripts/audit_pre_vm_stages.py scripts/test_audit_pre_vm_stages.py scripts/install_cape_optional_deps.py scripts/test_install_cape_optional_deps.py scripts/audit_upstream_installers.py scripts/test_audit_upstream_installers.py scripts/inspect_windows_media.py scripts/test_inspect_windows_media.py scripts/audit_windows_vm_preflight.py scripts/test_audit_windows_vm_preflight.py scripts/guard_vm_backing_access.py scripts/test_guard_vm_backing_access.py scripts/audit_clone_master.py scripts/test_audit_clone_master.py scripts/plan_vm_clones.py scripts/test_plan_vm_clones.py scripts/export_cold_master_disk.py scripts/test_export_cold_master_disk.py scripts/personalize_clone_windows.py scripts/test_personalize_clone_windows.py scripts/command2_clone_vms.py scripts/clone_domain_xml.py scripts/test_clone_domain_xml.py scripts/register_cape_clones.py scripts/verify_clone_agent.py scripts/test_verify_clone_agent.py scripts/test_command2_clone_vms.py scripts/guard_vm_tpm_socket.py scripts/test_guard_vm_tpm_socket.py scripts/test_command2_lifecycle.py
       - name: Run isolated unit tests
         run: |
           python3 -m unittest discover -s scripts -p 'test_audit_pre_vm_stages.py' -v
@@ -119,6 +121,7 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_plan_vm_clones.py' -v
           python3 -m unittest discover -s scripts -p 'test_clone_domain_xml.py' -v
           python3 -m unittest discover -s scripts -p 'test_command2_clone_vms.py' -v
+          python3 -m unittest discover -s scripts -p 'test_command2_lifecycle.py' -v
           python3 -m unittest discover -s scripts -p 'test_guard_vm_tpm_socket.py' -v
           python3 -m unittest discover -s scripts -p 'test_verify_clone_agent.py' -v
           python3 -m unittest discover -s scripts -p 'test_personalize_clone_windows.py' -v
