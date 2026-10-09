@@ -12,6 +12,7 @@ import ipaddress
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -229,8 +230,6 @@ def main(argv=None):
     parser.add_argument("--mode", choices=("plan", "apply"), default="plan")
     args = parser.parse_args(argv)
     try:
-        import shutil
-        globals()["shutil"] = shutil
         info = prepare(args.disk, args.old_ip, args.new_ip, args.hostname,
                        args.mask, args.gateway, args.mode)
         print(json.dumps(info, indent=2, sort_keys=True))
