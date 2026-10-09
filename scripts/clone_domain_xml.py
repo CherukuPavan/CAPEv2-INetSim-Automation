@@ -56,6 +56,12 @@ def render(master_xml: str, *, name: str, uuid_value: str, mac: str,
     if devices is not None:
         for redirect in list(devices.findall("redirdev")):
             devices.remove(redirect)
+        # Keep guest packages but omit the SPICE clipboard/integration channel:
+        # it is a host<->guest pathway unnecessary for CAPE's HTTP agent.
+        for channel in list(devices.findall("channel")):
+            target = channel.find("target")
+            if target is not None and target.get("name") == "com.redhat.spice.0":
+                devices.remove(channel)
     _require(not root.findall("./devices/interface[@type='direct']"), "Direct NIC unsupported")
     _require(not root.findall("./devices/interface[@type='bridge']"), "Host bridge must be inventoried as isolated network")
     _require(not root.findall("./sysinfo"), "Source contains SMBIOS serial settings that might identify duplicate hardware")
