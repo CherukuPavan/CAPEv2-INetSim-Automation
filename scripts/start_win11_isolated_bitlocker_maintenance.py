@@ -63,8 +63,20 @@ def xml_host_safe(xml:str,expected_uuid:str,orig_tpm:bytes,orig_nvram:str)->None
     require(nvr is not None and (nvr.text or "").strip()==orig_nvram,
             "Guest UEFI variable store path changed")
     tpm=root.find("./devices/tpm")
-    require(tpm is not None and ET.tostring(tpm)==orig_tpm,
-            "Guest TPM backend settings changed")
+    reference=ET.fromstring(orig_tpm)
+    actual_backend=tpm.find("backend") if tpm is not None else None
+    reference_backend=reference.find("backend")
+    require(
+        tpm is not None and reference_backend is not None
+        and actual_backend is not None
+        and tpm.get("model")==reference.get("model")
+        and actual_backend.get("type")==reference_backend.get("type")=="emulator"
+        and actual_backend.get("version")==reference_backend.get("version"),
+        "Guest TPM identity or backend changed"
+    )
+    # Live libvirt XML may add the runtime swtpm socket endpoint. Do not
+    # falsely flag this as a hardware identity change.
+    
     disks=root.findall("./devices/disk[@device='disk']")
     require(len(disks)==1,"Guest has unexpected system disks")
     src=disks[0].find("source")
