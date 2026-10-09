@@ -1,10 +1,10 @@
 # Verified-manual-build to automation workflow
 
-> **Current stage:** Manual Steps 1–11D complete through base CAPEv2 and optional Python package checks; VM provisioning starts next session. [Automation coverage and blockers](AUTOMATION_COVERAGE_STEPS_1_11.md) is the authoritative status map. `scripts/command1_pre_vm.sh` is a partial developer-stage entrypoint, NOT the finished three-command installer.
+> **Current stage (2026-10-09):** The user has completed the reference `win11` master, its tested host reachability and both final snapshots. A cold snapshot with a four-layer QCOW2 chain is the current Command 2 clone candidate. Four-command architecture is authoritative: [FOUR_COMMAND_ARCHITECTURE.md](FOUR_COMMAND_ARCHITECTURE.md). Command 1 still lacks safe, complete unattended Windows/CAPE-base installation; Command 2 is offline-tested code, not accepted on SSL-55. CAPE finalization belongs to Command 3 and INetSim belongs to Command 4.
 
 
 ## Source of truth
-SSL-55 is the reference machine for a **fresh, user-led manual** CAPEv2 + Windows analysis VM + INetSim VM installation. The user performs every manual operation and supplies the exact commands, configuration changes, GUI actions, results, and evidence. Do **not** assume prior experiments or rolled-back changes form part of the canonical build.
+SSL-55 is the reference machine for the **user-led manual** CAPEv2 + Windows analysis VM installation. The user has completed the first Windows master and the cloning-code development is underway. **Do not start recording Command 3 CAPE UI/service changes or Command 4 INetSim setup until Commands 1 and 2 are ready for host acceptance testing.** The user supplies exact manual commands, configuration changes, GUI actions, results, and evidence at each later stage. Do **not** assume prior experiments or rolled-back changes form part of the canonical build.
 
 ## Per-step evidence record
 For each manual step, record:
