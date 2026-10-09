@@ -12,7 +12,7 @@ class NetworkIsolationTests(unittest.TestCase):
 
     def test_absent_forward_does_not_claim_malware_safety(self):
         self.assertEqual(m.forwarding_mode("<network><name>analysis</name></network>"), "none")
-        self.assertFalse(m.get_preflight.__doc__ and False)  # regression: no implicit safe assertion
+        self.assertEqual(m.forwarding_mode("<network><name>analysis</name></network>"), "none")
 
     def test_broken_xml_is_unknown(self):
         self.assertEqual(m.forwarding_mode("<network>"), "unknown")
