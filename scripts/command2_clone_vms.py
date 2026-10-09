@@ -328,6 +328,29 @@ def create_one(item: dict, profile: dict, master_xml: str,
     return out
 
 
+def stop_failed_owned_guest(name: str, master_xml: str) -> str:
+    """Stop ONLY a new VM whose UUID matches our deterministic clone UUID."""
+    if not NAME.fullmatch(name):
+        raise ProvisionError("Unsafe failed clone name")
+    root = ET.fromstring(master_xml)
+    source_uuid = root.findtext("uuid")
+    if not source_uuid:
+        raise ProvisionError("Missing source UUID for cleanup identity check")
+    expected = str(uuid.uuid5(uuid.UUID(source_uuid), "cape-clone:" + name))
+    actual = virsh("domuuid", name)
+    if actual.lower() != expected.lower():
+        raise ProvisionError("Refusing to stop guest: clone UUID differs from expected")
+    state = virsh("domstate", name)
+    if state == "shut off":
+        return "Verified failed clone is already shut off"
+    if state not in ("running", "paused", "pmsuspended"):
+        raise ProvisionError(f"Unknown VM state during cleanup: {state}")
+    virsh("destroy", name, timeout=90)
+    if virsh("domstate", name) != "shut off":
+        raise ProvisionError("Guest still running after clone-only emergency stop")
+    return "Stopped failed clone only (master and earlier guests untouched)"
+
+
 def write_report(reportdir: Path, data: dict) -> Path:
     reportdir.mkdir(mode=0o700,parents=True,exist_ok=True)
     # Never reuse the same report filename when successive state changes
@@ -347,6 +370,9 @@ def run(profile: dict, count: int, mode: str, reportdir: Path) -> dict:
             "completed":[],"failure":None,
             "master_never_modified":True,
             "live_malware_not_authorized":True}
+    current_clone: str | None = None
+    defined_clones: set[str] = set()
+    master_xml: str | None = None
     try:
         items, master_xml, _top, bridge, master_nvram = preflight(profile,count,mode)
         output["proposed"]=[{"name":x["name"],"ip":x["ip"],
@@ -368,13 +394,17 @@ def run(profile: dict, count: int, mode: str, reportdir: Path) -> dict:
             source_config,preview,libvirt_existing=current|{x["name"] for x in items},
             snapshot=profile["snapshot_name"],interface=bridge)
         def journal(entry):
+            if entry.get("state") == "VM_DEFINED_NOT_STARTED":
+                defined_clones.add(entry["vm"])
             output["completed"].append(entry)
             write_report(reportdir,{"journal_event":entry,
                          "master_never_modified":True})
         success=[]
         for item in items:
+            current_clone = item["name"]
             result=create_one(item,profile,master_xml,master_nvram,journal)
             success.append(result)
+            current_clone = None
         # Every clone is shut off and has a running-state snapshot before
         # introducing it to CAPE. No stale CAPE entry is silently clobbered.
         current=set(virsh("list","--all","--name").splitlines())
@@ -395,6 +425,16 @@ def run(profile: dict, count: int, mode: str, reportdir: Path) -> dict:
     except Exception as exc:
         output["status"]="STOPPED_REQUIRES_OPERATOR_REVIEW"
         output["failure"]=str(exc)[:1600]
+        if current_clone and current_clone in defined_clones and master_xml:
+            try:
+                output["failed_guest_cleanup"] = stop_failed_owned_guest(current_clone, master_xml)
+            except Exception as cleanup_error:
+                output["failed_guest_cleanup"] = (
+                    "MANUAL URGENT REVIEW REQUIRED: " + str(cleanup_error)[:700])
+        elif current_clone:
+            output["failed_guest_cleanup"] = (
+                "No matching domain-defined event recorded; only private "
+                "clone output files may exist. Review before re-running.")
         return output
 
 
