@@ -31,9 +31,13 @@ def validate_agent_payload(payload: bytes) -> dict:
             "elevated":True, "features_verified":True}
 
 
-def ping_once(ip: str) -> None:
+def ping_once(ip: str, interface: str | None = None) -> None:
     try:
-        r=subprocess.run(["ping","-n","-c","2","-W","2",ip],
+        args=["ping","-n","-c","2","-W","2"]
+        if interface:
+            args.extend(["-I",interface])
+        args.append(ip)
+        r=subprocess.run(args,
                          capture_output=True,text=True,timeout=10,check=False)
     except (OSError,subprocess.TimeoutExpired) as exc:
         raise AgentCheckError(f"Host ping unavailable: {exc}") from exc
@@ -41,14 +45,18 @@ def ping_once(ip: str) -> None:
         raise AgentCheckError("Ubuntu ping test failed (guest unreachable or ICMP blocked)")
 
 
-def agent_once(ip: str, port: int = 8000) -> dict:
+def agent_once(ip: str, port: int = 8000,
+               interface: str | None = None) -> dict:
     # Use actual curl as requested, bypassing proxies and forcing a direct
     # connection to the guest IP rather than the corporate proxy environment.
     url=f"http://{ip}:{port}/"
+    args=["curl", "--noproxy", "*", "--silent", "--show-error",
+          "--fail", "--connect-timeout", "3", "--max-time", "8"]
+    if interface:
+        args.extend(["--interface",interface])
+    args.append(url)
     try:
-        r=subprocess.run(
-            ["curl", "--noproxy", "*", "--silent", "--show-error",
-             "--fail", "--connect-timeout", "3", "--max-time", "8", url],
+        r=subprocess.run(args,
             capture_output=True, text=True, timeout=12, check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -58,19 +66,45 @@ def agent_once(ip: str, port: int = 8000) -> dict:
     return validate_agent_payload(r.stdout.encode("utf-8"))
 
 
-def wait_for_agent(ip: str, *, timeout: int=180) -> dict:
+def verify_neighbor(ip: str, interface: str, expected_mac: str) -> None:
+    try:
+        r=subprocess.run(
+            ["ip","-4","neigh","show","to",ip,"dev",interface],
+            capture_output=True, text=True, timeout=10, check=False
+        )
+    except (OSError,subprocess.TimeoutExpired) as exc:
+        raise AgentCheckError("Cannot inspect Linux bridge neighbor table") from exc
+    if r.returncode!=0:
+        raise AgentCheckError("Neighbor table lookup failed")
+    import re
+    matches=re.findall(r"\\blladdr\s+([0-9a-fA-F:]{17})\\b", r.stdout)
+    if len(matches)!=1 or matches[0].lower()!=expected_mac.lower():
+        raise AgentCheckError("Ping target MAC does not match the expected cloned VM")
+
+
+def wait_for_agent(ip: str, *, timeout: int=180,
+                   interface: str | None = None,
+                   expected_mac: str | None = None) -> dict:
     address=ipaddress.ip_address(ip)
     if not isinstance(address,ipaddress.IPv4Address) or address.is_multicast or address.is_unspecified or address.is_loopback:
         raise AgentCheckError("Expected an explicit unicast guest IPv4 address")
     if timeout < 10 or timeout > 600:
         raise AgentCheckError("Guest validation timeout must be between 10 and 600 seconds")
+    if (interface is None) != (expected_mac is None):
+        raise AgentCheckError("Bridge interface and expected MAC must be specified together")
+    if interface and ("/" in interface or len(interface)>15 or not interface.isascii()):
+        raise AgentCheckError("Invalid analysis bridge device name")
     deadline=time.monotonic()+timeout
     last="No attempts"
     while time.monotonic()<deadline:
         try:
-            ping_once(str(address))
-            info=agent_once(str(address))
-            info.update({"guest_ip":str(address),"ping":"PASS","cape_curl_equivalent":"PASS"})
+            ping_once(str(address),interface)
+            if interface and expected_mac:
+                verify_neighbor(str(address),interface,expected_mac)
+            info=agent_once(str(address),interface=interface)
+            info.update({"guest_ip":str(address),"ping":"PASS",
+                         "neighbor_mac":"PASS" if interface else "NOT_CHECKED",
+                         "cape_curl_equivalent":"PASS"})
             return info
         except AgentCheckError as exc:
             last=str(exc)
