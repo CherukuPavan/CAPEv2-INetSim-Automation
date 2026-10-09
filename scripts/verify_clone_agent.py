@@ -77,7 +77,7 @@ def verify_neighbor(ip: str, interface: str, expected_mac: str) -> None:
     if r.returncode!=0:
         raise AgentCheckError("Neighbor table lookup failed")
     import re
-    matches=re.findall(r"\\blladdr\s+([0-9a-fA-F:]{17})\\b", r.stdout)
+    matches=re.findall(r"\blladdr\s+([0-9a-fA-F:]{17})\b", r.stdout)
     if len(matches)!=1 or matches[0].lower()!=expected_mac.lower():
         raise AgentCheckError("Ping target MAC does not match the expected cloned VM")
 
