@@ -1,9 +1,12 @@
 # CAPEv2 + INetSim Automation
 
-Private **development** work for a portable three-command malware-analysis lab:
-1. CAPEv2 with one Windows analysis VM.
-2. Additional Windows analysis VMs for parallel analysis.
-3. Separate Ubuntu INetSim VM and **independently tested, isolated** guest network.
+Private **development** work toward a portable **four-command** malware-analysis lab:
+1. **Host + first Windows master:** discover/bootstrap the host, configure CAPEv2 prerequisites and one Windows `win11` guest through its ready-to-clone snapshot.
+2. **Clone N:** ask the count, produce `win11_1`…`win11_N` with unique guest IPs and identities, verify ping/CAPE agent and per-clone snapshots.
+3. **CAPE finalization/UI:** update machinery and CAPE configuration, validate/restart services, verify the web UI and analysis readiness.
+4. **INetSim:** separately configure the isolated network simulation components.
+
+**[Current four-command design and actual completion gates](docs/FOUR_COMMAND_ARCHITECTURE.md).**
 
 **CURRENT STATUS: NOT A COMPLETED INSTALLER. Do not use for live malware.**
 SSL-55 now has a **manually configured** Windows 11 master `win11` with
@@ -19,7 +22,7 @@ are not finished; `default` libvirt NAT is not a safe analysis network.
 - [Canonical manual evidence](docs/STEP_LOG.md) and [roadmap](docs/ROADMAP.md).
 - [Portability rules](docs/PORTABILITY.md).
 - [Host containment policy](docs/LIVE_MALWARE_CONTAINMENT_POLICY.md).
-- **New partial Command-1 entrypoint:** `scripts/command1_pre_vm.sh`.
+- **Partial Command-1 entrypoint:** `scripts/command1_pre_vm.sh`.
   Its read-only audit covers Steps 1–11; it can explicitly install **only**
   basic missing Ubuntu prerequisites or verify/clone the upstream source.
   It **does not** rerun broad upstream hypervisor/CAPE installers, alter
@@ -116,10 +119,10 @@ modules:
   **does not** create or start a guest.
 - [Complete evidence, usage, safety gates and status](docs/MASTER_VM_CLONING.md).
 
-**Do not start clones yet.** The master CAPE mapping, independent guest
-IP/Windows identity modification, per-clone TPM/NVRAM, secure network and
-rollback still require implementation and testing. CI checks are offline
-only, not live deployment certification.
+**Do not start clones yet.** The offline Windows guest IP editor and
+per-clone firmware/TPM/snapshot/agent pipeline have now been implemented
+as **developer-stage drafts**, but need physical host testing. A verified
+isolated analysis network and compatibility/recovery checks remain blockers.
 
 ## Command 2 — count-driven Windows clones (development implementation)
 
@@ -138,12 +141,12 @@ The guarded development sequence covers independent cold QCOW2 exports;
 offline Windows static IPv4, gateway/DNS and hostname customization;
 new libvirt UUID/MAC/NVRAM/TPM identity; clone definition; benign boot;
 host ping and **actual curl** CAPE agent verification; analysis snapshot;
-shutdown/restart and snapshot restore/agent checks; and CAPE KVM machine
-registration. It logs every stage and preserves existing VMs on failure.
+shutdown/restart and snapshot restore/agent checks; and a **Command 3
+registration handoff**. Command 2 does **not** edit `kvm.conf` or restart
+CAPE services. It logs every stage and preserves existing VMs on failure.
 **This flow is not yet verified on physical SSL-55 or a fresh host.**
 
-[Full Command 2 contract, limitations and remaining SSL-55 blockers]
-(docs/COMMAND2_CLONING.md).
+[Full Command 2 contract, limitations and remaining SSL-55 blockers](docs/COMMAND2_CLONING.md).
 
 Current SSL-55 has a `default` NAT guest network; an approved isolated
 network, verified Windows Registry personalization backend, adequate disk
@@ -154,10 +157,11 @@ live malware execution is authorized by these development scripts.
 
 ## Workflow
 
-User manually performs each SSL-55 installation step, uploads one consolidated
-log/report, and the assistant reviews findings and updates the **development**
-branch. Nothing in this repository authorizes unattended changes on SSL-55;
-the scripts here are drafts until tested on supported clean machines. No work
-on `main` without explicit approval.
+The user has completed the reference Windows master and will resume manual
+CAPE finalization only **after Commands 1 and 2 are implementation-tested**.
+Current work is staged and CI-tested on **development**; nothing here
+authorizes unattended changes on SSL-55. No work on `main` without explicit
+approval. Commands 3 and 4 remain reserved until their manual reference
+procedure is recorded.
 
 See [WORKFLOW.md](docs/WORKFLOW.md).
