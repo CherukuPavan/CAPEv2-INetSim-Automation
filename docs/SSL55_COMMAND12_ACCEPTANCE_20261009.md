@@ -210,3 +210,43 @@ Do not substitute `hivexregedit` for `virt-win-reg` in an existing
 command without verifying Windows control sets, interface GUIDs and
 IPv4/hostname semantics.
 
+
+## Confirmed installation evidence — 2026-10-09 21:40 UTC
+
+The operator uploaded `CAPE_Hivex_Installation_20261009_214039_QU6qVO8K.txt`
+after executing the guarded three-package installation:
+
+- Installed `libhivex0=1.3.23-1build7`,
+  `libhivex-bin=1.3.23-1build7` and
+  `python3-hivex=1.3.23-1build7` from Ubuntu **24.04 Noble**.
+- Apt transaction: **3 newly installed, 0 upgraded, 0 removed**.
+- `/usr/bin/python3 -c 'import hivex'`: **PASS**.
+- SHA-256 of `/usr/bin/qemu-img`, `/usr/bin/qemu-nbd` and
+  `/usr/bin/qemu-system-x86_64`: **identical before and after**.
+- QEMU version remains **9.2.2**, libvirt version remains **11.1.0**,
+  and the existing `qemu` package was held.
+- The installer did **not** install `virt-win-reg`, so Command 2's
+  existing apply-path `personalize_clone_windows.py` is **still
+  blocked**, deliberately.
+
+**New safe development component:** `scripts/inspect_standalone_windows_hive.py`
+reads only an individually extracted, detached clone's Windows SYSTEM
+Registry hive (Hivex read-only). It discovers `Select\\Current`
+and parses `ControlSetNNN\\Services\\Tcpip\\Parameters\\Interfaces`
+for uniquely matched static IPv4 interfaces. The parser has mocked offline
+tests in `scripts/test_inspect_standalone_windows_hive.py`.
+The parser **does not** mount guest disks, alter Windows settings, write
+the hive, or change the master VM.
+
+**Next acceptance gate:** perform a reviewed, independent *cold-source
+disk export* to a previously unused staging destination, without starting
+the clone or touching the source. Confirm sufficient disk space, intact
+backing chain and guest operating-state metadata first. Only after a
+disposable clone exists should a separately approved, read-only NTFS
+hive extraction be considered. Do **not** mount the master or its
+backing layers through NBD or attach them with write access.
+
+The remaining isolated-network, offline-hive write-back, guest first
+boot, exact ping/curl identity and snapshot rollback checks are not
+finished. **Commands 1 and 2 are not yet final.**
+
