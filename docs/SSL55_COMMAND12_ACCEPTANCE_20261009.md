@@ -85,3 +85,44 @@ dependency conflicts.
 **Release status:** Commands 1–2 are still developer-stage; the completed
 manual master is confirmed, **automated deployment is not yet accepted**.
 Commands 3–4 are reserved for the later user-led phase.
+
+## Follow-up APT simulation — 2026-10-09 21:29 UTC
+
+The operator uploaded a complete read-only `apt-get -s
+--no-install-recommends install guestfs-tools` report. Result:
+**0 upgraded, 50 newly installed, 0 removed, 151 not upgraded;
+exit 0.** Crucially, it proposed Ubuntu `qemu-system-common`,
+`qemu-system-data`, `qemu-system-x86` and `qemu-utils` at **8.2.2**,
+`seabios` **1.16.3** and `libvirt0` **10.0.0**. Meanwhile the
+existing custom host runs QEMU **9.2.2** as a held `qemu` package
+and libvirt tooling **11.1.0**.
+
+**Decision: REJECT host-level `guestfs-tools` APT installation as
+simulated.** APT reporting no package removals does not establish
+safe coexistence, binary file ownership, executable resolution,
+library ABI or daemon compatibility. Older distro QEMU components
+and custom QEMU/libvirt may conflict. The APT package cache also
+contains both Ubuntu Noble and Focal candidates for some packages;
+do not mix suites or run `autoremove` to "resolve" this.
+
+The development-only `plan_guestfs_dependency_impact.sh` now reports
+`DEPENDENCY_DECISION=BLOCKED` if a guestfs APT plan introduces or
+removes QEMU/libvirt/firmware stack packages, or if the simulation
+fails. It cannot authorize installation automatically, even for
+plans without those package names.
+
+**Safer next investigation (read-only):** Check whether the host already
+has a supported isolated tool environment (Docker/Podman/other
+container runtime) for `virt-win-reg` on a temporary *detached,
+flattened clone QCOW2*. Alternatively evaluate minimal offline
+Windows Registry access dependencies without a host libvirt/QEMU
+replacement. A container-based method is only a **candidate** and must
+be assessed for file permissions, QEMU nested execution, container
+privilege requirements, filesystem locking, NTFS/Windows 11 and
+trusted/pinned images. Do not blindly pull or run third-party
+container images. All writes must be limited to an independent
+clone disk; no master backing layer or TPM secrets may be exposed.
+
+Neither route is validated on SSL-55 yet. Do not create guests, alter
+CAPE machine registration or bypass the restricted network gate.
+
