@@ -195,8 +195,14 @@ def check_empty_target_network(network_name: str, existing: set[str]) -> None:
 def check_cape_static_ip_conflicts(config_path: Path, proposed_ips: list[str]) -> None:
     """Treat every existing CAPE registration IP as reserved, including stale stanzas."""
     import configparser
-    if config_path.is_symlink() or not config_path.is_file():
-        raise ProvisionError("CAPE machine config is missing or is a symlink")
+    if config_path.is_symlink():
+        raise ProvisionError("CAPE machine config is a symlink")
+    # Command 3 owns CAPE machinery registration; Command 2 only checks
+    # addresses already present if the config exists on this host.
+    if not config_path.exists():
+        return
+    if not config_path.is_file():
+        raise ProvisionError("Existing CAPE config path is not a regular file")
     parser = configparser.ConfigParser(interpolation=None, strict=True)
     try:
         parser.read_string(config_path.read_text(encoding="utf-8"))
@@ -506,17 +512,9 @@ def run(profile: dict, count: int, mode: str, reportdir: Path) -> dict:
         if mode=="plan":
             output["status"]="PLAN_ONLY_NO_CHANGES"
             return output
-        if not Path(profile["cape_config"]).is_file():
-            raise ProvisionError("Expected existing CAPE kvm.conf missing")
-        # Confirm config can be rendered before creating a clone, but with
-        # future name inventory simulated. Existing placeholders are preserved
-        # in source config and retired from the active machine list if absent.
-        source_config=Path(profile["cape_config"]).read_text()
-        current=set(virsh("list","--all","--name").splitlines())
-        preview=[{"name":x["name"],"ip":x["ip"]} for x in items]
-        register_cape_clones.render_config(
-            source_config,preview,libvirt_existing=current|{x["name"] for x in items},
-            snapshot=profile["snapshot_name"],interface=bridge)
+        # No CAPE configuration changes or required CAPE config files here:
+        # Command 3 validates the actual machine inventory and updates
+        # machinery config only after Command 2 has completed.
         def journal(entry):
             if entry.get("state") == "VM_DEFINED_NOT_STARTED":
                 defined_clones.add(entry["vm"])
