@@ -71,6 +71,42 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(crypto.VolumeProbeError,"basic-data"):
             crypto.decide(rows)
 
+    def test_qemu_img_dd_sector_probe_blocks_actual_bitlocker_layout(self):
+        from pathlib import Path
+        from unittest.mock import patch
+        import tempfile
+        header, entries=make_gpt([crypto.BASIC_DATA,crypto.RECOVERY])
+        mbr=bytearray(512)
+        mbr[510:512]=b"\\x55\\xaa"
+        bitlocker=b"\\xeb\\x58\\x90-FVE-FS-"+b"\\x00"*501
+        ntfs=b"\\xeb\\x52\\x90NTFS    "+b"\\x00"*501
+        contents={
+            (0,1):bytes(mbr),
+            (1,1):header,
+            (2,32):entries,
+            (2048,1):bitlocker,
+            (7168,1):ntfs,
+        }
+        calls=[]
+        def fake_run(args, **kwargs):
+            calls.append(args)
+            offset=int(next(a[5:] for a in args if a.startswith("skip=")))
+            length=int(next(a[6:] for a in args if a.startswith("count=")))
+            output=Path(next(a[3:] for a in args if a.startswith("of=")))
+            output.write_bytes(contents[(offset,length)])
+            class Result: pass
+            return Result()
+        with tempfile.TemporaryDirectory() as td:
+            disk=Path(td)/"detached-clone.qcow2"
+            disk.write_bytes(b"QFI\\xfb")
+            with patch.object(crypto.subprocess,"run",side_effect=fake_run):
+                info=crypto.inspect_image(disk)
+            self.assertFalse(info["windows_registry_readable"])
+            self.assertEqual(info["decision"],"BITLOCKER_BLOCKED")
+            self.assertEqual(disk.read_bytes(),b"QFI\\xfb")
+        self.assertTrue(calls)
+        self.assertTrue(all(call[1]=="dd" and "-U" not in call for call in calls))
+
     def test_incomplete_boot_sector_refused(self):
         with self.assertRaisesRegex(crypto.VolumeProbeError,"Truncated"):
             crypto.classify_boot_sector(b"-FVE-FS-")
