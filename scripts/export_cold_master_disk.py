@@ -127,6 +127,18 @@ def check_destination(output: Path, chain: list[str], size: int) -> dict:
 def export(vm: str, snapshot: str, output: Path, dry_run: bool = True) -> dict:
     if os.geteuid() != 0:
         raise ExportError("Run with sudo for read-only source access and secure output")
+    if dry_run:
+        # Truly observational mode: no runtime lock file, temporary image,
+        # or directory creation. The export mode re-checks all invariants.
+        top, chain, size = source_state(vm, snapshot)
+        meta = check_destination(output, chain, size)
+        return {
+            "vm": vm, "snapshot": snapshot,
+            "top_image": top, "backing_layer_count": len(chain),
+            "output": str(output), "virtual_size_bytes": size,
+            "destination": meta, "executed": False,
+            "warning": "Plan only; Windows identity and static IP are not modified.",
+        }
     # Operator supplies a dedicated existing, root-owned directory.
     if LOCK_PATH.is_symlink():
         raise ExportError("Unsafe lock path")
