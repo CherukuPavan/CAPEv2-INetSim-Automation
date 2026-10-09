@@ -48,9 +48,7 @@ if grep -Eq '^Inst .*Ubuntu:20\.04/' "$SIM"; then
   VERDICT=BLOCK_FOCAL_SOURCE
 fi
 
-if [[ ${ID:-} != ubuntu ]]; then
-  . /etc/os-release
-fi
+. /etc/os-release
 if [[ ${ID:-} != ubuntu || ${VERSION_ID:-} != 24.04 ]]; then
   VERDICT=BLOCK_UNSUPPORTED_OS
 fi
