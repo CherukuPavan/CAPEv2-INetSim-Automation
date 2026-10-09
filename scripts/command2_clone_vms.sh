@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 HERE=$(CDPATH="" cd -- "$(dirname -- "$0")" && pwd -P)
 PROFILE="/etc/cape-clone/command2.json"
-if [[ -n "$CAPE_CLONE_PROFILE" ]]; then PROFILE="$CAPE_CLONE_PROFILE"; fi
+if [[ -n "${CAPE_CLONE_PROFILE:-}" ]]; then PROFILE="$CAPE_CLONE_PROFILE"; fi
 MODE=apply
 if [[ $# -ge 1 ]]; then
   case "$1" in
