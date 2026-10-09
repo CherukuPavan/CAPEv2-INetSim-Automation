@@ -84,6 +84,39 @@ class LifecycleTests(unittest.TestCase):
         self.assertLess(steps.index("snapshot"),steps.index("virsh:snapshot-revert"))
         self.assertEqual(events[-1],"CLONE_SHUT_OFF_READY_FOR_CAPE_REGISTRATION")
 
+    def test_snapshot_explicit_external_disk_and_ram(self):
+        from pathlib import Path
+        disk_dir=Path("/var/lib/libvirt/images/clones")
+        disk=str(disk_dir/"win11_1.cape-clean.qcow2")
+        memory=str(disk_dir/"win11_1.cape-clean.memory")
+        snapshot_xml=(
+            "<domainsnapshot><name>cape-clean</name><state>running</state>"
+            f'<memory snapshot="external" file="{memory}"/>'
+            "<disks><disk name='sda' snapshot='external'>"
+            f'<source file="{disk}"/></disk></disks></domainsnapshot>')
+        calls=[]
+        def virsh(*args,**kwargs):
+            calls.append(args)
+            if args[0]=="dumpxml":
+                return "<domain><devices><disk device='disk'><target dev='sda'/></disk></devices></domain>"
+            if args[0]=="domstate":
+                return "running"
+            if args[0]=="snapshot-dumpxml":
+                return snapshot_xml
+            if args[0]=="snapshot-create-as":
+                return ""
+            raise AssertionError("Unexpected virsh call")
+        with patch.object(c,"virsh",side_effect=virsh), \
+             patch.object(Path,"exists",return_value=False), \
+             patch.object(Path,"is_symlink",return_value=False), \
+             patch.object(Path,"is_file",return_value=True):
+            c.snapshot_running("win11_1","cape-clean",disk_dir)
+        create=next(call for call in calls if call[0]=="snapshot-create-as")
+        self.assertIn("--memspec",create)
+        self.assertIn(f"file={memory},snapshot=external",create)
+        self.assertIn(f"sda,snapshot=external,file={disk}",create)
+        self.assertIn("--atomic",create)
+
     def test_agent_failure_stops_only_new_clone_without_snapshot(self):
         steps,events=self.run_flow(fail_agent=True)
         self.assertIn("virsh:destroy",steps)
