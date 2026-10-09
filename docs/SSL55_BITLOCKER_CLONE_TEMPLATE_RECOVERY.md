@@ -351,3 +351,9 @@ authorize an actual redefinition, boot, Windows unlock, or decryption.**
 The operator should run one revised **read-only** host validation and
 return the output so we can confirm no additional host-connected
 devices are present on this machine.
+
+## Offline definition rollback report (2026-10-09 22:50 UTC)
+
+The SSL-55 host report confirms that the inactive maintenance domain definition was accepted, contained no network interface/USB redirection/guest channels, and was immediately returned to the original backed-up definition. Current cold snapshot and TPM/NVRAM metadata remained unchanged; no Windows boot or BitLocker operation occurred. This proves an offline *domain-definition* roundtrip, not actual BitLocker recovery.
+
+An additional development-only guarded startup component was drafted at `scripts/start_win11_isolated_bitlocker_maintenance.py`. It stages the same original-TPM/no-network working-overlay definition, checks the live domain while paused, and resumes Windows only after validation. It does not decrypt Windows. This new startup code has not yet been tested on SSL-55; all host deployment remains subject to review.
