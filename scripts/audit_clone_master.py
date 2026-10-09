@@ -7,6 +7,7 @@ that modify state. Produces one private JSON-formatted TXT report.
 from __future__ import annotations
 
 import argparse
+import configparser
 import datetime as dt
 import json
 import os
@@ -158,6 +159,20 @@ def network_summary(root: ET.Element) -> dict:
     }
 
 
+def cape_kvm_summary(contents: str) -> dict:
+    """Allowlist CAPE machinery fields only; never expose credentials."""
+    parser = configparser.ConfigParser(interpolation=None, strict=False)
+    parser.read_string(contents)
+    allow = ("machines", "label", "ip", "snapshot", "platform", "interface")
+    data: dict = {"sections": {}}
+    for section in parser.sections():
+        fields = {key: parser.get(section, key, raw=True)
+                  for key in allow if parser.has_option(section, key)}
+        if fields:
+            data["sections"][section] = fields
+    return data
+
+
 def file_metadata(name: str) -> dict:
     p = Path(name)
     info: dict = {"path": name, "exists": False}
@@ -305,11 +320,35 @@ def collect(vm: str) -> dict:
                  "/etc/apparmor.d/abstractions/libvirt-qemu"):
         result["host"].setdefault("policy_files", []).append(file_metadata(name))
     result["cape"] = {
-        "machine_registration": "NOT_VERIFIED_FROM_LIBVIRT_INVENTORY",
+        "machine_registration": "NOT_VERIFIED",
         "agent": "NOT_VERIFIED_FROM_LIBVIRT_INVENTORY",
         "static_ip_in_windows": "NOT_VERIFIED_UNLESS_GUEST_AGENT_REPORTS_IP",
         "shutdown_backup_consistency": "REQUIRES_CONFIRMATION",
     }
+    # Inspect known paths only. Never store raw contents of config files.
+    candidates = ("/opt/CAPEv2/conf/kvm.conf",
+                  "/home/cape/CAPEv2/conf/kvm.conf",
+                  "/opt/CAPEv2/conf/machinery.conf")
+    for path in candidates:
+        if not Path(path).is_file():
+            continue
+        source = run("sudo", "-n", "cat", path, timeout=8)
+        if not source["ok"]:
+            warnings.append(f"CAPE config could not be read: {path}")
+            continue
+        try:
+            data = cape_kvm_summary(source["stdout"])
+        except configparser.Error:
+            warnings.append(f"CAPE config not parseable as INI: {path}")
+            continue
+        result["cape"]["config_path"] = path
+        result["cape"]["allowlisted_mapping"] = data
+        vm_entries = [section for section, fields in data["sections"].items()
+                      if section == vm or fields.get("label") == vm]
+        result["cape"]["machine_registration"] = (
+            "MATCHING_ENTRY_PRESENT" if vm_entries else "NO_MATCHING_VM_ENTRY_IN_SCANNED_FILE"
+        )
+        break
     if result["vm"]["current_snapshot"] is None:
         warnings.append("No current libvirt snapshot was reported")
     warnings.append("Running snapshots may contain VM memory and are not automatically portable clone templates")
