@@ -94,6 +94,12 @@ def render(master_xml: str, *, name: str, uuid_value: str, mac: str,
     if genid is not None:
         genid.text=str(uuid.uuid5(uuid.UUID(parsed_uuid),"windows-genid"))
     src.set("file",clone_disk)
+    # Do not depend on the master host's Windows installer ISO path.
+    # Leave the CD-ROM hardware present but eject its installation media.
+    for optical in root.findall("./devices/disk[@device='cdrom']"):
+        medium = optical.find("source")
+        if medium is not None:
+            optical.remove(medium)
     nvram.text=clone_nvram
     nic_source.attrib.clear()
     nic_source.set("network",isolated_network)
