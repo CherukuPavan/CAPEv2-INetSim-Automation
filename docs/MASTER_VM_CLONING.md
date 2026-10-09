@@ -70,6 +70,50 @@ Future apply mode must reconcile real libvirt definitions, CAPE entries
 and DHCP/ARP/host observations before allocating them. Do not feed this
 plan directly to `virsh define` or start any proposed guest.
 
+### Cold-master disk export module (offline-only stage)
+
+`scripts/export_cold_master_disk.py` is an optional **explicit**
+cold-source exporter, with safe-by-default `--mode plan` and separate
+`--mode export`. It does not create a domain or touch the original.
+It requires a verified shut-off master, the *current* shut-off snapshot,
+a complete externally backed QCOW2 chain, one source disk and an unused
+`*.qcow2` target path in an **existing root-controlled directory**.
+The plan checks conservative free space (full 64 GiB virtual capacity
+plus 30 GiB reserve) and files, and refuses to clobber existing data.
+
+The export operation uses QEMU's regular image locking (never `-U`)
+to flatten the chain through `qemu-img convert` into a temporary file.
+It checks the new image and its absence of a backing dependency, checks
+that the master remains shut off and the source images are unchanged,
+then publishes the output without overwriting an existing path.
+Failure attempts to remove only the temporary output. Interrupted
+processes or concurrent operations can still require manual
+investigation; this is not a transactional snapshot-backup system.
+
+**Do not run export on SSL-55 yet.** We have reviewed the inventory and
+synthetic tests, but we have not audited live CAPE activity/snapshot
+writers, destination disk ownership, or applied source-integrity checks
+on the physical host. This is an implementable building block rather
+than approved unattended deployment.
+
+When approved, commands follow this pattern (paths are illustrative,
+not precreated):
+
+```bash
+sudo python3 scripts/export_cold_master_disk.py \
+  --vm win11 --snapshot finalshutoffversion \
+  --output /APPROVED/SECURE/STAGING/win11_1.qcow2 --mode plan
+# Only after confirming safeguards and capacity, explicit authorized action:
+# sudo python3 scripts/export_cold_master_disk.py ... --mode export
+```
+
+**Do not boot an exported disk before Windows guest identity/static IP,
+UEFI NVRAM, TPM state, domain XML, CAPE registration, and isolation
+have been established.** It is a private staging image, not a ready
+analysis VM. A flattened image is independently copyable, but will not
+reproduce libvirt's parent snapshot metadata or the running snapshot's
+RAM state; per-clone analysis/rollback snapshots must be created later.
+
 ### Status of the implementation
 
 **Implemented and offline-tested:** master inventory parsing, snapshot
@@ -77,7 +121,7 @@ metadata/source checks, candidate VM identity and IP planning, collision
 and high-level resource checks, and the separate QCOW2/AppArmor backing
 access guard.
 
-**Not yet implemented:** safe source export, complete clone VM definition,
+**Not yet implemented end-to-end:** deployable source export with physical-host acceptance, complete clone VM definition,
 UEFI/swtpm duplication/re-initialization, offline Windows hostname/IP
 customization, true isolated network validation, CAPE registration,
 guest snapshot creation, rollback and cross-host validation. The
