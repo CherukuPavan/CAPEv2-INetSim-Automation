@@ -7,6 +7,7 @@ Private **development** work toward a portable **four-command** malware-analysis
 4. **INetSim:** separately configure the isolated network simulation components.
 
 **[Current four-command design and actual completion gates](docs/FOUR_COMMAND_ARCHITECTURE.md).**
+**[Reference guide reconciliation for Commands 1–2](docs/COMMANDS_1_2_REFERENCE_RECONCILIATION.md)** records which steps from the operator's supplied PDF are substantiated, and identifies Windows 10 vs Windows 11 differences. The new acceptance report script is [`audit_command12_acceptance.py`](scripts/audit_command12_acceptance.py).
 
 **CURRENT STATUS: NOT A COMPLETED INSTALLER. Do not use for live malware.**
 SSL-55 now has a **manually configured** Windows 11 master `win11` with
@@ -32,6 +33,9 @@ are not finished; `default` libvirt NAT is not a safe analysis network.
 # Run these only from this repo's development checkout:
 bash scripts/command1_pre_vm.sh audit
 bash scripts/command1_pre_vm.sh plan-prereqs
+# On the completed local win11 master, create one private read-only host
+# acceptance TXT report (run sudo -v first if required):
+bash scripts/command1_pre_vm.sh host-acceptance --vm win11
 
 # Changes system packages; explicit, optional:
 # bash scripts/command1_pre_vm.sh apply-prereqs
