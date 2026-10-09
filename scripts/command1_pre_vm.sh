@@ -19,6 +19,7 @@ Modes:
   apply-virt              Controlled distro QEMU/libvirt install (not custom build).
   audit-installers        Static risk audit of local upstream installer scripts.
   inspect-media FILE      Read-only completed Windows archive/ISO metadata and SHA256.
+  preflight-windows       Read-only guest capacity, OVMF/TPM, libvirt NAT & ISO access report.
   plan-optionals          Inspect CAPE service-account optional dependencies.
   apply-optionals         Explicit, lockfile-gated optional dependency install.
   coverage                Show human-reviewed automation coverage/status documentation.
@@ -88,6 +89,10 @@ case "$MODE" in
     (($# == 1)) || { usage >&2; exit 2; }
     command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
     exec python3 "$HERE/inspect_windows_media.py" "$1"
+    ;;
+  preflight-windows)
+    command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
+    exec python3 "$HERE/audit_windows_vm_preflight.py" "$@"
     ;;
   plan-optionals)
     command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
