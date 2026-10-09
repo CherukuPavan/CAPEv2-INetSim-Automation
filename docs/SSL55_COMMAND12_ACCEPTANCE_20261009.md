@@ -126,3 +126,47 @@ clone disk; no master backing layer or TPM secrets may be exposed.
 Neither route is validated on SSL-55 yet. Do not create guests, alter
 CAPE machine registration or bypass the restricted network gate.
 
+
+## Follow-up offline tools audit — 2026-10-09 21:32 UTC
+
+The user supplied another read-only host report:
+
+- `qemu-nbd`, `qemu-img` and `qemu-system-x86_64` all resolve to
+  `/usr/bin/` and are owned by the held custom `qemu` package.
+- `ntfs-3g` is present (Ubuntu Noble version
+  `2022.10.3-1.2ubuntu3.2`).
+- `virt-win-reg`, `guestfish`, `hivexregedit` and `hivexsh` are
+  missing. `python3-hivex`, `libhivex0` and `libwin-hivex-perl`
+  have Ubuntu Noble `1.3.23-1build7` candidates.
+- Docker client `29.2.0` is installed, but the unprivileged account
+  received **permission denied** on the Docker daemon socket. Docker
+  usability as root, preexisting images and container security have
+  **not been established**.
+- APT candidates include packages from **both Noble and Focal**; never
+  install an Ubuntu 20.04 candidate into the Ubuntu 24.04 host.
+- Storage remains approximately **242 GiB free**, and `qemu` remains
+  held.
+
+**Candidate safer backend:** `python3-hivex` + `libhivex-bin`, with
+the already installed `qemu-nbd` and `ntfs-3g` *only on a disposable
+independent flattened clone*. This is an engineering hypothesis, not
+a verified guest customizer or approval to attach a Windows disk.
+Hivex works directly with offline Windows Registry hives. The
+official Hivex documentation warns that Registry writes can still
+damage hives; copy and validate standalone clone disk and hive first.
+
+A new `scripts/plan_minimal_hivex_backend.sh` performs read-only
+APT transaction simulation for that smaller backend, flags focal
+candidate packages, and surveys NBD and root-authorized Docker
+availability. It refuses to auto-install anything. Docker access may
+require an authorized root user; **do not add the account to the
+docker group** just to bypass the current permission error, because
+Docker daemon control is effectively privileged host access.
+
+No Hivex Registry-writing or QEMU-NBD guest-mount operation has yet
+been approved or tested. The current Command 2 apply mode still
+requires the existing `virt-win-reg` backend and must **not** be
+run until an independently reviewed compatible offline guest-IP
+customizer is available, network isolation is checked, and physical
+host acceptance succeeds.
+
