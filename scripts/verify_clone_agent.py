@@ -9,8 +9,6 @@ import ipaddress
 import json
 import subprocess
 import time
-import urllib.error
-import urllib.request
 
 
 class AgentCheckError(RuntimeError):
@@ -44,17 +42,20 @@ def ping_once(ip: str) -> None:
 
 
 def agent_once(ip: str, port: int = 8000) -> dict:
-    # Never inherit environment proxies; the request must go directly to
-    # the specified guest IP, not via an HTTP proxy.
-    opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    request=urllib.request.Request(f"http://{ip}:{port}/",method="GET")
+    # Use actual curl as requested, bypassing proxies and forcing a direct
+    # connection to the guest IP rather than the corporate proxy environment.
+    url=f"http://{ip}:{port}/"
     try:
-        with opener.open(request,timeout=5) as stream:
-            if stream.status!=200:
-                raise AgentCheckError(f"CAPE agent returned HTTP {stream.status}")
-            return validate_agent_payload(stream.read(8192))
-    except (OSError,urllib.error.URLError) as exc:
-        raise AgentCheckError(f"CAPE agent HTTP request failed: {type(exc).__name__}") from exc
+        r=subprocess.run(
+            ["curl", "--noproxy", "*", "--silent", "--show-error",
+             "--fail", "--connect-timeout", "3", "--max-time", "8", url],
+            capture_output=True, text=True, timeout=12, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise AgentCheckError(f"Ubuntu curl unavailable: {type(exc).__name__}") from exc
+    if r.returncode != 0:
+        raise AgentCheckError(f"Ubuntu curl CAPE agent probe failed (exit {r.returncode})")
+    return validate_agent_payload(r.stdout.encode("utf-8"))
 
 
 def wait_for_agent(ip: str, *, timeout: int=180) -> dict:
