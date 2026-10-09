@@ -217,6 +217,10 @@ def generate_plan(inv: dict, count: int, prefix: str = "win11_",
     source_snapshot = source_snapshot or inv.get("snapshots", {}).get("current")
     if not isinstance(source_snapshot, str) or not source_snapshot:
         _raise("No current snapshot identified: --source-snapshot required")
+    if not isinstance(inv, dict) or inv.get("schema") not in (
+        "cape-master-offline-inventory-v1", "cape-master-vm-inventory-v1"
+    ):
+        _raise("Unrecognized master inventory schema")
     blockers: list[str] = []
     warnings: list[str] = []
     vm = inv.get("vm") or {}
