@@ -219,6 +219,20 @@ def collect(vm: str) -> dict:
         return result
     summary = domain_summary(xml)
     result["vm"].update(summary)
+    # Inactive and active disks may differ while an external snapshot operation
+    # is pending. Record only a comparison, not potentially secret full XML.
+    if state_text.lower() == "running":
+        live = checked_xml(virsh("dumpxml", vm), "live VM definition", warnings)
+        if live is not None:
+            live_summary = domain_summary(live)
+            result["vm"]["live_disks_match_inactive"] = (
+                live_summary["disks"] == summary["disks"]
+            )
+            result["vm"]["live_interfaces_match_inactive"] = (
+                live_summary["interfaces"] == summary["interfaces"]
+            )
+            if not result["vm"]["live_disks_match_inactive"]:
+                warnings.append("Live and persistent disk XML differ; cloning source selection requires review")
     if summary["name"] != vm:
         warnings.append("VM XML name does not match requested VM")
     result["vm"]["current_snapshot"] = single(virsh("snapshot-current", vm, "--name"))
