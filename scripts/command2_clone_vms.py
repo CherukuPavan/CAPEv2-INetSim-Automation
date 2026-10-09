@@ -529,21 +529,33 @@ def run(profile: dict, count: int, mode: str, reportdir: Path) -> dict:
             result=create_one(item,profile,master_xml,master_nvram,bridge,journal)
             success.append(result)
             current_clone = None
-        # Every clone is shut off and has a running-state snapshot before
-        # introducing it to CAPE. No stale CAPE entry is silently clobbered.
-        current=set(virsh("list","--all","--name").splitlines())
-        new_config=register_cape_clones.render_config(
-            source_config,preview,libvirt_existing=current,
-            snapshot=profile["snapshot_name"],interface=bridge)
-        saved=register_cape_clones.apply_config(Path(profile["cape_config"]),new_config)
-        output["cape_backup"]=str(saved)
-        output["status"]="CLONES_VERIFIED_CAPE_CONFIG_UPDATED_RESTART_PENDING"
+        # Command 2 stops at verified clones. Changing CAPE machine entries,
+        # restarting services and exposing the web UI belongs to Command 3.
+        # Stage 3 must reconcile this handoff against fresh libvirt and
+        # network observations; the handoff is NOT trusted as authorization.
+        output["status"]="CLONES_VERIFIED_STAGE3_CAPE_CONFIGURATION_PENDING"
         output["ready"]=success
+        output["stage3_handoff"]={
+            "schema":"cape-command3-clone-handoff-v1",
+            "master":profile["master"],
+            "analysis_network":profile["network"],
+            "host_bridge":bridge,
+            "cape_config_to_review":profile["cape_config"],
+            "machine_snapshot":profile["snapshot_name"],
+            "machines":[{"name":x["name"],"ip":x["ip"],
+                         "snapshot":profile["snapshot_name"],
+                         "interface":bridge,
+                         "libvirt_uuid":str(uuid.uuid5(
+                             uuid.UUID(ET.fromstring(master_xml).findtext("uuid")),
+                             "cape-clone:"+x["name"]))}
+                        for x in success],
+            "status":"PENDING_FRESH_VERIFICATION_BY_COMMAND3",
+        }
         output["warnings"]=[
-            "CAPE snapshots were reverted once on fresh clones; periodic recovery tests remain necessary",
-            "CAPE services were not restarted; inspect ongoing analyses before restart",
-            "No real malware until institutional approval and guest IPv4/IPv6 isolation tests",
-            "Windows software remains copied from master; BitLocker/TPM rekey and Windows activation require verification",
+            "CAPE services/configuration/UI are deliberately untouched until Command 3",
+            "Clone snapshot recovery passed only the development-level benign checks",
+            "No real malware until institutional approval and verified guest IPv4/IPv6 isolation",
+            "Windows/TPM-bound software and activation require physical-host acceptance testing",
         ]
         return output
     except Exception as exc:
@@ -605,7 +617,7 @@ def main(argv=None) -> int:
             print("STOP:",report["failure"],file=sys.stderr)
         return 0 if report["status"] in (
             "PLAN_ONLY_NO_CHANGES",
-            "CLONES_VERIFIED_CAPE_CONFIG_UPDATED_RESTART_PENDING") else 2
+            "CLONES_VERIFIED_STAGE3_CAPE_CONFIGURATION_PENDING") else 2
     except (ProvisionError,OSError,ValueError,json.JSONDecodeError) as exc:
         print(f"STOP: {exc}",file=sys.stderr)
         return 2
