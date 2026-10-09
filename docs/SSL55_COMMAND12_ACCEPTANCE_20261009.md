@@ -320,3 +320,34 @@ A root-private, non-network-boot, no-write clone hive inspection is a
 possible next step **after operator approval and review**. Any actual
 Registry write-back and analysis-guest boot remain blocked by the
 independent guest IP and isolation acceptance gates.
+
+## Read-only NBD/SYSTEM hive inspection attempt — 2026-10-09 21:59 UTC
+
+The operator performed the specifically authorized read-only NBD attachment
+on the independent `cape-clones-staging/win11_1.qcow2` (never on master).
+The uploaded six-line report said:
+
+- `PASS: Clone detached and master shut off.`
+- `PASS: NBD attached read-only.`
+- `BLOCKED: Refuse Expected exactly one Windows SYSTEM hive`.
+
+**No Windows static IPv4/adapter/ControlSet details were obtained.**
+The error proves only that the script's expected hive count was not one;
+it does **not** distinguish missing Windows OS mount, case-sensitive
+directory mismatch, multiple hives, encrypted volume, or other image
+layout issues. Do not guess the source Windows IP and do not boot clone.
+
+The previous inspection's finally block attempted unmount and
+`qemu-nbd --disconnect` even on error; the log does **not** independently
+prove that cleanup completed. Check /sys/block/nbd*/pid,
+`findmnt` entries for NBD/FUSE and remaining `/run/cape-hive-*`
+mount directories **before** any new attachment. If a lingering mount
+or NBD attachment exists, fail closed and report instead of attaching
+another device.
+
+Only after cleanup is proven should a follow-up clone-only,
+strictly read-only filesystem layout probe identify NTFS/BitLocker
+partitions and check the `Windows/System32/config/SYSTEM` path
+case-insensitively (metadata or hive magic only; no registry data dump).
+Disconnect and unmount in a finally block; do not apply Registry
+changes or create/start guest domains as part of diagnosis.
