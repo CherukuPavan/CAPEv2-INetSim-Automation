@@ -56,8 +56,8 @@ class Tests(unittest.TestCase):
                 v.verify_neighbor("198.51.100.20","virbr2","02:11:22:33:44:55")
 
     def test_healthy_clone_checks_real_bridge_mac_and_cape_agent(self):
-        with patch.object(v,"ping_once") as ping, \\
-             patch.object(v,"verify_neighbor") as neighbor, \\
+        with patch.object(v,"ping_once") as ping, \
+             patch.object(v,"verify_neighbor") as neighbor, \
              patch.object(v,"agent_once",return_value={"identity":"CAPE Agent!"}) as curl:
             info=v.wait_for_agent("198.51.100.20",timeout=10,
                  interface="virbr2",expected_mac="02:aa:bb:cc:dd:ee")
