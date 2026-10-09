@@ -96,7 +96,7 @@ def get_preflight(iso: Path | None) -> dict[str, Any]:
         checks["libvirt_images_free_gib"] = "unknown"
 
     names = ("virsh", "virt-install", "virt-manager", "qemu-system-x86_64",
-             "qemu-img", "swtpm")
+             "qemu-img", "swtpm", "swtpm_setup")
     checks["tools_available"] = {name: shutil.which(name) is not None for name in names}
     for folder in ("/usr/share/OVMF", "/usr/share/edk2/ovmf"):
         if Path(folder).is_dir():
@@ -138,7 +138,9 @@ def get_preflight(iso: Path | None) -> dict[str, Any]:
         # ISO provenance must be verified separately via inspect_windows_media.py.
     blockers = []
     if not checks["tools_available"]["swtpm"]:
-        blockers.append("swtpm missing: TPM 2.0 support must be planned for Windows 11")
+        blockers.append("swtpm missing: install distro swtpm + swtpm-tools before attaching emulated TPM 2.0")
+    if not checks["tools_available"]["swtpm_setup"]:
+        blockers.append("swtpm_setup missing: software TPM state initialization tools not verified")
     if not checks["libvirt_system_connection"]:
         blockers.append("libvirt system connection unavailable")
     if checks["default_libvirt_forward_mode"] in ("nat", "route", "open"):
