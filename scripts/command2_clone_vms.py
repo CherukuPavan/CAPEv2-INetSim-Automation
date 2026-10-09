@@ -327,10 +327,15 @@ def create_one(item: dict, profile: dict, master_xml: str,
 
 def write_report(reportdir: Path, data: dict) -> Path:
     reportdir.mkdir(mode=0o700,parents=True,exist_ok=True)
-    path=reportdir / ("cape_command2_"+datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")+"_"+str(os.getpid())+".json")
+    # Never reuse the same report filename when successive state changes
+    # occur within one second (the old name caused an EEXIST abort).
+    path=reportdir / ("cape_command2_"+datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")+"_"+str(os.getpid())+"_"+str(time.time_ns())+".json")
     fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,"w") as file:
         json.dump(data,file,indent=2,sort_keys=True)
+        file.write("\n")
+        file.flush()
+        os.fsync(file.fileno())
     return path
 
 
