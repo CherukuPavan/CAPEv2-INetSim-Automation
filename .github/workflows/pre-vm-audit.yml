@@ -24,6 +24,7 @@ on:
       - 'scripts/probe_swtpm_socket_start_once.sh'
       - 'scripts/guarded_win11_tpm_apparmor_rule.sh'
       - 'scripts/probe_qemu_caps_start_once.sh'
+      - 'scripts/audit_libvirt_apparmor_includes.sh'
       - '.github/workflows/pre-vm-audit.yml'
   pull_request:
     paths:
@@ -48,6 +49,7 @@ on:
       - 'scripts/probe_swtpm_socket_start_once.sh'
       - 'scripts/guarded_win11_tpm_apparmor_rule.sh'
       - 'scripts/probe_qemu_caps_start_once.sh'
+      - 'scripts/audit_libvirt_apparmor_includes.sh'
       - '.github/workflows/pre-vm-audit.yml'
 
 permissions:
@@ -81,6 +83,7 @@ jobs:
           bash -n scripts/probe_swtpm_socket_start_once.sh
           bash -n scripts/guarded_win11_tpm_apparmor_rule.sh
           bash -n scripts/probe_qemu_caps_start_once.sh
+          bash -n scripts/audit_libvirt_apparmor_includes.sh
       - name: No accidental host provisioning during tests
         run: |
           echo 'The CI suite is offline-only; no apt, pip, libvirt or malware execution.'
