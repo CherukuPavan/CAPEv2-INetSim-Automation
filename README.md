@@ -121,6 +121,37 @@ IP/Windows identity modification, per-clone TPM/NVRAM, secure network and
 rollback still require implementation and testing. CI checks are offline
 only, not live deployment certification.
 
+## Command 2 — count-driven Windows clones (development implementation)
+
+The operator has finished the manually configured `win11` master. The
+current candidate source is the powered-off `finalshutoffversion`
+snapshot with a **four-layer** backing chain. Command 2 now has a
+count-prompt shell entrypoint:
+
+```bash
+bash scripts/command2_clone_vms.sh --plan
+# DO NOT run --apply on SSL-55 until isolated network and offline Registry
+# compatibility are verified and a protected deployment profile exists.
+```
+
+The guarded development sequence covers independent cold QCOW2 exports;
+offline Windows static IPv4, gateway/DNS and hostname customization;
+new libvirt UUID/MAC/NVRAM/TPM identity; clone definition; benign boot;
+host ping and **actual curl** CAPE agent verification; analysis snapshot;
+shutdown/restart and snapshot restore/agent checks; and CAPE KVM machine
+registration. It logs every stage and preserves existing VMs on failure.
+**This flow is not yet verified on physical SSL-55 or a fresh host.**
+
+[Full Command 2 contract, limitations and remaining SSL-55 blockers]
+(docs/COMMAND2_CLONING.md).
+
+Current SSL-55 has a `default` NAT guest network; an approved isolated
+network, verified Windows Registry personalization backend, adequate disk
+capacity, and post-deployment negative egress tests are missing from
+the provided evidence. The script must **stop safely** in their absence,
+rather than create analysis guests with uncontrolled connectivity. No
+live malware execution is authorized by these development scripts.
+
 ## Workflow
 
 User manually performs each SSL-55 installation step, uploads one consolidated
