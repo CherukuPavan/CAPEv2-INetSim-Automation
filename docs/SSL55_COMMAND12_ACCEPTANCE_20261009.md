@@ -250,3 +250,33 @@ The remaining isolated-network, offline-hive write-back, guest first
 boot, exact ping/curl identity and snapshot rollback checks are not
 finished. **Commands 1 and 2 are not yet final.**
 
+
+## First cold-clone export preflight — 2026-10-09 21:45 UTC
+
+The user ran the requested **read-only** standalone host inspection and
+uploaded `CAPE_First_Clone_Export_Preflight_20261009_214539_e03nyNYI.txt`.
+Result: **COLD EXPORT PREFLIGHT PASSED**.
+
+- `win11` was **shut off** with current snapshot `finalshutoffversion`.
+- Verified backing layers: `win11.finalshutoffversion` →
+  `win11.Afterfull` → `win11.basicinstallwinsnapshot` → `win11.qcow2`.
+- Virtual capacity **64 GiB**, free storage **241.12 GiB**, minimum
+  proposed single-export capacity plus host reserve **94 GiB**.
+- Proposed standalone staging disk:
+  `/var/lib/libvirt/images/cape-clones-staging/win11_1.qcow2`.
+- **No disk export was performed**. No VM or original disk change occurred.
+
+Next step is an **explicitly authorized** cold-disk flatten/copy of the
+verified master chain into a brand-new, unique standalone QCOW2 file.
+No guest start, network attachment, snapshot revert, Registry edit, or
+CAPE configuration change is part of that export. A completed exported
+file is not a ready-to-boot clone: its Windows static IP, hostname,
+UEFI/TPM and agent identity are still inherited and must be changed
+before any guest startup on an analysis network.
+
+Perform a fresh shutdown/snapshot/backing-chain verification immediately
+before export and again before publish; check QEMU image integrity,
+final no-backing property, file owner/permissions, source-image metadata
+and available disk capacity. Refuse overwrite/symlink targets and do not
+use QEMU's `-U` unsafe shared-image option. Failure cleanup must touch
+only the new incomplete export, never the master or snapshot chain.
