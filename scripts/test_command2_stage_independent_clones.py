@@ -88,6 +88,37 @@ class Tests(unittest.TestCase):
         self.assertFalse(outcome["analysis_network_connected"])
         self.assertFalse(outcome["malware_execution_authorized"])
 
+    def test_copied_disk_must_verify_plaintext_before_nvram_or_domain_define(self):
+        import json
+        import tempfile
+        from unittest.mock import Mock
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            disk=root/"win11_1.qcow2"
+            firmware=root/"win11_1_VARS.fd"
+            entry={"name":"win11_1","disk":str(disk),
+                   "nvram":str(firmware),"future_ipv4":"192.168.240.101"}
+            def fake_cmd(*args,**kwargs):
+                if args[:2]==("qemu-img","convert"):
+                    Path(args[-1]).write_bytes(b"synthetic-qcow2")
+                    return ""
+                if args[:2]==("qemu-img","info"):
+                    return json.dumps({"format":"qcow2",
+                        "virtual-size":m.VIRTUAL_SIZE})
+                return ""
+            with patch.object(m,"BASE",root),\\
+                 patch.object(m,"run_command",side_effect=fake_cmd) as calls,\\
+                 patch.object(m,"stamp",return_value=("fixed",)),\\
+                 patch.object(m,"virsh",return_value="shut off") as virsh_mock,\\
+                 patch.object(m.verified,"render",return_value="<domain/>"),\\
+                 patch.object(m.crypto,"require_cleartext_candidate",
+                     side_effect=m.crypto.VolumeProbeError("encrypted")):
+                with self.assertRaisesRegex(m.MultiStageError,"VERIFY_PLAINTEXT_OS"):
+                    m.provision(entry,fixture(),("fixed",),("fixed",),set())
+            self.assertFalse(disk.exists())
+            self.assertFalse(firmware.exists())
+            self.assertFalse(any(call.args[0]=="define" for call in virsh_mock.call_args_list))
+
     def test_verify_definition_rejects_natted_nic(self):
         item=m.planned(1)[0]
         uid="af0ba1c2-f4c4-49a5-9111-513a9c405cae"
