@@ -636,6 +636,17 @@ def main(argv=None) -> int:
     parser.add_argument("--count",type=int,help="Omit for interactive count prompt")
     parser.add_argument("--reportdir",type=Path,default=Path.home()/"cape_clone_reports")
     a=parser.parse_args(argv)
+    # SSL-55 proved the cold master snapshot is BitLocker-encrypted.
+    # The old apply flow exported the encrypted master and depended on
+    # virt-win-reg, unavailable with the verified host QEMU installation.
+    # Disable this legacy entrypoint's mutation path until the new
+    # standalone-plaintext-template Command 2 pipeline replaces it.
+    if a.mode=="apply":
+        print("BLOCKED: Legacy Command 2 --apply clones an encrypted snapshot and "
+              "uses unverified Windows registry tooling. Do not run this route. "
+              "Use command2_stage_independent_clones.py for no-NIC staging.",
+              file=sys.stderr)
+        return 2
     try:
         if a.count is None:
             if not sys.stdin.isatty():
