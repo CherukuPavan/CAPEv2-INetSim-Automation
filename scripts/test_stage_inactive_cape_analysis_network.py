@@ -27,7 +27,9 @@ class Tests(unittest.TestCase):
             m.validate_xml(xml)
 
     def test_dhcp_rejected(self):
-        xml=m.network_xml().replace("</ip>",'<dhcp/></ip>')
+        root=ET.fromstring(m.network_xml())
+        ET.SubElement(root.find("ip"),"dhcp")
+        xml=ET.tostring(root,encoding="unicode")
         with self.assertRaisesRegex(m.Blocked,"DHCP"):
             m.validate_xml(xml)
 
