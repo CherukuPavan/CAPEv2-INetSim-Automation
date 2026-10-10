@@ -56,19 +56,28 @@ def execute(*args,timeout=120):
 def virsh(*args):
     return execute("virsh","-c","qemu:///system",*args)
 
-def safe_file(path):
+def safe_file(path,*,root_private=True):
     need(path.is_file() and not path.is_symlink(),
          "Missing or symlinked file: "+path.name)
     st=path.stat()
-    need(stat.S_ISREG(st.st_mode) and st.st_uid==0 and
-         not st.st_mode&0o077,"File not root-private: "+path.name)
+    need(stat.S_ISREG(st.st_mode) and
+         not (st.st_mode&0o022),
+         "Unsafe type or writable file: "+path.name)
+    if root_private:
+        need(st.st_uid==0 and not st.st_mode&0o077,
+             "Image not root-private: "+path.name)
     return st
 
 def check_disk():
     for p in (DISK,TEMPLATE):
         safe_file(p)
-    nv=safe_file(NVRAM)
-    orig=safe_file(ORIGINAL_NVRAM)
+    # Clone NVRAM was explicitly chowned to the ORIGINAL libvirt UEFI
+    # owner by the staging code; the owner need not be root on this host.
+    nv=safe_file(NVRAM,root_private=False)
+    orig=safe_file(ORIGINAL_NVRAM,root_private=False)
+    need((nv.st_uid,nv.st_gid)==(orig.st_uid,orig.st_gid) and
+         not nv.st_mode&0o077,
+         "New NVRAM does not match trusted original owner or mode 0600")
     for other in (TEMPLATE,ORIGINAL_NVRAM):
         st=other.stat()
         target=DISK.stat() if other==TEMPLATE else nv
