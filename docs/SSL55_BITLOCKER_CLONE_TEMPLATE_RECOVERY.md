@@ -849,3 +849,27 @@ https://github.com/kevoreilly/CAPEv2/blob/master/docs/book/src/installation/gues
 
 Do not attach a virtual NIC or enable external egress during
 the above localhost-only verification.
+
+## Agent listener present; first localhost curl commands used HTTPS — 2026-10-10 17:58
+
+Operator screenshot from `win11_trial_1` Windows CMD shows:
+- `netstat -ano | findstr ":8000"`: **TCP 0.0.0.0:8000 LISTENING PID 5648**.
+  This matches the earlier running `python.exe` PID 5648, so Python is
+  listening on the expected CAPE agent port.
+- The two attempted `curl.exe` requests accidentally used
+  `https://127.0.0.1:8000/` and
+  `https://127.0.0.1:8000/status` instead of HTTP.
+  Windows curl returned `schannel: next InitializeSecurityContext failed:
+  SEC_E_INVALID_TOKEN (0x80090308)`. That is consistent with sending
+  HTTPS/TLS to a plaintext-HTTP agent endpoint; it is NOT proof of an
+  agent failure. No agent HTTP response is yet available.
+- The observed `0.0.0.0` bind means the process listens on all
+  available IPv4 adapters once a guest NIC is added. This must be
+  understood and contained before enabling any analysis network.
+
+Next guest step: while still zero NIC, retry with exact plaintext HTTP:
+`curl.exe --noproxy "*" --max-time 5 http://127.0.0.1:8000/`
+and
+`curl.exe --noproxy "*" --max-time 5 http://127.0.0.1:8000/status`.
+Inspect the response status and agent identity. Do not change guest
+firewalls, attach NAT, or run samples.
