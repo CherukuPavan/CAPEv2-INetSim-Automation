@@ -49,4 +49,22 @@ Neither design should be executed on SSL-55 until rollback/partial-failure handl
 - Make actual checkpoint capture a distinct explicit action, not a side-effect of a read-only plan.
 - Continue networking isolation/fail-closed persistence work **without enabling a guest NIC** until independently verified.
 
+## Existing clone-name collision: required future Command 2 behavior
+
+The current `scripts/command2_stage_independent_clones.py` preflight
+iterates `win11_1..win11_N` and rejects any existing domain or artifact.
+Since `win11_1` now exists and is the accepted personalized guest,
+re-running it with `--count 5 --mode stage` is NOT a way to add four
+more VMs; it will fail at `win11_1` (correctly, without overwriting).
+Future count-driven Command 2 must either:
+- define `N` as **total desired clone count**, revalidate and preserve
+  accepted earlier clones, and only stage missing `win11_2..win11_N`; or
+- define `N` as **additional desired clone count** and explicitly
+  allocate fresh safe names above the current highest index.
+
+Do not mix these semantics. The user earlier requested
+`win11_1..win11_5` for count 5, suggesting total desired count,
+but this must be stated in the CLI. No extra guests should be staged
+until the space budget and storage/TPM restoration gates pass.
+
 **DO NOT RUN MALWARE OR CONNECT ANY ANALYSIS NIC**. This design is not a guarantee of restore or full Command 2 readiness.
