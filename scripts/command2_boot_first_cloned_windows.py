@@ -217,13 +217,25 @@ def boot():
           flush=True)
     print("PASS: exact per-clone TPM AppArmor rule validated",flush=True)
     virsh("start",NAME,"--paused")
-    # Do not proceed to Windows CPU resume until the paused identity is
-    # checked against the plan, including zero NICs and security isolation.
-    paused=virsh("domstate",NAME).lower()
-    need(paused in ("paused","paused (user)"),
-         "Clone did not remain paused; DO NOT RESUME")
-    check_xml(virsh("dumpxml",NAME),live=True)
-    check_master_and_trial()
+    # Do not resume guest CPUs unless the live zero-NIC definition, master
+    # preservation, and clone identity have all passed. If QEMU unexpectedly
+    # ran instead of pausing, suspend ONLY the newly created owned clone.
+    try:
+        paused=virsh("domstate",NAME).lower()
+        need(paused in ("paused","paused (user)"),
+             "Clone did not remain paused; DO NOT RESUME")
+        check_xml(virsh("dumpxml",NAME),live=True)
+        check_master_and_trial()
+    except Exception:
+        try:
+            if (virsh("domuuid",NAME)==IDENT and
+                virsh("domstate",NAME)=="running"):
+                virsh("suspend",NAME)
+                print("SAFETY_PAUSE: unexpectedly running win11_1",flush=True)
+        except Exception:
+            print("CRITICAL: paused start verification failed; inspect VM state",
+                  file=sys.stderr)
+        raise
     print("PASS: named clone started PAUSED; live XML has zero NICs",flush=True)
     virsh("resume",NAME)
     try:
