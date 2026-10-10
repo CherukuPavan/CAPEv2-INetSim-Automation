@@ -982,3 +982,52 @@ and jump verdict order visible. This is still NOT runtime isolation.
 The dedicated no-forward lab bridge/subnet must be installed only
 after approved networking design and evaluated with guest negative
 IPv4/IPv6 reachability tests and allowed CAPE-agent communication.
+
+## Firewall rule-order report accepted — 2026-10-10 21:51 UTC
+
+Operator uploaded `CAPE_Firewall_Order_Audit_20261010_215114_I8MKrMMm.txt` (992 lines).
+
+- Master `win11` shut off, trial `win11_trial_1` RUNNING with zero NICs.
+- IPv4 iptables filter FORWARD default policy **ACCEPT**; the
+  ordered top-level jumps are `DOCKER-USER` (position 1),
+  `DOCKER-FORWARD` (2), `LIBVIRT_FWX` (3),
+  `LIBVIRT_FWI` (4), `LIBVIRT_FWO` (5).
+- IPv6 ip6tables filter FORWARD also policy **ACCEPT**, with same
+  five top-level jumps. Docker and libvirt own rules and hooks.
+- IPv4 NAT POSTROUTING invokes `LIBVIRT_PRT` at position 4,
+  following existing Docker masquerade entries. The libvirt
+  NAT chain includes MASQUERADE targets. Match conditions were
+  intentionally omitted, so do not infer those targets always match.
+- Nftables ip/ip6 filter FORWARD base chains at priority **0**
+  both have policy **accept**; existing input and output base
+  chains also accept by default.
+- The report has `malware_analysis_network_approved=false`;
+  no host network, route, firewall or guest changes occurred.
+
+**Safety decision:** Existing Docker/libvirt forwarding policies are
+insufficient as a standalone containment guarantee. Do NOT connect a
+guest to NAT/virbr0, assume no-forward XML alone is runtime proof, or
+alter the shared host's global FORWARD policy. Continue isolated
+test-VM development with zero NIC until dedicated lab network firewall
+and guest negative tests are complete.
+
+**Next safe execution milestone:** Define a new persistent but
+**INACTIVE** libvirt network with `name=cape-analysis-isolated`,
+`bridge=cape-lab0`, provisional `192.168.240.0/24`,
+`<port isolated='yes'/>`, `<dns enable='no'/>`, no
+`<forward>`, no `<dhcp>`, no IPv6 global prefix, and no
+autostart. This only registers config; it must NOT call
+`virsh net-start`, attach any clone NIC, modify firewall/routing,
+or run malware. The provisional CIDR has no identified SSL-55 local
+overlaps, but remote organizational network conflicts remain UNKNOWN.
+Only choose/use it for actual activation after host/site confirmation.
+
+Implementation in development:
+`scripts/stage_inactive_cape_analysis_network.py` with
+`--mode plan` and `--mode define`; fixture tests pass:
+https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38089467332
+The SSL-55 operator has NOT yet executed the stage command.
+
+Official libvirt references:
+https://libvirt.org/formatnetwork.html
+https://libvirt.org/manpages/virsh.html
