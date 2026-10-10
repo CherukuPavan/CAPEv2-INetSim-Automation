@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Offline-only multi-clone cold staging unit tests; no host mutations."""
+import unittest
+from unittest.mock import patch
+from pathlib import Path
+import xml.etree.ElementTree as ET
+import command2_stage_independent_clones as m
+import stage_first_no_nic_windows_clone as stage
+from test_stage_first_no_nic_windows_clone import fixture
+
+class Tests(unittest.TestCase):
+    def test_numbering_hostname_ip_paths_and_no_duplication(self):
+        items=m.planned(5)
+        self.assertEqual([x["name"] for x in items],
+                         ["win11_1","win11_2","win11_3","win11_4","win11_5"])
+        self.assertEqual([x["windows_hostname"] for x in items],
+                         ["WIN11-1","WIN11-2","WIN11-3","WIN11-4","WIN11-5"])
+        self.assertEqual([x["future_ipv4"] for x in items],
+                         ["192.168.240."+str(i) for i in range(101,106)])
+        for item in items:
+            self.assertTrue(item["disk"].endswith(item["name"]+".qcow2"))
+            self.assertTrue(item["nvram"].endswith(item["name"]+"_VARS.fd"))
+        self.assertEqual(len(set(x["disk"] for x in items)),5)
+        self.assertEqual(len(set(x["nvram"] for x in items)),5)
+
+    def test_clone_count_bounded(self):
+        for bad in (0,-1,17):
+            with self.subTest(bad=bad),self.assertRaisesRegex(m.MultiStageError,"between"):
+                m.planned(bad)
+
+    def test_verified_no_nic_renderer_reused_not_natted(self):
+        uid="af0ba1c2-f4c4-49a5-9111-513a9c405cae"
+        item=m.planned(1)[0]
+        xml=stage.render(fixture(),identifier=uid,
+            name=item["name"],disk=Path(item["disk"]),
+            nvram=Path(item["nvram"]))
+        root=ET.fromstring(xml)
+        self.assertEqual(root.findtext("name"),"win11_1")
+        self.assertEqual(root.findtext("uuid"),uid)
+        self.assertEqual(root.findtext("./os/nvram"),item["nvram"])
+        self.assertEqual(root.find("./devices/disk[@device='disk']/source").get("file"),
+                         item["disk"])
+        self.assertFalse(root.findall("./devices/interface"))
+        self.assertFalse(root.findall("./devices/channel"))
+        self.assertFalse(root.findall("./devices/redirdev"))
+        self.assertEqual(root.find("./devices/tpm/backend").get("version"),"2.0")
+        self.assertEqual(root.find("./devices/graphics").get("listen"),"127.0.0.1")
+
+    def test_renderer_refuses_path_alias_or_wrong_directory(self):
+        with self.assertRaisesRegex(stage.StageError,"protected staging"):
+            stage.render(fixture(),identifier="af0ba1c2-f4c4-49a5-9111-513a9c405cae",
+                name="win11_1",disk="/var/lib/libvirt/images/win11_1.qcow2",
+                nvram=str(m.NVBASE/"win11_1_VARS.fd"))
+
+    def test_plan_keeps_disk_and_domain_untouched(self):
+        entry=m.planned(1)
+        with patch.object(m,"preflight",return_value=(entry,fixture(),("template",),("vars",),
+                                              {"host_free_gib":512,"conservative_required_gib":94})),\
+             patch.object(m,"provision") as prod,\
+             patch.object(m.os,"open",return_value=99),\
+             patch.object(m.os,"fstat") as fstat,\
+             patch.object(m.os,"close"),\
+             patch.object(m.fcntl,"flock"),\
+             patch.object(m,"check",wraps=m.check):
+            fstat.return_value.st_uid=0
+            fstat.return_value.st_mode=0o600
+            result=m.deploy(1,"plan")
+        self.assertEqual(result["result"],"MULTI_CLONE_ZERO_NIC_PLAN_ONLY")
+        prod.assert_not_called()
+
+    def test_failure_retains_previously_created_clones(self):
+        item=m.planned(2)
+        def fake(entry,*args):
+            if entry["name"]=="win11_2":raise m.MultiStageError("synthetic failed copy")
+            return dict(entry,result="STAGED_SHUT_OFF_ZERO_NICS")
+        with patch.object(m,"preflight",return_value=(item,fixture(),("template",),("vars",),
+                                              {"host_free_gib":512,"conservative_required_gib":158})),\
+             patch.object(m,"provision",side_effect=fake),\
+             patch.object(m.os,"open",return_value=99),\
+             patch.object(m.os,"fstat") as fstat,\
+             patch.object(m.os,"close"),\
+             patch.object(m.fcntl,"flock"):
+            fstat.return_value.st_uid=0
+            fstat.return_value.st_mode=0o600
+            outcome=m.deploy(2,"stage")
+        self.assertEqual(outcome["result"],"BLOCKED_OR_PARTIAL_REVIEW_REQUIRED")
+        self.assertEqual([x["name"] for x in outcome["created"]],["win11_1"])
+        self.assertFalse(outcome["analysis_network_connected"])
+        self.assertFalse(outcome["malware_execution_authorized"])
+
+    def test_verify_definition_rejects_natted_nic(self):
+        item=m.planned(1)[0]
+        uid="af0ba1c2-f4c4-49a5-9111-513a9c405cae"
+        xml=stage.render(fixture(),identifier=uid,
+            name=item["name"],disk=Path(item["disk"]),
+            nvram=Path(item["nvram"]))
+        xml=xml.replace("</devices>",'<interface type="network"><source network="default"/></interface></devices>')
+        with patch.object(m,"virsh",side_effect=lambda *args:(
+               "shut off" if args[0]=="domstate" else xml)),\
+             patch.object(m,"run_command",return_value='{"format":"qcow2","virtual-size":68719476736}'):
+            with self.assertRaisesRegex(m.MultiStageError,"unexpected|Unexpected"):
+                m.verify_definition(item,uid)
+
+if __name__=="__main__":
+    unittest.main()
