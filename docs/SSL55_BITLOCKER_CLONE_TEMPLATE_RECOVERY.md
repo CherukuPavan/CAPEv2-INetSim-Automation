@@ -1,6 +1,15 @@
 # SSL-55 BitLocker-protected Windows 11 master: clone-template recovery plan
 
-**Status: DESIGN ONLY — NOT APPROVED FOR EXECUTION.**
+**Current status (2026-10-10): WINDOWS CLONE VERIFIED; NFT GUARD LIVE; LAB NETWORK INACTIVE; NOT APPROVED FOR MALWARE EXECUTION.**
+
+This document is a **chronological engineering log**. Early "design only"
+sections describe the October 9 initial state and historical precautions.
+Later dated acceptance records supersede that early state, but no
+section authorizes connecting analysis VMs to NAT, running samples, or
+bypassing required egress tests. As of October 10, the independent
+decrypted Windows template, first no-NIC trial boot, and CAPE agent
+localhost checks are accepted; the lab network remains inactive and
+the dedicated firewall guard is installed **without reboot persistence**.
 
 Evidence from the operator's October 9, 2026 read-only reports:
 
