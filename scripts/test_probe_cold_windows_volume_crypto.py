@@ -115,6 +115,37 @@ class Tests(unittest.TestCase):
         self.assertTrue(any("skip=2048" in a and "count=2049" in a for a in calls))
         self.assertTrue(any("skip=2" in a and "count=34" in a for a in calls))
 
+    def test_qemu_img_dd_nonzero_lba_positive_plaintext(self):
+        from pathlib import Path
+        from unittest.mock import patch
+        import tempfile
+        header, entries=make_gpt([crypto.BASIC_DATA,crypto.RECOVERY])
+        mbr=bytearray(512)
+        mbr[510:512]=b"\x55\xaa"
+        ntfs=b"\xeb\x52\x90NTFS    "+b"\x00"*501
+        sample={(0,1):bytes(mbr),(1,1):header,(2,32):entries,
+                (2048,1):ntfs,(7168,1):ntfs}
+        observed=[]
+        def fake_run(args,**_):
+            start=int(next(x[5:] for x in args if x.startswith("skip=")))
+            end=int(next(x[6:] for x in args if x.startswith("count=")))
+            blocks=end-start
+            assert blocks>=1, "QEMU count/skip would truncate output"
+            observed.append((start,blocks))
+            Path(next(x[3:] for x in args if x.startswith("of="))).write_bytes(
+                sample[(start,blocks)])
+            return object()
+        with tempfile.TemporaryDirectory() as td:
+            disk=Path(td)/"clear-template.qcow2"
+            disk.write_bytes(b"QFI\xfb")
+            with patch.object(crypto.subprocess,"run",side_effect=fake_run):
+                result=crypto.inspect_image(disk)
+        self.assertEqual(result["decision"],
+                         "CLEAR_NTFS_CANDIDATE_NOT_BOOT_VERIFIED")
+        self.assertTrue(result["windows_registry_readable"])
+        self.assertIn((2048,1),observed)
+        self.assertIn((2,32),observed)
+
     def test_incomplete_boot_sector_refused(self):
         with self.assertRaisesRegex(crypto.VolumeProbeError,"Truncated"):
             crypto.classify_boot_sector(b"-FVE-FS-")
