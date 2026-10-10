@@ -805,3 +805,47 @@ virt-win-reg on SSL-55), verified no-forward lab isolation and negative
 egress, distinct clone snapshots and working CAPE agents, multi-clone
 parallel acceptance and clean second-host reproduction. Do not label
 Command 2 or full four-command deployment complete yet.
+
+## Guest-side BitLocker + Python verified inside first trial — 2026-10-10 17:50
+
+Operator supplied screenshot of elevated Windows Command Prompt inside
+`win11_trial_1 on QEMU/KVM` after first independent desktop boot.
+
+Guest command `manage-bde -status C:` confirms:
+- C: 62.92 GB, BitLocker Version **None**, Conversion Status
+  **Fully Decrypted**, Percentage Encrypted **0.0%**,
+  Encryption Method None, Protection Status **Protection Off**,
+  Lock Status Unlocked, Key Protectors None Found.
+- This confirms the clone was not re-encrypted automatically on the
+  first boot with its newly generated TPM.
+
+Guest command `"C:\\Program Files\\Python310\\python.exe" --version`
+returned **Python 3.10.11**.
+
+Guest command `tasklist /FI "IMAGENAME eq python.exe"` returned
+one `python.exe` in user Console session 1, PID **5648**,
+memory usage approximately 4,892 KiB.
+
+This verifies installed Python and a running Python process on an
+independent clone; the process **has not yet been established to be
+CAPE's `agent.py`**. Do not mark CAPE agent integration complete.
+
+Next **benign guest-local-only** verification while the trial remains
+zero NIC:
+- `curl.exe --noproxy "*" --max-time 5 http://127.0.0.1:8000/`
+  should return a JSON object containing `"CAPE Agent!"`,
+  `version`, `features`, and `is_user_admin` if the Python
+  CAPE agent from the current upstream repository is running.
+- `curl.exe --noproxy "*" --max-time 5 http://127.0.0.1:8000/status`
+  should return the agent's current `"Analysis status"` object;
+  this GET does not submit analysis work.
+- `netstat -ano | findstr ":8000"` reveals the listener PID to
+  compare with Python's observed PID if it has remained unchanged.
+
+Actual upstream reference:
+https://github.com/kevoreilly/CAPEv2/blob/master/agent/agent.py
+and guest agent instructions:
+https://github.com/kevoreilly/CAPEv2/blob/master/docs/book/src/installation/guest/agent.rst
+
+Do not attach a virtual NIC or enable external egress during
+the above localhost-only verification.
