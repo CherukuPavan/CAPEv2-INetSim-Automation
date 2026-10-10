@@ -432,3 +432,43 @@ personalized or verified CAPE analysis VM.
 **As of this screenshot the VM shutdown, cold cleartext probe, export,
 and final master definition restoration have not yet been confirmed**.
 Do not mark Command 1 or Command 2 complete.
+
+## Cold template export first attempt safely blocked — 2026-10-10 16:45
+
+Operator uploaded `CAPE_Decrypted_Template_Export_20261010_164551_IUGydwjs.txt`:
+
+- `PASS: Five-layer source and preserved master verified`.
+- The next check failed at
+  `BLOCKED: Block Incomplete disk sector read`.
+- No conversion/export was started; no independent decrypted template
+  was published. Master, snapshots and TPM backup remain unchanged
+  by the export command.
+
+**Cause found in the sector-probe implementation:** QEMU's
+`qemu-img dd` computes the effective copy limit as
+`count * block_size` before subtracting `skip * block_size`.
+With `count=1 skip=1` the output image can be zero bytes. Our
+previous sector reader used the conventional `dd` expectation that
+count begins *after* skip. That expectation was invalid for this
+QEMU behavior and resulted in the incomplete-read error.
+See QEMU source `img_dd()` in `qemu-img.c` where count bounds
+`size` before applying the skip offset:
+https://qemu.googlesource.com/qemu/+/c28db9e0002df2abf88283b41dce0be17e8b0888/qemu-img.c
+
+**Fix in shared `scripts/probe_cold_windows_volume_crypto.py`:**
+For a window of `sectors` blocks starting at `lba`, call
+`qemu-img dd bs=512 count=(lba+sectors) skip=lba`, which
+requests an output of exactly `sectors * 512` bytes for the
+QEMU implementation on SSL-55. Continue validating the exact
+output length, GPT CRCs, Windows NTFS/BitLocker partition signature,
+VM shutdown and protected source chain before exporting.
+The regression mock now encodes QEMU's count-before-skip semantics,
+including for nonzero GPT and partition LBAs. A complete host
+integration probe is still necessary before attempting the long
+standalone template export again.
+
+**Do not interpret this blocker as Windows re-encryption.**
+Windows previously showed Fully Decrypted/0.0% in the guest, but
+offline plaintext NTFS verification is still required and has not
+yet succeeded on the shut-off maintenance image. Do not
+restart the guest or restore the original VM definition.
