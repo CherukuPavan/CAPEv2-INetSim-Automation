@@ -106,13 +106,15 @@ class Tests(unittest.TestCase):
                     return json.dumps({"format":"qcow2",
                         "virtual-size":m.VIRTUAL_SIZE})
                 return ""
-            with patch.object(m,"BASE",root),\\
-                 patch.object(m,"run_command",side_effect=fake_cmd) as calls,\\
-                 patch.object(m,"stamp",return_value=("fixed",)),\\
-                 patch.object(m,"virsh",return_value="shut off") as virsh_mock,\\
-                 patch.object(m.verified,"render",return_value="<domain/>"),\\
-                 patch.object(m.crypto,"require_cleartext_candidate",
-                     side_effect=m.crypto.VolumeProbeError("encrypted")):
+            with (
+                patch.object(m,"BASE",root),
+                patch.object(m,"run_command",side_effect=fake_cmd) as calls,
+                patch.object(m,"stamp",return_value=("fixed",)),
+                patch.object(m,"virsh",return_value="shut off") as virsh_mock,
+                patch.object(m.verified,"render",return_value="<domain/>"),
+                patch.object(m.crypto,"require_cleartext_candidate",
+                    side_effect=m.crypto.VolumeProbeError("encrypted")),
+            ):
                 with self.assertRaisesRegex(m.MultiStageError,"VERIFY_PLAINTEXT_OS"):
                     m.provision(entry,fixture(),("fixed",),("fixed",),set())
             self.assertFalse(disk.exists())
