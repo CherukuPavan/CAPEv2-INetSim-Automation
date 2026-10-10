@@ -504,3 +504,40 @@ independent disposable Windows boot with fresh TPM/NVRAM, system identity,
 static IPv4, CAPE agent, isolated network, and clean snapshot still
 requires implementation and acceptance on SSL-55, then on a second
 supported fresh Ubuntu machine.
+
+## Independent decrypted Windows master template export verified — 2026-10-10 16:56 UTC
+
+User uploaded `CAPE_Final_Plaintext_Template_Export_20261010_165626_IAA64zkw.txt`.
+It confirms `RESULT: DECRYPTED_STANDALONE_TEMPLATE_EXPORTED`:
+
+- New root-private independent flattened disk:
+  `/var/lib/libvirt/images/cape-clones-staging/win11_decrypted_template.qcow2`.
+- **No QCOW2 backing file**; Windows source partition is verified
+  **plaintext NTFS** after conversion; `qemu-img check` was run.
+- Original master source files and protected TPM backup were untouched
+  by the export command.
+- No guest was booted and no clones have been personalized.
+- The old detached `win11_1.qcow2` from earlier tests remains an
+  **encrypted** standalone export and is NOT this new template.
+
+The accepted next gate is **read-only** Windows Registry inventory from
+the shut-off, trusted decrypted standalone template, using an available
+free `/dev/nbdN` exported by QEMU `qemu-nbd --read-only` and a
+`ntfs-3g -o ro,norecover,nodev,nosuid,noexec` mount of partition 3.
+The `Windows/System32/config/SYSTEM` hive is inspected through the
+installed `python3-hivex` library; output must contain only allowlisted
+ControlSet/current interface GUID, static IPv4/subnet and basic hostname
+fields. Unmount and disconnect on completion; no full registry,
+recovery keys or TPM state may be uploaded. See new
+`scripts/inspect_decrypted_template_network.py` and its fixture tests.
+
+The existing `scripts/personalize_clone_windows.py` requires
+`virt-win-reg` from libguestfs, which may conflict with SSL-55's held
+custom QEMU packages. A separate tested portable clone-only Windows
+customization implementation is therefore still needed; do not install
+incompatible distro libguestfs packages or treat export success as
+automatic hostname/static-IP provisioning.
+
+Upstream:
+https://www.qemu.org/docs/master/tools/qemu-nbd.html
+https://manpages.debian.org/trixie/ntfs-3g/mount.ntfs-3g.8.en.html
