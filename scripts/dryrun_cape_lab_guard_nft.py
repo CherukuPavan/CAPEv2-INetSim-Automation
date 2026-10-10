@@ -84,7 +84,7 @@ def validate_policy(source:str):
         need(token in source,"Missing fail-closed proposed nft guard expression")
     need(source.count('type filter hook ')==3,"Unexpected nft hook count")
     need(source.count('drop')==4,"Unexpected nft guard-drop count")
-    need(source.count(' accept')==2,"Unexpected nft explicit-accept count")
+    need(source.count(' accept\n')==2,"Unexpected nft explicit-accept count")
 
 def check_guest_and_network():
     need(os.geteuid()==0,"Run using sudo")
@@ -167,7 +167,7 @@ def perform():
             "host_network_modified":False,
             "guest_nic_attached":False,
             "runtime_egress_containment_verified":False,
-            "inerTSim_services_enabled":False,
+            "inetsim_services_enabled":False,
             "note":"Syntax-only draft. Do NOT start network or attach guest NICs until reviewed, installed and runtime negative tests succeed."}
 
 def main():
