@@ -1070,3 +1070,46 @@ guest interface binding only to the approved network, bridge/L2
 controls, negative IPv4/IPv6/campus/Docker egress probes and
 positive isolated CAPE-agent communication must pass before running
 samples. Never flush host firewall or disrupt existing Docker/SSH.
+
+## nftables syntax-only bridge guard check PASSED — 2026-10-10 22:02
+
+Operator uploaded `CAPE_Lab_Firewall_DryRun_20261010_220215_grjbuOnB.txt`
+(43 lines); `RESULT: LAB_GUARD_NFT_DRY_RUN_PASSED`.
+
+- `win11` shut off; `win11_trial_1` RUNNING with zero NICs.
+- `cape-analysis-isolated` remained INACTIVE, no bridge or guest NIC.
+- `nft --check --file` succeeded against installed SSL-55 nftables;
+  no conflicting `inet cape_analysis_guard` table existed.
+- Firewall tables before and after dry-run identical.
+- No host firewall/routes, VM interface or network activation changed.
+- Candidate interface-specific `inet cape_analysis_guard`,
+  base hook priority `-50`, exact test-proven source SHA256:
+  `58b84446ad74ac7ea8b14aa57d94c19945baa3db7330e54c7fb2312a9577ea14`.
+- Candidate FORWARD: drop all packets entering/leaving bridge
+  `cape-lab0`.
+- Candidate INPUT: established/related replies from
+  `cape-lab0` addressed to `192.168.240.1` may be accepted;
+  otherwise drop ingress from that bridge.
+- Candidate OUTPUT: host-to-guest TCP/8000 within
+  `192.168.240.0/24` may be accepted; otherwise drop egress
+  to the bridge. This is only for benign CAPE-agent polling.
+- `INETSIM_CONFIGURED=NO`,
+  `RUNTIME_EGRESS_ISOLATION_VERIFIED=NO`. No samples.
+
+**Next guarded operation (NOT YET DONE):** create-only install of
+this exact reviewed nftables policy into the currently running
+firewall, while lab network remains inactive, recheck dedicated table
+hook/verdict order and verify zero guest NICs. The installation code
+`scripts/install_cape_lab_guard_nft.py` pins the successful host
+nft dry-run policy SHA256, refusing source drift and pre-existing
+table collision. It preserves the guard for manual review rather
+than removing a potentially needed safety barrier if post-install
+verification unexpectedly fails. Offline tests passed:
+https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38090128086
+
+**Caveats:** The first installation is a transient nftables guard:
+without an explicit boot-ordered persistence setup, reboot might
+remove it. DO NOT start or autostart any analysis network / attach
+NIC / execute samples until persistence, source/site address conflict
+checks, independent host management preservation and negative
+IPv4/IPv6/campus/Docker egress tests have passed.
