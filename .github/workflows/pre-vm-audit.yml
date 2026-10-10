@@ -58,6 +58,7 @@ on:
       - 'scripts/inspect_decrypted_template_network.py'
       - 'scripts/stage_first_no_nic_windows_clone.py'
       - 'scripts/command2_stage_independent_clones.py'
+      - 'scripts/command2_stage_independent_clones.sh'
       - 'scripts/guard_cape_lab_boot.py'
       - 'scripts/patch_clone_hivex_system_copy.py'
       - 'scripts/test_patch_clone_hivex_system_copy.py'
@@ -157,6 +158,7 @@ on:
       - 'scripts/inspect_decrypted_template_network.py'
       - 'scripts/stage_first_no_nic_windows_clone.py'
       - 'scripts/command2_stage_independent_clones.py'
+      - 'scripts/command2_stage_independent_clones.sh'
       - 'scripts/guard_cape_lab_boot.py'
       - 'scripts/patch_clone_hivex_system_copy.py'
       - 'scripts/test_patch_clone_hivex_system_copy.py'
@@ -257,6 +259,7 @@ jobs:
           bash -n scripts/bootstrap_pre_vm_prereqs.sh
           bash -n scripts/command1_pre_vm.sh
           bash -n scripts/command2_clone_vms.sh
+          bash -n scripts/command2_stage_independent_clones.sh
           bash -n scripts/plan_guestfs_dependency_impact.sh
           bash -n scripts/plan_minimal_hivex_backend.sh
           bash -n scripts/install_minimal_hivex_guarded.sh
