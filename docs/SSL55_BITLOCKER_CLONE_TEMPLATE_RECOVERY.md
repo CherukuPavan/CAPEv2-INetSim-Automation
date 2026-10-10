@@ -764,3 +764,44 @@ may auto-enable device encryption on future boots; verify its
 volume conversion and protector status after guest login.
 No malware analysis yet; traffic containment and cloning network
 identities remain incomplete.
+
+## FIRST INDEPENDENT WINDOWS 11 TRIAL DESKTOP BOOT VERIFIED — 2026-10-10 ~17:41 UTC
+
+Operator uploaded:
+- `CAPE_Trial_Windows_First_Resume_20261010_174019_cnXlZb4m.txt`
+- Virt-manager screenshot showing `win11_trial_1 on QEMU/KVM`
+  running at the Windows 11 desktop with an open
+  `C:\\Program Files\\Python310\\python.exe` console window.
+
+**Confirmed:** `RESULT: TRIAL_WINDOWS_RESUMED_WITH_ZERO_NICS`.
+First guest resume passed protected master checks, new disk/NVRAM/TPM
+identity checks and live zero-network/host-share checks.
+Trial `win11_trial_1` transitioned to RUNNING; the original
+`win11` stayed SHUT OFF. The operator's screenshot independently
+establishes that **Windows 11 successfully booted to the desktop
+on the disposable clone with its new libvirt TPM identity**.
+There was no BitLocker recovery prompt on this boot.
+
+**Not yet established:** The clone's `manage-bde -status C:`
+might differ from the image's prior 0%-encrypted state after TPM
+rekey/device encryption; a guest-side repeat is required. The visible
+Python executable does not establish version, CAPE agent process
+identity, API responsiveness, or startup persistence. The template
+and original master have not been modified by these clone boot steps,
+but the disposable clone's disk, NVRAM and its own swtpm state will
+be writable and may change after Windows boots, by design.
+
+**Next benign, offline guest checks:** From a Windows 11
+administrator Command Prompt in `win11_trial_1`, capture
+`manage-bde -status C:`, `"C:\\Program Files\\Python310\\python.exe" --version`,
+and `tasklist /fi "imagename eq python.exe"`. Do not run malware,
+connect a NIC, reboot the original master, install tools or disable
+host security. The Python process will require a separate subsequent
+CAPE agent behavioral verification once networking is safe.
+
+**Outstanding for portable 4-command goal:** Windows hostname/IP/NIC
+re-detection, clone-only registry customization (without incompatible
+virt-win-reg on SSL-55), verified no-forward lab isolation and negative
+egress, distinct clone snapshots and working CAPE agents, multi-clone
+parallel acceptance and clean second-host reproduction. Do not label
+Command 2 or full four-command deployment complete yet.
