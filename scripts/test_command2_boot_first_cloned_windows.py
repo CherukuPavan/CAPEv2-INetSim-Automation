@@ -51,13 +51,15 @@ class Tests(unittest.TestCase):
             if args==("dumpxml",b.NAME):return "<domain/>"
             if args==("resume",b.NAME):return ""
             raise AssertionError("Unexpected virsh: "+str(args))
-        with patch.object(b,"preflight",return_value={
-                 "result":"COMMAND2A_FIRST_BOOT_PREFLIGHT_PASSED"}),\\
-             patch.object(b.tpm,"prepare",return_value={
-                 "status":"INSTALLED"}) as apparmor,\\
-             patch.object(b,"check_xml") as verify_xml,\\
-             patch.object(b,"check_master_and_trial"):
-            with patch.object(b,"virsh",side_effect=mock_virsh):
+        with (
+            patch.object(b,"preflight",return_value={
+                "result":"COMMAND2A_FIRST_BOOT_PREFLIGHT_PASSED"}),
+            patch.object(b.tpm,"prepare",return_value={
+                "status":"INSTALLED"}) as apparmor,
+            patch.object(b,"check_xml") as verify_xml,
+            patch.object(b,"check_master_and_trial"),
+            patch.object(b,"virsh",side_effect=mock_virsh),
+        ):
                 report=b.boot()
         self.assertEqual(report["result"],"COMMAND2A_NEW_CLONE_BOOTED_ZERO_NICS")
         self.assertEqual(calls[0],("start",b.NAME,"--paused"))
@@ -78,10 +80,12 @@ class Tests(unittest.TestCase):
             if args==("domstate",b.NAME):return "paused"
             if args==("dumpxml",b.NAME):return "<domain/>"
             raise AssertionError("Unexpected action")
-        with patch.object(b,"preflight",return_value={}),\\
-             patch.object(b.tpm,"prepare",return_value={"status":"INSTALLED"}),\\
-             patch.object(b,"check_xml",side_effect=b.BootBlocked("NIC")),\\
-             patch.object(b,"virsh",side_effect=mock_virsh):
+        with (
+            patch.object(b,"preflight",return_value={}),
+            patch.object(b.tpm,"prepare",return_value={"status":"INSTALLED"}),
+            patch.object(b,"check_xml",side_effect=b.BootBlocked("NIC")),
+            patch.object(b,"virsh",side_effect=mock_virsh),
+        ):
             with self.assertRaisesRegex(b.BootBlocked,"NIC"):
                 b.boot()
         self.assertNotIn(("resume",b.NAME),seen)
@@ -99,12 +103,14 @@ class Tests(unittest.TestCase):
             if args==("domuuid",b.NAME):return b.IDENT
             if args==("suspend",b.NAME):return ""
             raise AssertionError("Unexpected action: "+str(args))
-        with patch.object(b,"preflight",return_value={}),\\
-             patch.object(b.tpm,"prepare",return_value={"status":"INSTALLED"}),\\
-             patch.object(b,"check_xml"),\\
-             patch.object(b,"check_master_and_trial",
-                 side_effect=[None,b.BootBlocked("poststart")]),\\
-             patch.object(b,"virsh",side_effect=mock_virsh):
+        with (
+            patch.object(b,"preflight",return_value={}),
+            patch.object(b.tpm,"prepare",return_value={"status":"INSTALLED"}),
+            patch.object(b,"check_xml"),
+            patch.object(b,"check_master_and_trial",
+                side_effect=[None,b.BootBlocked("poststart")]),
+            patch.object(b,"virsh",side_effect=mock_virsh),
+        ):
             with self.assertRaisesRegex(b.BootBlocked,"poststart"):
                 b.boot()
         self.assertIn(("suspend",b.NAME),calls)
