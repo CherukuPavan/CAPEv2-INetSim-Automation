@@ -121,6 +121,10 @@ def storage():
             "snapshot_or_copy_authorized": False,
             "more_clones_authorized": False}
 
+def first_line(value):
+    lines = [line for line in value.splitlines() if line.strip()]
+    return lines[0] if lines else "VERSION_OUTPUT_NOT_CAPTURED"
+
 def perform():
     need(os.geteuid() == 0, "Run with sudo/root")
     identity(NAME, UUID, "running")
@@ -151,8 +155,8 @@ def perform():
             "uefi_vars_metadata_only": metadata(NVRAM),
             "clone_tpm": inspect_tpm(),
             "host_versions": {"virsh": virsh("version").splitlines()[:8],
-                              "qemu_img": cmd("qemu-img", "--version").splitlines()[0],
-                              "swtpm": cmd("swtpm", "--version").splitlines()[0]},
+                              "qemu_img": first_line(cmd("qemu-img", "--version")),
+                              "swtpm": first_line(cmd("swtpm", "--version"))},
             "storage": storage(),
             "cold_consistent_copy_verified": False,
             "snapshot_revert_verified": False,
