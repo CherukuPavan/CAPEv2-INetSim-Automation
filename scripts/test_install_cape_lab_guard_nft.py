@@ -51,6 +51,13 @@ class Tests(unittest.TestCase):
             with self.assertRaisesRegex(m.GuardInstallBlocked,"ordering"):
                 m.verify_installed()
 
+    def test_install_policy_matches_operator_approved_dry_run_sha(self):
+        import hashlib
+        self.assertEqual(
+            hashlib.sha256(d.policy_text().encode("utf-8")).hexdigest(),
+            m.APPROVED_POLICY_SHA256
+        )
+
     def test_plan_never_changes_host(self):
         with patch.object(m,"preflight",return_value=d.policy_text()),\
              patch.object(m,"execute") as exec_mock:
