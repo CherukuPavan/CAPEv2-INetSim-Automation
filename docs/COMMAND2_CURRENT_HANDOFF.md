@@ -142,7 +142,12 @@ only the independently verified `win11_1` clone. Current guest name is
 `Win`; target `WIN11-1`. Do not apply the existing offline hive IP editor:
 it hardcodes an unverified source IP and unknown adapter GUID. A hostname
 rename via the guest OS requires explicit operator authorization and a
-controlled Windows restart before it takes effect. The no-NIC libvirt
+controlled Windows restart before it takes effect. First collect the
+read-only SMBIOS UUID inside the running clone using
+`(Get-CimInstance Win32_ComputerSystemProduct).UUID`; compare it to
+libvirt UUID `732b2256-ee99-41fa-881d-fbf5c476d960`. Some firmware
+can expose a differently formatted ID: mismatches require review, not
+forced renaming. The no-NIC libvirt
 identity and protected original master must be rechecked after any restart.
 **There is no need to repeat the agent localhost test**: JSON `status: init`
 was already decoded from screenshots. No network or malware is authorized.
