@@ -56,7 +56,22 @@ def call(*args,timeout=120):
 def virsh(*args):
     return call("virsh","-c","qemu:///system",*args)
 
-def render(saved_xml,*,identifier):
+def render(saved_xml,*,identifier,name=NAME,disk=DISK,nvram=NVRAM):
+    # The zero-NIC renderer is reusable by Command 2 for arbitrary VM counts.
+    # All safety checks on the saved source domain remain enforced.
+    import re
+    ensure(re.fullmatch(r"win11_[1-9][0-9]{0,2}",name) is not None or name==NAME,
+           "Invalid Windows clone name")
+    disk=Path(disk)
+    nvram=Path(nvram)
+    ensure(disk.is_absolute() and nvram.is_absolute() and
+           not any(".."==part for part in disk.parts+nvram.parts) and
+           disk!=nvram, "Unsafe independent clone file paths")
+    ensure(disk.parent==DISK.parent and nvram.parent==NVRAM.parent and
+           disk.name==name+".qcow2" and
+           nvram.name==name+"_VARS.fd",
+           "Clone disk/NVRAM must remain in protected staging directories")
+    identifier=str(uuid.UUID(identifier))
     root=ET.fromstring(saved_xml)
     ensure(root.tag=="domain" and root.get("type")=="kvm",
            "Source must be KVM domain")
@@ -110,13 +125,13 @@ def render(saved_xml,*,identifier):
             devices.remove(element)
     for label in list(root.findall("./seclabel")):
         root.remove(label)
-    root.find("name").text=NAME
+    root.find("name").text=name
     root.find("uuid").text=identifier
     genid=root.find("genid")
     if genid is not None:
         genid.text=str(uuid.uuid5(uuid.UUID(identifier),"new-windows-genid"))
-    src.set("file",str(DISK))
-    vars.text=str(NVRAM)
+    src.set("file",str(disk))
+    vars.text=str(nvram)
     # Do not inherit unattached Windows installer media from SSL-55.
     for optical in devices.findall("./disk[@device='cdrom']"):
         medium=optical.find("source")
