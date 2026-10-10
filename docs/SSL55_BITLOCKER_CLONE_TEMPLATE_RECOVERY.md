@@ -1113,3 +1113,38 @@ remove it. DO NOT start or autostart any analysis network / attach
 NIC / execute samples until persistence, source/site address conflict
 checks, independent host management preservation and negative
 IPv4/IPv6/campus/Docker egress tests have passed.
+
+## Scoped CAPE lab nftables table installed successfully — 2026-10-10 22:09 UTC
+
+Operator uploaded `CAPE_Lab_Guard_Install_20261010_220958_7hBg4wpJ.txt` (28 lines):
+- `RESULT: CAPE_LAB_NFT_GUARD_INSTALLED_AND_CHECKED`.
+- New dedicated live table **`inet cape_analysis_guard`** installed,
+  source SHA-256
+  `58b84446ad74ac7ea8b14aa57d94c19945baa3db7330e54c7fb2312a9577ea14`
+  matched previously accepted syntax-only policy.
+- Guard base hooks / priorities / rule verdict order verified.
+- Protected original `win11` master unchanged; trial
+  `win11_trial_1` running with ZERO NICs.
+- Libvirt network `cape-analysis-isolated` and bridge name
+  `cape-lab0` remain INACTIVE. No guest NIC or network activation.
+- **`REBOOT_PERSISTENCE_CONFIGURED: NO`**,
+  `INETSIM_CONFIGURED: NO`, `RUNTIME_EGRESS_ISOLATION_VERIFIED: NO`.
+  No malware samples are authorized.
+
+**Critical shared-host risk:** Do **not** blindly enable/restart
+`nftables.service` or write/replace `/etc/nftables.conf` on SSL-55.
+The system may have Docker/libvirt-managed active nftables/iptables
+chains that a service's `flush ruleset` operation would destroy,
+potentially impacting campus networking, containers and management
+connections. Installing a transient guard is NOT boot-safe persistence.
+
+Next checkpoint: strictly read-only inventory of `nftables.service`
+unit load/active/enabled state, its effective ExecStart/Stop/Reload
+behavior, `/etc/nftables.conf` unsafe `flush ruleset` or includes,
+other firewall manager services, libvirt network autostart policy and
+current guard identity. NO systemctl enable/start/restart, NO
+`nft -f` without `--check`, no firewall rewrite or VM change.
+Build a dedicated guard-only boot service that never flushes unrelated
+firewall chains, and gate all analysis-network starts on it; test safe
+boot ordering and negative egress on a disposable benign setup before
+enabling any guest NIC or malware execution.
