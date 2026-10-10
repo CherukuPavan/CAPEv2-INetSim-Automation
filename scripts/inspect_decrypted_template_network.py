@@ -69,11 +69,12 @@ def validate():
     require(disk.st_uid==0 and not disk.st_mode & 0o077,
             "Plaintext Windows template is not root-private")
 
-def choose_free_nbd()->str:
-    for path in sorted(Path("/sys/block").glob("nbd*")):
+def choose_free_nbd(sys_dir:Path=Path("/sys/block"),
+                    dev_dir:Path=Path("/dev"))->str:
+    for path in sorted(sys_dir.glob("nbd*")):
         if not DEV_PATTERN.fullmatch(path.name):
             continue
-        device=Path("/dev")/path.name
+        device=dev_dir/path.name
         if not device.exists() or (path/"pid").exists():
             continue
         children=list(path.glob(path.name+"p*"))
