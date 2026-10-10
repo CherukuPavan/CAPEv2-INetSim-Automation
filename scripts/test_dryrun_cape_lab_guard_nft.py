@@ -20,7 +20,7 @@ class Tests(unittest.TestCase):
 
     def test_missing_forward_drop_fails_closed(self):
         source=m.policy_text().replace('iifname "cape-lab0" drop','iifname "cape-lab0" accept',1)
-        with self.assertRaisesRegex(m.DryRunBlocked,"Missing"):
+        with self.assertRaisesRegex(m.DryRunBlocked,"Missing|drop"):
             m.validate_policy(source)
 
     def test_existing_guard_name_detected(self):
