@@ -143,3 +143,29 @@ acceptance test; the old clone code is intentionally not patched
 in place on SSL-55. Do not use a previously downloaded checkout
 whose commit SHA is outdated. If the separate target names are also
 occupied, STOP and review instead of overwriting or deleting.
+
+## Actual SSL-55 independent second clone staged — Oct 10 22:50
+
+Operator report `CAPE_Command2A_FirstClone_20261010_225052_N9tH7v9D.txt`
+is **PASS**:
+- Plan: `MULTI_CLONE_ZERO_NIC_PLAN_ONLY`, free capacity 125 GiB;
+  conservative requirement 94 GiB for 1 clone.
+- Stage: `INDEPENDENT_ZERO_NIC_CLONES_STAGED`, one `created`
+  entry with `STAGED_SHUT_OFF_ZERO_NICS`.
+- Domain: `win11_1`; UUID
+  `732b2256-ee99-41fa-881d-fbf5c476d960`.
+- Fresh independently cloned disk
+  `/var/lib/libvirt/images/cape-clones-staging/win11_1.command2.qcow2`
+  and NVRAM
+  `/var/lib/libvirt/qemu/nvram/win11_1.command2_VARS.fd`.
+- No source-master mutation reported; guest **NOT STARTED**, zero NICs,
+  no network attached, no snapshot, TPM state created only on first boot.
+- `WIN11-1` and `192.168.240.101` remain **PLANNED**, NOT SET
+  inside Windows. Planned MAC
+  `02:75:dc:63:ca:e1` is NOT attached to any NIC.
+- Malware execution NOT approved, egress isolation NOT verified.
+
+Next: independently check live libvirt identity, disk chain, NVRAM
+and AppArmor scoping; guarded TPM socket profile for this exact new VM;
+then one benign first boot with zero NICs. Do not start trial/master,
+activate the network, or use malware samples.
