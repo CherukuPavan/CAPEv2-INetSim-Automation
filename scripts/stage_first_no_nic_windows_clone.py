@@ -67,9 +67,13 @@ def render(saved_xml,*,identifier,name=NAME,disk=DISK,nvram=NVRAM):
     ensure(disk.is_absolute() and nvram.is_absolute() and
            not any(".."==part for part in disk.parts+nvram.parts) and
            disk!=nvram, "Unsafe independent clone file paths")
+    # Older SSL-55 recovery experiments already own e.g. win11_1.qcow2.
+    # For Command 2 allocate separate, explicit files; NEVER recycle or
+    # overwrite recovery artifacts and do not rename them automatically.
+    permitted={(name+".qcow2",name+"_VARS.fd"),
+               (name+".command2.qcow2",name+".command2_VARS.fd")}
     ensure(disk.parent==DISK.parent and nvram.parent==NVRAM.parent and
-           disk.name==name+".qcow2" and
-           nvram.name==name+"_VARS.fd",
+           (disk.name,nvram.name) in permitted,
            "Clone disk/NVRAM must remain in protected staging directories")
     identifier=str(uuid.UUID(identifier))
     root=ET.fromstring(saved_xml)
