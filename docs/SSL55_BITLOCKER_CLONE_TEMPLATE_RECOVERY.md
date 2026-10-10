@@ -570,3 +570,33 @@ then detach NBD. No guest boot, no writeable filesystem mount,
 no snapshot reversion or network changes. Do not mark clone
 personalization or Command 2 complete until a disposable clone is
 independently customized and boot-verified.
+
+## Windows SYSTEM registry inspection succeeded — 2026-10-10 17:12
+
+Operator uploaded `CAPE_Windows_Registry_v2_20261010_171228_67qcEsIP.txt`.
+It verifies original `win11` **shut off**, the independent 64 GiB
+standalone QCOW2 template, and a successfully read-only extracted
+Windows SYSTEM registry hive. NBD `/dev/nbd0` was disconnected afterward.
+
+`Current ControlSet = 1`. Three Windows NIC registry entries were
+found: one DHCP enabled, one incomplete/unknown, and **one static IPv4**
+interface with GUID
+`{bd7aa820-47b9-4dd6-a85f-db3bd6d77e74}`, original
+IPv4 `192.168.122.125`, subnet `255.255.255.0`.
+`template_modified=false`. No guest VM boot or registry edit occurred.
+
+**Important:** This GUID is a registry identity of the old VM.
+Windows Plug and Play might create a *new* network interface GUID when
+a cloned virtual NIC has a new MAC/PCI identity. Editing only this
+registry key without verifying actual active guest NIC afterward would
+not prove clone static-IP personalization is correct. Make a disposable
+independent, **zero-NIC test clone** from the verified plaintext template,
+with fresh libvirt UUID/swtpm and separate writable UEFI NVRAM, and
+test independent benign boot before attaching only a reviewed isolated
+network or performing targeted Windows clone-only registry edits.
+
+Do not overwrite the existing earlier encrypted
+`/var/lib/libvirt/images/cape-clones-staging/win11_1.qcow2`;
+it is distinct from the exported plaintext template.
+Do not reuse the original swtpm private identity or attach the clone
+to libvirt's campus-connected default NAT network.
