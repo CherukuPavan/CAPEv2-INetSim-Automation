@@ -111,18 +111,25 @@ Actual operator report:
 1. Open the **specific win11_1** console in virt-manager. Verify Windows
    completed its boot and a user session can be opened. Do not start
    original `win11`, re-run clone staging, attach NICs or start a network.
-2. Run the new **read-only, no-network** guest observation file
-   `scripts/command2_win11_1_guest_observation.ps1` **INSIDE**
-   `win11_1` PowerShell. Because this VM has zero NICs, copy its code
-   from the host browser / supported VM clipboard; do not try to fetch
-   files using the guest Internet or add host folders/device passthrough.
-   The probe writes one private desktop TXT and prints its contents.
-3. Return the TXT or captured visible text to the engineering chat.
-   Check actual Windows hostname, Python interpreter, localhost agent
-   `http://127.0.0.1:8000/status`, local 8000 listener, adapters/IPs,
-   BitLocker and TPM observations. A missing agent must be repaired
-   on this clone without compromising the original. Guest observation
-   is not authorization for network activation.
+2. In the Windows PowerShell console, manually run a minimal set
+   of benign local inspection commands (`hostname`, `python --version`,
+   `py --version`, `Invoke-WebRequest -UseBasicParsing
+   http://127.0.0.1:8000/status`, `Get-NetAdapter`). Screenshot the
+   observed desktop and shell outcomes from the host console. Do NOT
+   assume host/guest clipboard works: verified zero-NIC XML also forbids
+   guest channels, and SPICE clipboard may require a guest agent channel.
+   Never add a NIC, guest shared folder, USB passthrough or extra
+   virtio channel just to move this report.
+3. For future **approved** secure transfer only, the new read-only
+   Windows observation script `scripts/command2_win11_1_guest_observation.ps1`
+   can run inside `win11_1` and writes one guest-Desktop TXT.
+   Merely storing code in GitHub does not make it accessible to a no-NIC
+   guest; script is NOT yet guest-tested. If safe transfer is unavailable,
+   screenshots suffice for the immediate guest checks. Return the
+   screenshots/TXT for review. Check hostname, Python, local agent,
+   adapters/IPs, BitLocker and TPM in stages. A missing agent must
+   be repaired on this clone without compromising the original.
+   Observation is not authorization for network activation.
 4. Only after independent guest evidence, plan targeted clone-only
    hostname/IP personalization, safely contained NIC attachment,
    boot guard persistence and negative IPv4/IPv6 egress acceptance.
