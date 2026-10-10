@@ -145,8 +145,9 @@ def perform():
     need(DISK != NVRAM and DISK.exists() and NVRAM.exists(),
          "Clone files unavailable")
     data = {"result": "COMMAND2A_SNAPSHOT_FEASIBILITY_READ_ONLY",
-            "original_master_preserved": True,
-            "trial_unchanged_zero_nics": True,
+            "original_master_identity_state_verified": True,
+            "original_master_disk_fingerprints_checked": False,
+            "trial_identity_state_zero_nics_verified": True,
             "analysis_network_inactive": True,
             "guest_nics": 0,
             "clone_domain_views": clone,
