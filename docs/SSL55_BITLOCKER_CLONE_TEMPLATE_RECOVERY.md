@@ -389,3 +389,46 @@ snapshot revert, delete the maintenance overlay or forcibly halt the
 VM. The local root-private preservation backup remains intact.
 Windows desktop appearance indicates TPM unlock may have succeeded
 but does not yet establish the C: volume's actual BitLocker state.
+
+## BitLocker fully decrypted on the maintenance overlay — 2026-10-10
+
+The user provided a screenshot of Windows `manage-bde -status C:` inside
+the still-running **no-NIC**, original-TPM maintenance guest:
+
+- `Conversion Status: Fully Decrypted`.
+- `Percentage Encrypted: 0.0%`.
+- `BitLocker Version: None`.
+- `Encryption Method: None`.
+- `Protection Status: Protection Off`.
+- `Lock Status: Unlocked`.
+- `Key Protectors: None Found`.
+
+**This is the guest-side completion evidence only.** The Windows machine
+must be cleanly shut down before the Linux host reads or exports the
+working image. Use a full Windows shutdown, `shutdown /s /t 0`, to
+avoid Fast Startup/hybrid-hibernated NTFS. If it is already shut off,
+do not start it again just to execute that command.
+Microsoft documents full Shutdown.exe semantics:
+https://learn.microsoft.com/en-us/troubleshoot/windows-client/setup-upgrade-and-drivers/fast-startup-causes-system-hibernation-shutdown-fail
+
+The original four-layer encrypted master must never be overwritten,
+committed, snapshot-reverted or used as the decrypted template.
+`win11_1.qcow2` remains a distinct earlier encrypted copy.
+
+The new `scripts/export_decrypted_maintenance_template.py` runs after
+the guest is completely shut off. Its `--mode plan` performs a
+read-only, fail-closed check of the existing snapshot and maintenance
+XML, five-layer backing chain, crypto/NTFS boot-sector signature,
+secure output directory and available space. Its separate, explicitly
+authorized `--mode export` converts only the fully shut-off decrypted
+maintenance overlay into the independent,
+root-private `win11_decrypted_template.qcow2`. A second offline
+crypto probe verifies the new flattened image has plaintext NTFS
+before publishing it; source and master QCOW2 layers are fingerprinted
+for unexpected concurrent modification. The template **does not**
+contain a usable independently paired original TPM and is not yet a
+personalized or verified CAPE analysis VM.
+
+**As of this screenshot the VM shutdown, cold cleartext probe, export,
+and final master definition restoration have not yet been confirmed**.
+Do not mark Command 1 or Command 2 complete.
