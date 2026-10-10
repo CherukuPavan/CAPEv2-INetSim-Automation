@@ -21,6 +21,8 @@ import xml.etree.ElementTree as ET
 import dryrun_cape_lab_guard_nft as draft
 
 NAME=draft.TABLE
+# Must equal successful SSL-55 operator nft --check report (Oct 10).
+APPROVED_POLICY_SHA256="58b84446ad74ac7ea8b14aa57d94c19945baa3db7330e54c7fb2312a9577ea14"
 LOCK=Path("/run/lock/cape-cold-export.lock")
 
 class GuardInstallBlocked(RuntimeError):pass
@@ -118,6 +120,8 @@ def preflight():
         raise GuardInstallBlocked(str(e)) from e
     script=draft.policy_text()
     draft.validate_policy(script)
+    need(hashlib.sha256(script.encode("utf-8")).hexdigest()==APPROVED_POLICY_SHA256,
+         "Proposed nft draft has drifted from the SSL-55 successful dry-run")
     need(not has_table(),"CAPE guard nftables table already exists; do not overwrite")
     return script
 
@@ -157,7 +161,7 @@ def install():
                 "scope":"only bridge "+draft.BRIDGE,
                 "priority":-50,
                 "table_verified":True,
-                "host_other_firewall_chains_modified":False,
+                "host_other_firewall_chains_modified_by_script":False,
                 "lab_network_active":False,
                 "trial_guest_nic_count":0,
                 "guard_persistent_across_reboot":False,
