@@ -15,8 +15,18 @@ class TPMTests(unittest.TestCase):
         self.assertIn("*-win11_3-swtpm.sock rw,",rule)
         self.assertNotIn("win11_4",rule)
 
+    def test_exact_trial_clone_socket_rule(self):
+        target,rule=m.expected("win11_trial_1",UUID)
+        self.assertEqual(target.name,"98-cape-swtpm-"+UUID)
+        self.assertEqual(
+            rule,
+            "  /run/libvirt/qemu/swtpm/*-win11_trial_1-swtpm.sock rw,\\n"
+        )
+        self.assertNotIn("*-win11-swtpm.sock",rule)
+
     def test_rejects_master_or_glob(self):
-        for vm in ["win11", "win11_0","win11_*","win11_01","cuckoo1"]:
+        for vm in ["win11", "win11_0","win11_*","win11_01","cuckoo1",
+                   "win11_trial_0","win11_trial_01","win11_trial_*"]:
             with self.subTest(vm=vm):
                 with self.assertRaises(m.PolicyError):
                     m.expected(vm,UUID)
