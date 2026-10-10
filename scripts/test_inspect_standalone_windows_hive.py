@@ -35,7 +35,15 @@ class FakeHive:
     def node_get_child(self,node,name):return self.edges.get((node,name))
     def node_children(self,node):return self.child_nodes.get(node,[])
     def node_name(self,node):return self.names[node]
-    def node_get_value(self,node,name):return self.handles.get((node,name))
+    def node_get_value(self,node,name):
+        # Mirror Ubuntu Hivex: missing values may raise RuntimeError("Success")
+        # instead of returning zero, so production must not call this method.
+        raise RuntimeError("Success")
+    def node_values(self,node):
+        return [handle for (n,_),handle in self.handles.items() if n==node]
+    def value_key(self,handle):
+        return next(name for (n,name),value in self.handles.items()
+                    if value==handle)
     def value_value(self,handle):return self.reverse[handle]
 
 def multisz(values):
@@ -60,6 +68,20 @@ class Tests(unittest.TestCase):
     def test_dhcp_interface_refused(self):
         with self.assertRaisesRegex(hive.HiveReadError,"not statically"):
             hive.inspect(FakeHive(dhcp=1),expected_ip=IP)
+
+    def test_optional_registry_value_absent_without_runtime_error(self):
+        fake=FakeHive()
+        fake.values.pop((8,"IPAddress"))
+        fake.handles.pop((8,"IPAddress"))
+        result=hive.inspect(fake,expected_ip=None)
+        self.assertEqual(result["matched_static_interfaces"],[])
+
+    def test_required_registry_value_missing_is_explained(self):
+        fake=FakeHive()
+        fake.values.pop((2,"Current"))
+        fake.handles.pop((2,"Current"))
+        with self.assertRaisesRegex(hive.HiveReadError,"absent: Current"):
+            hive.inspect(fake,expected_ip=None)
 
     def test_missing_expected_ip_refused(self):
         with self.assertRaisesRegex(hive.HiveReadError,"found 0"):
