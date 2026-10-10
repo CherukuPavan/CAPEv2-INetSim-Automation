@@ -131,17 +131,21 @@ virt-manager console. Screenshots establish:
   TPM readiness fields.
 - `manage-bde -status C:` showed Fully Decrypted, 0.0% encrypted,
   Encryption Method None, Protection Off, Unlocked, no protectors.
-- Current guest **Windows hostname remains unverified**. Guest static IP,
-  network containment, snapshot/revert and independent CAPE agent version
-  remain unverified.
+- Operator separately ran `hostname` inside **win11_1** and confirmed
+  the exact output `Win` (operator statement, not a screenshot). This is
+  the **verified reported current guest hostname**; target remains `WIN11-1`
+  and HAS NOT BEEN APPLIED. Guest static IP, network containment,
+  snapshot/revert and independent CAPE agent version remain unverified.
 
-**Next minimal guest command**: run `hostname` in the already
-running win11_1 PowerShell and report the exact current hostname.
-Do not run it on Ubuntu or on the original master. There is **no
-need to repeat the agent localhost check**, since the complete JSON
-`status: init` has been decoded from the operator screenshots.
-No malware execution or guest/host networking changes are authorized.
-Guest personalization can then be planned (NOT applied yet).
+**Current next gate:** design safe Windows-native hostname change for
+only the independently verified `win11_1` clone. Current guest name is
+`Win`; target `WIN11-1`. Do not apply the existing offline hive IP editor:
+it hardcodes an unverified source IP and unknown adapter GUID. A hostname
+rename via the guest OS requires explicit operator authorization and a
+controlled Windows restart before it takes effect. The no-NIC libvirt
+identity and protected original master must be rechecked after any restart.
+**There is no need to repeat the agent localhost test**: JSON `status: init`
+was already decoded from screenshots. No network or malware is authorized.
 
 The read-only optional PowerShell observation script now decodes
 byte-array HTTP content as UTF-8; this code is not yet guest-executed
