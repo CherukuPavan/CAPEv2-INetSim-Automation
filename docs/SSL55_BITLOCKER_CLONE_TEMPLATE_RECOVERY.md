@@ -541,3 +541,32 @@ automatic hostname/static-IP provisioning.
 Upstream:
 https://www.qemu.org/docs/master/tools/qemu-nbd.html
 https://manpages.debian.org/trixie/ntfs-3g/mount.ntfs-3g.8.en.html
+
+## Standalone template Windows registry inspection safely blocked — 2026-10-10 17:06
+
+The operator uploaded `CAPE_Windows_Template_Registry_20261010_170600_obPzzD1y.txt`.
+The 64 GiB plaintext standalone QCOW2, no-backing property, and
+read-only NBD/NTFS mount of Windows partition 3 all **passed**.
+However, the inline Python Hivex inspection failed on
+`node_get_value` with `RuntimeError: Success`, followed by an
+attempted `.close()` that is unavailable in Ubuntu's generated
+`hivex.Hivex` Python binding. The NBD was disconnected and the
+command exited 1; no registry edits or template modifications occurred.
+
+This was a script bug, not evidence of a corrupt Windows hive.
+The new `scripts/inspect_standalone_windows_hive.py` uses the
+`node_values` and `value_key` API to identify present optional
+registry values without triggering missing-value exceptions,
+handles DHCP and incomplete interface records in inventory mode,
+and no longer calls `.close()`. Regression tests now simulate the
+observed missing-value RuntimeError and prove graceful inventory
+handling. `scripts/inspect_decrypted_template_network.py` uses this
+corrected implementation.
+
+Next host action: repeat the **read-only** trusted-template NBD +
+hivex registry inventory only, verify the required Windows SYSTEM
+ControlSet, static-IP interface GUID(s), subnet mask and DHCP states,
+then detach NBD. No guest boot, no writeable filesystem mount,
+no snapshot reversion or network changes. Do not mark clone
+personalization or Command 2 complete until a disposable clone is
+independently customized and boot-verified.
