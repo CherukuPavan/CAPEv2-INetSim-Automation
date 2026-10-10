@@ -169,3 +169,29 @@ Next: independently check live libvirt identity, disk chain, NVRAM
 and AppArmor scoping; guarded TPM socket profile for this exact new VM;
 then one benign first boot with zero NICs. Do not start trial/master,
 activate the network, or use malware samples.
+
+## First independent clone benign boot gate READY — Oct 10
+
+Code in `scripts/command2_boot_first_cloned_windows.py` and wrapper
+`scripts/command2_first_clone_benign_boot_acceptance.sh` passed
+[synthetic CI 38093326064](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38093326064).
+
+This test is pinned to the reported `win11_1` UUID
+`732b2256-ee99-41fa-881d-fbf5c476d960`; verifies independent
+`win11_1.command2.qcow2` and `win11_1.command2_VARS.fd`,
+existing master and trial status/identities, current snapshot,
+app-level clone AppArmor swtpm rule, sufficient memory, read-only
+QCOW2 check, and zero NIC/host passthrough in inactive XML.
+
+Operator `plan` is no-write. Only after approval `boot` may install
+a narrow name-specific AppArmor swtpm socket include, start the named
+clone `--paused`, check the live zero-NIC QEMU definition, and
+`virsh resume` it. The script is limited to the named clone
+and can suspend only it if post-start checks fail.
+
+**Not yet host verified:** `win11_1` Windows boot, agent status,
+guest static IPv4, AppArmor startup, independent TPM state, or new
+clone Windows desktop. The first benign boot should be validated
+by opening the **win11_1** console and inspecting the guest desktop
+and localhost CAPE Agent status. No NIC/network, sample analysis,
+firewall service reload or host network modification is authorized.
