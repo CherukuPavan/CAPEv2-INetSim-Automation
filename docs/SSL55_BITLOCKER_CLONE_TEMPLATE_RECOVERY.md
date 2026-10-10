@@ -472,3 +472,35 @@ Windows previously showed Fully Decrypted/0.0% in the guest, but
 offline plaintext NTFS verification is still required and has not
 yet succeeded on the shut-off maintenance image. Do not
 restart the guest or restore the original VM definition.
+
+## Corrected offline decrypted NTFS verification PASSED — 2026-10-10 16:51 UTC
+
+Operator uploaded `CAPE_Decrypted_NTFS_Verification_20261010_165138_aN8MkRL5.txt` (20 lines):
+- Windows maintenance guest `win11` was **shut off**.
+- The cold five-layer maintenance image chain verified.
+- Corrected QEMU nonzero-sector reads passed.
+- Protective MBR, primary GPT header and partition-array CRC passed.
+- **Windows partition 3 was positively identified as plaintext NTFS**.
+- `RESULT: READ_ONLY_PLAINTEXT_VOLUME_VERIFIED`.
+- No VM boot, export, original-master modification or TPM change occurred.
+
+This proves actual Linux-side plaintext readability following guest-side
+`manage-bde -off`; it clears the Windows volume-encryption blocker for
+making a standalone template. The original source QCOW2 chain remains
+encrypted in its cold baseline; the decrypted Windows state is in the
+independent COW maintenance overlay.
+
+Next operation: **guarded cold standalone template export** to
+`/var/lib/libvirt/images/cape-clones-staging/win11_decrypted_template.qcow2`
+using `scripts/export_decrypted_maintenance_template.py --mode export`,
+or an equivalent fully reviewed local no-credential command if repository
+checkout is not present. The export must preserve the four original
+master QCOW2 files, original private swtpm/NVRAM backups, libvirt XML
+and snapshots, must not overwrite an existing destination, and must
+verify an unbacked QCOW2 + plaintext NTFS boot sector after conversion.
+
+Success remains short of final four-command portability: the first
+independent disposable Windows boot with fresh TPM/NVRAM, system identity,
+static IPv4, CAPE agent, isolated network, and clean snapshot still
+requires implementation and acceptance on SSL-55, then on a second
+supported fresh Ubuntu machine.
