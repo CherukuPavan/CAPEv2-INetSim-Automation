@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -24,11 +25,12 @@ class PolicyError(RuntimeError):
 
 
 def expected(name: str, identifier: str) -> tuple[Path, str]:
-    if not guard.SAFE_VM.fullmatch(name) or not name.startswith("win11_"):
-        raise PolicyError("Guard accepts only an explicit win11_N clone name")
-    suffix = name.split("win11_",1)[1]
-    if not suffix.isdigit() or int(suffix) < 1 or str(int(suffix)) != suffix:
-        raise PolicyError("Clone name suffix must be a positive canonical integer")
+    # Canonical production clones and isolated disposable trial clones.
+    # Never match the protected master win11, globs or arbitrary guest names.
+    if not guard.SAFE_VM.fullmatch(name) or not re.fullmatch(
+        r"win11_(?:[1-9][0-9]*|trial_[1-9][0-9]*)", name
+    ):
+        raise PolicyError("Only canonical win11_N or win11_trial_N clone names")
     try:
         realuuid=str(uuid.UUID(identifier))
     except (ValueError, AttributeError, TypeError) as exc:
