@@ -97,6 +97,8 @@ def safely_patch(hive,old_ip,new_ip,hostname):
                 "network_subnet":str(NETWORK),
                 "guest_nic_hardware_mapping_verified":False,
                 "guest_boot_verified":False}
+    except HivePatchBlocked:
+        raise
     except (ValueError,hiveins.HiveReadError) as exc:
         raise HivePatchBlocked(str(exc)) from exc
     except Exception as exc:
