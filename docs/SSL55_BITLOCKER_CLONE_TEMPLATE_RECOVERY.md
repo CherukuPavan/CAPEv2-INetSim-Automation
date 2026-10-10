@@ -600,3 +600,35 @@ Do not overwrite the existing earlier encrypted
 it is distinct from the exported plaintext template.
 Do not reuse the original swtpm private identity or attach the clone
 to libvirt's campus-connected default NAT network.
+
+## First disposable clone stage prepared in development — 2026-10-10
+
+A guarded `scripts/stage_first_no_nic_windows_clone.py` was created
+and its synthetic XML/fail-closed tests passed in CI
+(https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38071117993).
+
+The first trial VM is named `win11_trial_1` to avoid overwriting the
+previous unrelated encrypted `win11_1.qcow2`.
+It is intentionally **not one of the production win11_N analysis VMs**.
+
+Stage script:
+- Confirms original master shut off, original cold snapshot metadata,
+  protected private preservation backup and independent plaintext template.
+- Clones `win11_decrypted_template.qcow2` into
+  `win11_trial_1.qcow2` independently (no backing files).
+- Initializes a separate **writable copy** of UEFI variables at
+  `/var/lib/libvirt/qemu/nvram/win11_trial_1_VARS.fd`, not the original
+  NVRAM file; VM UUID and Windows GenID are regenerated.
+- Does NOT duplicate original swtpm private state. A new libvirt
+  emulator TPM state should be initialized for the new UUID on first boot.
+- Removes NIC, USB redirection and guest channels; local-only SPICE
+  display. Does not connect to NAT/INetSim or start any guest.
+- Creates the libvirt domain in **shut-off** state only after disk
+  independent integrity/plaintext checks and preserved source stamps.
+- No Windows hostname or static IPv4 personalization has yet happened.
+  These are separate steps after independent benign boot and network
+  identity validation.
+
+Stage can be rerun only if no trial VM/disk/NVRAM destination already
+exists; never overwrite. No VM boot until AppArmor swtpm and disk access
+checks are complete, and live zero-NIC configuration is validated paused.
