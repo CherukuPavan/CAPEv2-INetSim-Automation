@@ -164,6 +164,9 @@ def preflight(count):
     check(virsh("domstate",verified.NAME)=="running",
           "Proven no-NIC trial is no longer running")
     trial=ET.fromstring(virsh("dumpxml",verified.NAME))
+    check(trial.findtext("name")==verified.NAME and
+          trial.findtext("uuid")=="e75f6fef-347d-462f-9738-4de3df6bfa74",
+          "Proven trial identity changed")
     check(not trial.findall("./devices/interface"),
           "Proven trial acquired a guest NIC")
     return entries,saved,source_stamp,vars_stamp,resources
@@ -181,8 +184,10 @@ def verify_definition(entry,identifier):
     root=ET.fromstring(virsh("dumpxml","--inactive",entry["name"]))
     disk=root.find("./devices/disk[@device='disk']/source")
     backend=root.find("./devices/tpm/backend")
+    expected_genid=str(uuid.uuid5(uuid.UUID(identifier),"new-windows-genid"))
     check(root.findtext("name")==entry["name"] and
           root.findtext("uuid")==identifier and
+          (root.findtext("genid") in (None,expected_genid)) and
           root.findtext("./os/nvram")==entry["nvram"] and
           disk is not None and disk.get("file")==entry["disk"] and
           backend is not None and backend.get("type")=="emulator" and
@@ -235,6 +240,11 @@ def provision(entry,saved,base_stamp,vars_stamp,existing_macs):
               not info.get("backing-filename") and
               not info.get("full-backing-filename"),
               "Copied disk is not standalone QCOW2")
+        stage="VERIFY_PLAINTEXT_OS"
+        try:
+            crypto.require_cleartext_candidate(temp_path)
+        except crypto.VolumeProbeError as error:
+            raise MultiStageError("Copied clone lacks readable plaintext Windows volume") from error
         check(stamp(SOURCE)==base_stamp and
               stamp(ORIGINAL_VARS)==vars_stamp,
               "Source template or original firmware changed mid-copy")
@@ -269,6 +279,7 @@ def provision(entry,saved,base_stamp,vars_stamp,existing_macs):
               "Source or original firmware changed after clone registration")
         return dict(entry,uuid=identifier,planned_mac=mac,
                     result="STAGED_SHUT_OFF_ZERO_NICS",
+                    planned_mac_not_attached=True,
                     independent_tpm="new libvirt swtpm state on first boot",
                     guest_personalized=False,ip_assigned=False,
                     network_attached=False,guest_started=False,
