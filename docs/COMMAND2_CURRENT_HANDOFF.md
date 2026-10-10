@@ -283,6 +283,60 @@ NICs or enable/restart global nftables.service.
   approved. No new VM, port or network may be enabled as a result
   of the preflight alone.
 
+## ACTUAL host-verified SSL-55 postrestart acceptance (2026-10-10 23:37)
+
+Operator uploaded **both**:
+- `CAPE_Command2A_PostRestartHost_20261010_233741_bINonScB.txt`
+- `CAPE_Command2A_AuditRunner_zITqBcvd.sh`, the executable auditor.
+The local Git blob hash of the uploaded runner matches the previously
+reviewed GitHub script SHA `e5bc083bb1e5eeed8103a65a374543648c14318c`.
+
+The actual TXT report ends:
+`RESULT: COMMAND2A_POSTRESTART_HOST_READONLY_PASS`.
+
+Checks verified EXACT expected UUIDs and states (`win11_1` running,
+original `win11` shut off, trial running), the live and inactive
+clone disk/NVRAM/TPM configuration, zero NICs and no host passthrough,
+trial has zero NICs, lab libvirt network inactive and non-autostart,
+and CAPE-specific nftables guard table present. **No clone snapshot
+exists in libvirt metadata yet.** Only ONE Windows disk is attached:
+`win11_1.command2.qcow2`, currently 31,538,872,320 bytes logical
+QCOW2 file size (~29.37 GiB); clone NVRAM 540,672 bytes. Host root
+filesystem: 937 GiB total, 794 GiB used, **97 GiB available (90%
+used)**; RAM: 62 GiB total, **46 GiB MemAvailable**. The guard's
+presence does not prove ruleset integrity, reboot persistence or
+runtime IPv4/IPv6 isolation. The report does NOT inspect actual TPM
+state storage nor establish rollback completeness.
+
+**Snapshot safety decision:** Do not immediately create an ordinary
+disk-only libvirt snapshot or run qemu-img on the live guest. A
+restorable Windows 11 analysis baseline must account for at least the
+QCOW2 disk, dedicated UEFI NVRAM, per-clone swtpm state, libvirt VM
+identity/configuration, consistency and storage reservation. Disk-only
+live snapshots can be crash-consistent; libvirt snapshot metadata
+alone is not evidence that TPM state is snapshotted. Relevant official
+references:
+- https://www.libvirt.org/kbase/snapshots.html
+- https://www.libvirt.org/manpages/virsh.html
+- https://www.qemu.org/docs/master/specs/tpm
+
+**New DEV-only snapshot feasibility stage:** Three files committed to
+development:
+- `scripts/command2_snapshot_feasibility_audit.py`: root
+  read-only inspection of EXACT clone and protected host state,
+  libvirt snapshot metadata, separate clone swtpm permanent state
+  FILE METADATA ONLY (no TPM content), firmware/disk metadata,
+  versions and conservative 64+30 GiB storage requirement.
+- `scripts/test_command2_snapshot_feasibility_audit.py`:
+  synthetic offline unit tests, including no-NIC and no-write gates.
+- `scripts/command2_snapshot_feasibility_acceptance.sh`:
+  one-report operator launcher.
+
+These files are **not yet host-verified**; no snapshot, restoration,
+Windows IP, second clone or networking is authorized by the audit.
+With 97 GiB free and a 94 GiB conservative copy+reserve model, capacity
+is only marginal and will need fresh revalidation before allocation.
+
 ## Previous guest-verification procedure (historical; do not repeat completed steps)
 
 1. Open the **specific win11_1** console in virt-manager. Verify Windows
