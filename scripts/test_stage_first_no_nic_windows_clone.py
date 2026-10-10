@@ -62,8 +62,8 @@ class Tests(unittest.TestCase):
             s.render(xml,identifier=U)
 
     def test_guest_ip_not_personalized_and_no_guest_started(self):
-        self.assertIn("zero-NIC",s.__doc__)
-        self.assertIn("no guest IP address/hostname customization yet",
+        self.assertIn("zero nics",s.__doc__.lower())
+        self.assertIn("no guest ip address/hostname customization yet",
                       s.__doc__.lower())
 
 if __name__=="__main__":
