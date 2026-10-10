@@ -18,10 +18,22 @@ class Tests(unittest.TestCase):
         self.assertEqual([x["future_ipv4"] for x in items],
                          ["192.168.240."+str(i) for i in range(101,106)])
         for item in items:
-            self.assertTrue(item["disk"].endswith(item["name"]+".qcow2"))
-            self.assertTrue(item["nvram"].endswith(item["name"]+"_VARS.fd"))
+            self.assertTrue(item["disk"].endswith(item["name"]+".command2.qcow2"))
+            self.assertTrue(item["nvram"].endswith(item["name"]+".command2_VARS.fd"))
+            self.assertNotEqual(item["disk"],str(m.BASE/(item["name"]+".qcow2")))
+            self.assertNotEqual(item["nvram"],str(m.NVBASE/(item["name"]+"_VARS.fd")))
         self.assertEqual(len(set(x["disk"] for x in items)),5)
         self.assertEqual(len(set(x["nvram"] for x in items)),5)
+
+    def test_legacy_recovery_disk_is_never_the_command2_destination(self):
+        entry=m.planned(1)[0]
+        self.assertEqual(entry["name"],"win11_1")
+        self.assertEqual(Path(entry["disk"]).name,"win11_1.command2.qcow2")
+        self.assertEqual(Path(entry["nvram"]).name,"win11_1.command2_VARS.fd")
+        self.assertNotEqual(Path(entry["disk"]).name,"win11_1.qcow2")
+        self.assertNotEqual(Path(entry["nvram"]).name,"win11_1_VARS.fd")
+        # Different storage names, same requested libvirt domain win11_1;
+        # stage uses O_EXCL, destination checks, and never deletes old disks.
 
     def test_clone_count_bounded(self):
         for bad in (0,-1,17):
