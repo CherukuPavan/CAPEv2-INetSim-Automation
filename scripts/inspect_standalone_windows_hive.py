@@ -39,31 +39,37 @@ def require_child(hive: object, parent: int, name: str) -> int:
     return found
 
 
-def require_value(hive: object, node: int, key: str, expected_type: int) -> bytes:
+def optional_value(hive: object, node: int, key: str, expected_type: int) -> bytes | None:
+    """Read optional value using enumeration; missing lookup can raise on Hivex.
+
+    Some Debian/Ubuntu python3-hivex bindings throw RuntimeError("Success")
+    when node_get_value() is called for an absent registry value.
+    Enumerating node_values() + value_key() avoids this ambiguous path.
+    """
     try:
-        handle = hive.node_get_value(node, key)
-        if not handle:
-            raise HiveReadError(f"Missing Windows SYSTEM value {key}")
-        typ, raw = hive.value_value(handle)
+        found = []
+        for handle in hive.node_values(node):
+            name = hive.value_key(handle)
+            if isinstance(name, str) and name.casefold() == key.casefold():
+                found.append(handle)
+        if len(found) > 1:
+            raise HiveReadError(f"Duplicate Windows value {key}")
+        if not found:
+            return None
+        typ, raw = hive.value_value(found[0])
     except HiveReadError:
         raise
     except Exception as exc:
-        raise HiveReadError(f"Cannot read Windows SYSTEM value {key}") from exc
+        raise HiveReadError(f"Cannot inspect Windows value {key}") from exc
     if typ != expected_type or not isinstance(raw, bytes):
-        raise HiveReadError(f"Wrong Registry type for {key}")
+        raise HiveReadError(f"Unexpected Registry type for {key}")
     return raw
 
 
-def optional_value(hive: object, node: int, key: str, expected_type: int) -> bytes | None:
-    try:
-        handle = hive.node_get_value(node, key)
-    except Exception as exc:
-        raise HiveReadError(f"Cannot inspect Windows value {key}") from exc
-    if not handle:
-        return None
-    typ, raw = hive.value_value(handle)
-    if typ != expected_type or not isinstance(raw, bytes):
-        raise HiveReadError(f"Unexpected Registry type for {key}")
+def require_value(hive: object, node: int, key: str, expected_type: int) -> bytes:
+    raw = optional_value(hive, node, key, expected_type)
+    if raw is None:
+        raise HiveReadError(f"Required Windows SYSTEM value absent: {key}")
     return raw
 
 
@@ -161,10 +167,10 @@ def inspect_file(path: Path, expected_ip: str | None = None) -> dict:
             raise HiveReadError("Input is not a Windows registry hive (regf)")
         import hivex  # Ubuntu /usr/bin/python3; optional in GitHub CI
         h = hivex.Hivex(str(path), write=False)
-        try:
-            result = inspect(h, expected_ip=expected_ip)
-        finally:
-            h.close()
+        # Ubuntu's generated hivex.Hivex Python binding has no .close()
+        # method; it owns its handle and releases it when garbage collected.
+        result = inspect(h, expected_ip=expected_ip)
+        del h
         result["hive_bytes"] = info.st_size
         return result
     except (OSError, ImportError) as exc:
