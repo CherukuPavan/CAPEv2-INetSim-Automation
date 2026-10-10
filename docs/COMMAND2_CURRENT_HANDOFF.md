@@ -137,17 +137,36 @@ virt-manager console. Screenshots establish:
   and HAS NOT BEEN APPLIED. Guest static IP, network containment,
   snapshot/revert and independent CAPE agent version remain unverified.
 
-**Current next gate:** design safe Windows-native hostname change for
-only the independently verified `win11_1` clone. Current guest name is
-`Win`; target `WIN11-1`. Do not apply the existing offline hive IP editor:
-it hardcodes an unverified source IP and unknown adapter GUID. A hostname
-rename via the guest OS requires explicit operator authorization and a
-controlled Windows restart before it takes effect. First collect the
-read-only SMBIOS UUID inside the running clone using
-`(Get-CimInstance Win32_ComputerSystemProduct).UUID`; compare it to
-libvirt UUID `732b2256-ee99-41fa-881d-fbf5c476d960`. Some firmware
-can expose a differently formatted ID: mismatches require review, not
-forced renaming. The no-NIC libvirt
+## NEW operator screenshot: hostname AND independent guest UUID confirmed
+
+A subsequent Administrator PowerShell screenshot inside the `win11_1`
+virt-manager console shows both:
+- `hostname` => **Win**
+- `(Get-CimInstance Win32_ComputerSystemProduct).UUID` =>
+  **732B2256-EE99-41FA-881D-FBF5C476D960** (case-insensitive match
+  to this clone's actual libvirt UUID
+  `732b2256-ee99-41fa-881d-fbf5c476d960`).
+
+This passes the guest identity read-only gate. **No hostname rename,
+Windows restart, snapshot, guest IP or NIC attachment has yet been
+observed.** The existing offline hive IP editor has an unverified
+source-IP assumption and must NOT be applied.
+
+New reusable script `scripts/command2_guest_hostname_only.ps1` has
+a read-only `Plan` default and a separately confirmed `Rename` mode.
+It requires the exact guest SMBIOS UUID, current `Win`, target
+`WIN11-1`, zero visible NICs, workgroup rather than domain membership,
+Administrator token and a typed authorization. The rename mode uses
+the Windows-native `Rename-Computer` without auto-restart, and does
+not touch host/network/IP/TPM/CAPE configuration. This script was
+committed to the **development** branch, but is **NOT YET verified
+inside Windows**. No safe host-to-guest code transfer mechanism has
+been proven; operator may test an equivalent minimal guarded PowerShell
+sequence manually through the local virt-manager display.
+
+The next accepted action is **operator-authorized clone-only hostname
+rename**, followed by a deliberately separate Windows restart and
+guest+host verification. Do not rename the master or trial clone. The no-NIC libvirt
 identity and protected original master must be rechecked after any restart.
 **There is no need to repeat the agent localhost test**: JSON `status: init`
 was already decoded from screenshots. No network or malware is authorized.
