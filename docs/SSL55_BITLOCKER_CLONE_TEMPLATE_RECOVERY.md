@@ -1031,3 +1031,42 @@ The SSL-55 operator has NOT yet executed the stage command.
 Official libvirt references:
 https://libvirt.org/formatnetwork.html
 https://libvirt.org/manpages/virsh.html
+
+## Inactive, isolated CAPE analysis network DEFINED — 2026-10-10 21:57 UTC
+
+Operator uploaded `CAPE_Inactive_Network_Stage_20261010_215705_zuBWjeLk.txt`.
+
+**Confirmed success:** `RESULT: INACTIVE_ISOLATED_NETWORK_DEFINED`.
+The persistent libvirt network `cape-analysis-isolated` is configured
+with bridge name `cape-lab0` and IPv4 `192.168.240.0/24`,
+host-side `192.168.240.1`. The register-only guard passed local
+network/bridge conflict checks. Crucially, this network remains
+**INACTIVE**, **not AUTOSTARTED**, with **no bridge created**, **no NAT**,
+**no guest NIC attached**, and **no host firewall changes**.
+The original `win11` master remains shut off, the running
+`win11_trial_1` remains at zero NICs.
+
+This is ONLY network definition, **not** guest egress isolation approval;
+the report states `MALWARE_EGRESS_ISOLATION_VERIFIED: NO`.
+Remote organizational subnets and all runtime escape paths are not
+tested. No malware may execute.
+
+**Next operator gate:** validate candidate interface-scoped nftables
+syntax against SSL-55's installed nftables (using
+`nft --check --file`, which does not apply changes), with the lab
+network kept inactive and no guest NICs. A draft
+`scripts/dryrun_cape_lab_guard_nft.py` in development generates an
+`inet` table `cape_analysis_guard` targeting `cape-lab0` at
+priority -50: DROP all routed packets entering or leaving the bridge,
+DROP unsolicited lab-to-host traffic, permit only tracked guest
+replies to `192.168.240.1`, and permit host-to-guest IPv4 TCP/8000
+for benign CAPE agent polling. DNS/HTTP/other INetSim inbound service
+exceptions will be designed later, only after INetSim is installed
+and bound to the isolated host IP. No rules are installed by dry-run.
+
+A dry-run syntax pass remains far short of actual containment:
+separate tested firewall installation, boot/reload persistence,
+guest interface binding only to the approved network, bridge/L2
+controls, negative IPv4/IPv6/campus/Docker egress probes and
+positive isolated CAPE-agent communication must pass before running
+samples. Never flush host firewall or disrupt existing Docker/SSH.
