@@ -115,3 +115,31 @@ be applied to one disposable clone for initial field verification.
   independent L2/L3 isolation and parallel CAPE acceptance still pending.
 - Private GitHub repository access from the SSL-55 shell is NOT known;
   operator deployment must fail safely if the host cannot authenticate.
+
+## October 10 — legacy win11_1 filename collision caught safely
+
+Operator executed the first clone acceptance wrapper. Authenticated GitHub
+checkout succeeded at reviewed SHA
+`46de6aaeb65f34429f1dc427d9e37f5b7574b7ea`. The plan correctly
+stopped **BEFORE** staging, reporting
+`Target disk/NVRAM already exists: win11_1.qcow2`,
+`created=[]`, `BLOCKED_OR_PARTIAL_REVIEW_REQUIRED`.
+That older file predates the Command 2A clone test. Its content is NOT
+reverified by this report and may be an earlier protected recovery copy.
+**DO NOT rename, overwrite, delete, truncate, convert or start this image.**
+
+The safe fix is **separate Command 2-specific artifact filenames**:
+`win11_1.command2.qcow2` and
+`win11_1.command2_VARS.fd`, and the analogous names for `win11_N`.
+Libvirt domain naming stays `win11_1`, `win11_2`, etc.; only the
+private clone artifacts use separate filenames. Both target paths
+are checked for absence and are created exclusively. The verified
+zero-NIC XML renderer now permits matching legacy names or matching
+`.command2` names, rejecting mixed pairs or different directories.
+Offline CI includes distinct-destination and renderer tests.
+
+The operator must obtain the new `development` revision before the
+acceptance test; the old clone code is intentionally not patched
+in place on SSL-55. Do not use a previously downloaded checkout
+whose commit SHA is outdated. If the separate target names are also
+occupied, STOP and review instead of overwriting or deleting.
