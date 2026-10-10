@@ -53,7 +53,15 @@ Add-Observation 'PYTHON (SYSTEM PATH)' {
 Add-Observation 'LOCAL CAPE AGENT HTTP /status (NO INTERNET)' {
     $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/status' -UseBasicParsing -TimeoutSec 6 -ErrorAction Stop
     'HTTP_STATUS=' + $response.StatusCode
-    $body = [string]$response.Content
+    # Windows PowerShell may return System.Byte[] for this API.
+    # Decode UTF-8 bytes instead of printing one decimal byte per line.
+    if ($response.Content -is [byte[]]) {
+        $body = [System.Text.Encoding]::UTF8.GetString($response.Content)
+    } elseif ($response.Content -is [string]) {
+        $body = $response.Content
+    } else {
+        $body = [string]$response.Content
+    }
     'BODY=' + $body.Substring(0, [Math]::Min(1500, $body.Length))
 }
 Add-Observation 'TCP PORT 8000 LISTENER' {
