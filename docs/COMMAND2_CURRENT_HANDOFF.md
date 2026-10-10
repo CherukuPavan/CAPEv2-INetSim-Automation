@@ -202,13 +202,35 @@ containment is implied by the plan. Planned `192.168.240.1` should
 NOT be configured as a forwarding gateway until dedicated guard and
 egress tests are complete.
 
-**Next safe acceptance gate**: controlled *guest-only* Windows restart
+**Historical next gate (NOW OPERATOR-REPORTED PASSED):** controlled *guest-only* Windows restart
 of the already running `win11_1`, with zero NICs preserved, followed
 by `hostname` readback => `WIN11-1`. Recheck CAPE localhost status
 `init`, Python, TPM and no adapters. Do not reboot Ubuntu host,
 connect any VM NIC, touch protected original master, or run malware.
 
-## Next operator action: verify hostname after an operator-approved guest-only restart
+## Operator-confirmed Windows hostname persisted after guest restart (2026-10-10)
+
+After executing the Windows-native `Rename-Computer -NewName WIN11-1`
+inside the previously identity-verified `win11_1`, the operator restarted
+Windows and reports that `hostname` now returns **WIN11-1**. This is a
+**guest-operator-reported post-reboot acceptance**, not independently
+supported by a new screenshot/TXT upload. It completes the manual
+hostname-rename proof, not the reusable scripted rename acceptance.
+
+**Unverified after this restart:** CAPE localhost agent auto-start and
+`/status`, Python version, TPM ready state, Windows network-adapter
+inventory, host libvirt zero-NIC definition and source-master integrity.
+Do not equate successful Windows restart with these checks passing.
+No static `192.168.240.101` IP is assigned or guest NIC authorized;
+`cape-analysis-isolated` must stay inactive.
+
+**Next minimal guest check:** In **win11_1 PowerShell** run
+`curl.exe -sS --noproxy "*" --max-time 8 http://127.0.0.1:8000/status`
+and `Get-NetAdapter`. Observe the actual JSON result and absence of
+guest adapters after restart. If localhost CAPE status is absent, do
+not claim persistent auto-start; diagnose before any networking change.
+
+## Previous guest-verification procedure (historical; do not repeat completed steps)
 
 1. Open the **specific win11_1** console in virt-manager. Verify Windows
    completed its boot and a user session can be opened. Do not start
