@@ -665,3 +665,37 @@ successful first independent swtpm initialization. No test clone
 boot should be authorized until this preboot report is reviewed and
 any required AppArmor access is prepared narrowly, without
 disabling AppArmor.
+
+## Trial clone offline pre-boot audit PASSED — 2026-10-10 17:26
+
+Operator uploaded `CAPE_First_Clone_PreBoot_Audit_20261010_172646_bzFGAtcz.txt`.
+
+All read-only pre-boot gates passed: both original `win11` and disposable
+`win11_trial_1` shut off; original snapshot and backup intact; trial
+clone UUID `e75f6fef-347d-462f-9738-4de3df6bfa74`, independent QCOW2
+and distinct UEFI NVRAM file, TPM 2.0 emulator configured, zero NIC, zero
+USB redirection or host shares, host-loopback-only graphics, and AppArmor
+enabled/local include supported.
+
+Report explicitly indicated:
+`TRIAL_TPM_APPARMOR_RULE: NOT_YET_INSTALLED` and
+`TRIAL_TPM_STATE_EXISTS: False`. This is expected for a VM that has
+never been booted but means trial-specific QEMU-to-swtpm socket access
+must be prepared before the first Windows boot on SSL-55. Do NOT
+copy original `win11` swtpm secrets to the trial clone.
+
+The guarded helper `scripts/guard_vm_tpm_socket.py` now accepts
+canonical production `win11_N` and disposable `win11_trial_N`
+names, but not the original `win11` name, globs, arbitrary names,
+or zero/leading-zero suffixes. Only an exact trial-specific rule should
+be created under
+`/etc/apparmor.d/abstractions/libvirt-qemu.d/98-cape-swtpm-e75f6fef-347d-462f-9738-4de3df6bfa74`:
+`/run/libvirt/qemu/swtpm/*-win11_trial_1-swtpm.sock rw,`.
+Tests for the rule generator passed in
+https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38071922519 .
+
+Next host step: checked, idempotent narrow rule install and
+`apparmor_parser -Q` syntax verification with a journal/report;
+no guest starts, host-wide policy disablement, snapshot operations,
+TM/NVRAM copy or network changes. Pause before first boot for
+checking the actual rule installation report and ownership/DAC.
