@@ -114,10 +114,13 @@ virt-manager console. Screenshots establish:
   This is a guest-session acceptance for newly staged win11_1.
 - `python --version` and `py --version` both output Python 3.10.11.
 - Local request to `http://127.0.0.1:8000/status` returned a
-  series of decimal UTF-8 byte values starting `123 34 109 101 115...`,
-  representing JSON starting `{"mess...`. This **proves an HTTP response
-  was obtained**, but HTTP code and full JSON status have NOT yet been
-  captured in plaintext. Do not claim the specific agent status or version.
+  series of decimal UTF-8 byte values starting `123 34 109 101 115...`.
+  The complete screenshot sequence was **manually decoded and parsed**
+  into valid JSON:
+  `{"message": "Analysis status", "status": "init", "description": ""}`.
+  CAPE localhost agent **status init is GUEST-VERIFIED**. Its software
+  version and HTTP response status code are not independently verified
+  by this screenshot.
 - `Get-NetAdapter` showed no adapters in its default output, consistent
   with the boot-script verified libvirt zero-NIC definition. No active
   guest network is authorized.
@@ -132,20 +135,13 @@ virt-manager console. Screenshots establish:
   network containment, snapshot/revert and independent CAPE agent version
   remain unverified.
 
-**Next minimal, safe guest commands**, in the already running win11_1
-PowerShell (do not run on Ubuntu or on the original master):
-
-```powershell
-hostname
-curl.exe -sS -i --noproxy "*" --max-time 8 "http://127.0.0.1:8000/status"
-```
-
-Capture ONE screenshot showing hostname, HTTP status and actual JSON
-response. The `curl.exe` invocation does only a localhost GET and does
-not attach/enable a NIC or contact the Internet. Do not execute malware
-or modify the guest/host networking. Once captured, the result can
-be checked against the expected agent protocol, and guest
-personalization can be planned (NOT applied yet).
+**Next minimal guest command**: run `hostname` in the already
+running win11_1 PowerShell and report the exact current hostname.
+Do not run it on Ubuntu or on the original master. There is **no
+need to repeat the agent localhost check**, since the complete JSON
+`status: init` has been decoded from the operator screenshots.
+No malware execution or guest/host networking changes are authorized.
+Guest personalization can then be planned (NOT applied yet).
 
 The read-only optional PowerShell observation script now decodes
 byte-array HTTP content as UTF-8; this code is not yet guest-executed
