@@ -176,7 +176,39 @@ byte-array HTTP content as UTF-8; this code is not yet guest-executed
 and its SHA was revised in development. A no-NIC guest has no guaranteed
 copy/paste channel; screenshots are sufficient for this milestone.
 
-## Next operator action: inspect the already RUNNING win11_1 Windows session
+## NEW operator screenshot: guest-only hostname rename REQUESTED (2026-10-10 23:29)
+
+In Administrator PowerShell **inside win11_1**, operator executed:
+
+```powershell
+Rename-Computer -NewName WIN11-1
+```
+
+Windows reported: `WARNING: The changes will take effect after you
+restart the computer Win.` This is evidence that the Windows-native
+rename request **was accepted**, **NOT** evidence that the machine was
+already restarted or that `hostname` currently equals `WIN11-1`.
+The shorter manual guest command was used because the VM intentionally
+has zero NICs and no verified host/guest clipboard transfer. The
+guarded PowerShell script in GitHub remains **unexecuted on the guest**.
+
+Operator separately asked which planned IP to use. **The intended
+Command 2 subnet is `192.168.240.0/24`, with `win11_1` target
+`192.168.240.101`** (planned bridge `cape-lab0` on isolated
+`cape-analysis-isolated`). It is NOT `192.168.122.101`, which
+resembles the common libvirt default NAT subnet. No actual guest IP,
+NIC attachment, host-side gateway, active bridge or tested IPv4/IPv6
+containment is implied by the plan. Planned `192.168.240.1` should
+NOT be configured as a forwarding gateway until dedicated guard and
+egress tests are complete.
+
+**Next safe acceptance gate**: controlled *guest-only* Windows restart
+of the already running `win11_1`, with zero NICs preserved, followed
+by `hostname` readback => `WIN11-1`. Recheck CAPE localhost status
+`init`, Python, TPM and no adapters. Do not reboot Ubuntu host,
+connect any VM NIC, touch protected original master, or run malware.
+
+## Next operator action: verify hostname after an operator-approved guest-only restart
 
 1. Open the **specific win11_1** console in virt-manager. Verify Windows
    completed its boot and a user session can be opened. Do not start
