@@ -91,7 +91,12 @@ class Tests(unittest.TestCase):
         def fake_run(args, **kwargs):
             calls.append(args)
             offset=int(next(a[5:] for a in args if a.startswith("skip=")))
-            length=int(next(a[6:] for a in args if a.startswith("count=")))
+            end=int(next(a[6:] for a in args if a.startswith("count=")))
+            # QEMU qemu-img dd computes the end-of-input byte bound
+            # using count, then subtracts skip to form output length.
+            # Earlier count=1,skip=1 therefore wrote ZERO bytes.
+            length=end-offset
+            self.assertGreater(length,0)
             output=Path(next(a[3:] for a in args if a.startswith("of=")))
             output.write_bytes(contents[(offset,length)])
             class Result: pass
@@ -106,6 +111,9 @@ class Tests(unittest.TestCase):
             self.assertEqual(disk.read_bytes(),b"QFI\xfb")
         self.assertTrue(calls)
         self.assertTrue(all(call[1]=="dd" and "-U" not in call for call in calls))
+        self.assertTrue(any("skip=1" in a and "count=2" in a for a in calls))
+        self.assertTrue(any("skip=2048" in a and "count=2049" in a for a in calls))
+        self.assertTrue(any("skip=2" in a and "count=34" in a for a in calls))
 
     def test_incomplete_boot_sector_refused(self):
         with self.assertRaisesRegex(crypto.VolumeProbeError,"Truncated"):
