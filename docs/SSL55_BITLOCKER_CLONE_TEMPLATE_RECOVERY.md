@@ -730,3 +730,37 @@ https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/380722654
 Next operator action: guarded first start PAUSED, confirm live zero NIC
 and TPM state, upload TXT; only then authorize a separate benign
 `virsh resume win11_trial_1` after reviewing the output.
+
+## First trial clone START-PAUSED succeeded — 2026-10-10 17:36 UTC
+
+Operator uploaded `CAPE_Trial_First_Paused_Start_20261010_173641_UsinqVVV.txt`:
+- `RESULT: TRIAL_FIRST_START_PAUSED_SAFE`.
+- Trial VM `win11_trial_1`, UUID
+  `e75f6fef-347d-462f-9738-4de3df6bfa74`, **PAUSED**.
+- libvirt accepted QEMU start with independent clone disk,
+  NVRAM and TPM emulator AppArmor rule.
+- Live XML verified zero NIC, zero USB redirection and zero host shares.
+- Original `win11` VM stayed shut off; host memory reserve checked.
+- No guest CPU resume and **Windows has not yet booted**.
+- No static IPv4 or Windows hostname personalization.
+
+A guarded `scripts/resume_first_no_nic_windows_clone.py` was added
+to `development` with separate `--mode plan` (read-only) and
+`--mode resume`. Resume requires original snapshot/backup intact,
+VM exactly PAUSED, exact libvirt UUID and independent disk/UEFI,
+AppArmor enabled and trial-only swtpm rule present, live and
+persistent XML zero network/USB/host shares and loopback graphics.
+It performs `virsh resume win11_trial_1` **only**, verifies
+trial transitions to RUNNING, and rechecks live domain and original
+master. Post-resume unsafe state calls `virsh suspend` on only the
+trial guest, never destroys the original. Tests passed:
+https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38072573625
+
+**After controlled resume**, obtain visual evidence from the
+`win11_trial_1` virt-manager console that Windows 11 reaches the
+login/desktop with independent TPM and no BitLocker recovery screen.
+Do not manually attach NIC or restart the original. Windows
+may auto-enable device encryption on future boots; verify its
+volume conversion and protector status after guest login.
+No malware analysis yet; traffic containment and cloning network
+identities remain incomplete.
