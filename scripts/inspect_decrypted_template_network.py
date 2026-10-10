@@ -110,6 +110,8 @@ def inventory():
         require(Path(part).exists(),"Windows NTFS partition device unavailable")
         require(call("blockdev","--getro",part)=="1",
                 "Windows partition NBD is not read-only")
+        require(call("blkid","-p","-o","value","-s","TYPE",part)=="ntfs",
+                "Partition 3 is not NTFS; refuse filesystem mount")
         with tempfile.TemporaryDirectory(prefix="cape-win11-registry-") as temp:
             root=Path(temp)
             mountdir=root/"mnt"
