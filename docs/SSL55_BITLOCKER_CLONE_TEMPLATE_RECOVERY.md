@@ -699,3 +699,34 @@ Next host step: checked, idempotent narrow rule install and
 no guest starts, host-wide policy disablement, snapshot operations,
 TM/NVRAM copy or network changes. Pause before first boot for
 checking the actual rule installation report and ownership/DAC.
+
+## Trial TPM AppArmor rule installed — 2026-10-10 17:31 UTC
+
+Operator uploaded `CAPE_Trial_TPM_AppArmor_20261010_173117_dbhwjFTx.txt`.
+Result `TRIAL_TPM_APPARMOR_READY`:
+- Original and trial VMs shut off.
+- Trial UUID, independent QCOW2 and zero-NIC libvirt definition checked.
+- AppArmor enabled, local include supported.
+- Installed exact narrow rule at
+  `/etc/apparmor.d/abstractions/libvirt-qemu.d/98-cape-swtpm-e75f6fef-347d-462f-9738-4de3df6bfa74`
+  granting `rw` to this trial guest's `swtpm` socket only.
+- AppArmor syntax verified. No host-wide profile reload. Original
+  master state unchanged. No VM started.
+
+Guarded first-start implementation:
+`scripts/start_first_no_nic_windows_clone_paused.py`
+with strict `--mode plan` (read-only) and
+`--mode start-paused` (trial-only VM START PAUSED) modes.
+The latter requires preserved source/backup, same UUID, independent
+disk/NVRAM, adequate memory, exact trial TPM AppArmor rule and no
+NIC/USB redirection/host shares; it checks live paused QEMU XML and
+never calls `virsh resume`. Any unsafe live XML calls a stop of
+**only** disposable `win11_trial_1`. Original `win11` is never
+started. No malware or network samples until full negative egress
+containment checks and CAPE integration. GitHub CI offline fixtures
+passed at
+https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38072265411 .
+
+Next operator action: guarded first start PAUSED, confirm live zero NIC
+and TPM state, upload TXT; only then authorize a separate benign
+`virsh resume win11_trial_1` after reviewing the output.
