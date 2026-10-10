@@ -358,6 +358,46 @@ was performed**. Re-run after a fresh SHA-pinned file download and
 review actual unit-test and host audit results before continuing.
 This code edit is NOT a claim that the full test suite passed.
 
+## HOST-VERIFIED read-only swtpm/UEFI feasibility audit (2026-10-10 23:46)
+
+Actual user report:
+`CAPE_Command2A_SnapshotFeasibility_20261010_234638_eLxaAMp1.txt`.
+Result: `COMMAND2A_SNAPSHOT_FEASIBILITY_READ_ONLY`, no VM changes.
+This followed a separately fixed Python 3.12 `types.SimpleNamespace`
+offline-test import failure. The host report proves the audit executed,
+but does not itself include the unit-test console log.
+
+Exact findings:
+- `win11_1` (UUID `732b2256-ee99-41fa-881d-fbf5c476d960`)
+  present with **zero NIC** live and inactive XML, independent QCOW2,
+  OVMF VARS and emulated TPM 2.0.
+- Clone swtpm directory:
+  `/var/lib/libvirt/swtpm/732b2256-ee99-41fa-881d-fbf5c476d960/tpm2`.
+  `tpm2-00.permall` is 9,234 B, UID/GID 105, mode 0600;
+  `.lock` is zero length, UID/GID 105, mode 0640.
+  **Contents not read. No restore tested.**
+- Clone QCOW2 on-disk allocated blocks ~31,415,902,208 bytes
+  (~29.26 GiB), file size 31,538,872,320 bytes; root-owned mode 0600.
+  UEFI VARS 540,672 B, root-owned mode 0600.
+- QEMU/qemu-img 9.2.2; libvirt 11.1.0; swtpm 0.7.3.
+- No libvirt snapshot metadata exists. Analysis network inactive.
+- `free_gib_approx = 96.11`; conservative independent 64 GiB cold disk
+  copy + 30 GiB reserve = 94 GiB, leaving only **2.11 GiB headroom**.
+  This was a PASS on numerical feasibility ONLY and explicitly reported
+  `snapshot_or_copy_authorized: false`, `more_clones_authorized: false`.
+- Original master UUID/state verified, disk fingerprint not checked;
+  guest TPM recovery, copy/restore consistency and atomic memory/TPM
+  snapshot all UNVERIFIED.
+
+Engineering decision: **no live disk-only snapshot or direct copy of
+active swtpm state**. New development-only design:
+`docs/COMMAND2_COLD_CHECKPOINT_DESIGN.md` documents candidate complete
+cold clone-only restore points (QCOW2 + NVRAM + swtpm + libvirt XML),
+storage trade-offs, explicit operator approval, rollback/restore gates
+and future overlay design. It is NOT an executed backup or a completed
+implementation. Keep `win11_1` networkless; do not shut it down or
+allocate disk yet solely on this read-only evidence.
+
 ## Previous guest-verification procedure (historical; do not repeat completed steps)
 
 1. Open the **specific win11_1** console in virt-manager. Verify Windows
