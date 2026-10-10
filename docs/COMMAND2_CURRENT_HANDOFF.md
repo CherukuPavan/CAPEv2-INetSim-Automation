@@ -230,6 +230,37 @@ and `Get-NetAdapter`. Observe the actual JSON result and absence of
 guest adapters after restart. If localhost CAPE status is absent, do
 not claim persistent auto-start; diagnose before any networking change.
 
+## NEW screenshot-verified guest post-restart acceptance (2026-10-10 23:33)
+
+User screenshot `image(20261010-233344).png` shows **inside win11_1**:
+
+- `hostname` -> `WIN11-1` after Windows restart: **PASS**.
+- `python --version` -> `Python 3.10.11`: **PASS**.
+- `curl.exe http://127.0.0.1:8000/status` ->
+  `{"message": "Analysis status", "status": "init", "description": ""}`:
+  **guest-side localhost CAPE status PASS after restart**.
+- `Get-NetAdapter` -> no adapters listed: **guest observation PASS**;
+  pre-restart host libvirt XML had zero NICs. A *fresh host-side*
+  libvirt check is still needed before changing networking or snapshots.
+
+This advances real Command 2 clone guest acceptance: Windows restart,
+hostname change, Python and CAPE local endpoint all verified from screenshot,
+no in-guest network adapters observed. **Do not commit screenshots of
+Windows TPM OwnerAuth or any other secret.**
+
+Still **NOT verified**: automatic scripted Windows personalization on
+additional clones; NIC mapping; the planned `192.168.240.101` static IP;
+network activation and safety gates; dedicated nft persistence;
+runtime IPv4/IPv6 negative egress checks; cloned snapshot rollback including
+UEFI and swtpm state; second VM; CAPE integration; portability.
+
+**NEXT:** Collect one READ-ONLY SSL-55 host checkpoint for exact clone,
+original-master and trial state, inactive lab network, disk/NVRAM/TPM
+resources and available disk/memory before designing the independent clone
+snapshot and networking procedures. Do not start or stop any VM, run
+`qemu-img check` on a running guest disk, touch master snapshots, attach
+NICs or enable/restart global nftables.service.
+
 ## Previous guest-verification procedure (historical; do not repeat completed steps)
 
 1. Open the **specific win11_1** console in virt-manager. Verify Windows
@@ -263,9 +294,10 @@ changes are made by the observation script.** Its PowerShell behavior
 remains host-unverified until executed inside win11_1.
 
 ## Still unfinished before full Command 2
-1. Complete inside-guest Windows desktop, TPM, Python and CAPE agent
-   validation on already-running `win11_1`; plan clean restoration to a
-   verified clone-only baseline if needed.
+1. **DONE for one guest:** screenshot-verified `WIN11-1`, Python 3.10.11,
+   CAPE localhost `status: init` postrestart; TPM had passed *before*
+   restart. Recheck host clone isolation/state and design clone-only
+   disk/NVRAM/swtpm snapshot and restoration acceptance.
 2. Safe full Windows personalization (NIC GUID + hostname/static IP) on
    clone only, proven new NIC adapter binding; approved no-egress bridge.
 3. Boot-ordered dedicated guard service and persistence without flush,
