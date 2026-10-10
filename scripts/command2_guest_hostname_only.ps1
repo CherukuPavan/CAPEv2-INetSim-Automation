@@ -1,6 +1,6 @@
 # Command 2A - safely stage hostname-only personalization in a ZERO-NIC Windows clone.
 # Run INSIDE the Windows guest as Administrator, never on the Ubuntu host.
-# Read-only by default. No NIC, IP, firewall, registry, TPM, CAPE or reboot changes.
+# Read-only by default. Rename mode changes the Windows hostname only; it does not touch NICs, IPs, firewall, TPM, CAPE, or reboot.
 # Test invocation:
 #   .\command2_guest_hostname_only.ps1 -ExpectedUuid '732b2256-ee99-41fa-881d-fbf5c476d960' -OldName 'Win' -NewName 'WIN11-1'
 # Authorized guest-only rename:
@@ -20,7 +20,7 @@ if ($NewName -cnotmatch '^[A-Za-z0-9][A-Za-z0-9-]{0,14}$' -or
 }
 if ($OldName -ieq $NewName) { Block 'Old and new hostname must differ.' }
 try { $id = [guid]$ExpectedUuid } catch { Block 'Expected UUID is malformed.' }
-try { $guestId = [guid](Get-CimInstance Win32_ComputerSystemProduct).UUID }
+try { $guestId = [guid]((Get-CimInstance Win32_ComputerSystemProduct).UUID) }
 catch { Block 'Cannot read guest SMBIOS UUID.' }
 if ($guestId -ne $id) { Block 'Wrong Windows guest UUID; no changes made.' }
 $current = [Environment]::MachineName
@@ -34,7 +34,7 @@ if ($win.PartOfDomain) { Block 'Unexpected domain-joined Windows installation.' 
 $adapters = @(Get-NetAdapter -ErrorAction Stop)
 if ($adapters.Count -ne 0) { Block 'A guest network adapter is present; refusing hostname-only acceptance.' }
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$principal = New-Object Security.Principal.WindowsPrincipal($identity)
+$principal = [Security.Principal.WindowsPrincipal]::new($identity)
 $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) { Block 'Elevated Administrator PowerShell is required.' }
 Write-Output ('PREFLIGHT_PASS: UUID=' + $guestId.ToString())
