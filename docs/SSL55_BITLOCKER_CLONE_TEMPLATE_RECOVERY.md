@@ -632,3 +632,36 @@ Stage script:
 Stage can be rerun only if no trial VM/disk/NVRAM destination already
 exists; never overwrite. No VM boot until AppArmor swtpm and disk access
 checks are complete, and live zero-NIC configuration is validated paused.
+
+## First disposable clone staged on SSL-55 — 2026-10-10 17:20
+
+Operator uploaded `CAPE_First_Independent_Clone_Stage_20261010_172024_sywGAwN3.txt`:
+- `RESULT: DISPOSABLE_CLONE_STAGED_NOT_BOOTED`.
+- VM: `win11_trial_1`, UUID
+  `e75f6fef-347d-462f-9738-4de3df6bfa74`.
+- Independent disk:
+  `/var/lib/libvirt/images/cape-clones-staging/win11_trial_1.qcow2`.
+- Independent UEFI variables:
+  `/var/lib/libvirt/qemu/nvram/win11_trial_1_VARS.fd`.
+- Zero virtual network interfaces and no guest boot; original master
+  and original swtpm state untouched.
+- Windows static IP and hostname **NOT** personalized yet.
+
+A new `scripts/audit_first_no_nic_windows_clone.py` implements a
+read-only pre-boot gate for the exact first-trial UUID and files:
+verify original VM shut off/current cold snapshot unchanged, clone
+shut off, independent root-private standalone QCOW2, unique writable
+UEFI variables file/inode, TPM 2.0 emulator and separate UUID,
+zero NIC/hostdev/redirection/channel, graphics loopback-only,
+AppArmor enabled and its local include syntax supported.
+The audit reports whether the narrow trial-specific swtpm socket
+exception is already present. It does not install an exception,
+start a VM, create TPM state or change files.
+
+The original `win11` master on SSL-55 required a narrow swtpm
+socket AppArmor rule. That rule for `win11` must NOT be assumed to
+cover `win11_trial_1`. Even an offline XML pass cannot prove a
+successful first independent swtpm initialization. No test clone
+boot should be authorized until this preboot report is reviewed and
+any required AppArmor access is prepared narrowly, without
+disabling AppArmor.
