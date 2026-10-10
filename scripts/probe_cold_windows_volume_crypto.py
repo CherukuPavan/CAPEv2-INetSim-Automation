@@ -104,7 +104,11 @@ def inspect_image(image: Path) -> dict:
                 out.unlink()
             args = [
                 "qemu-img", "dd", "-f", "qcow2", "-O", "raw",
-                f"bs={SECTOR}", f"count={sectors}", f"skip={lba}",
+                # QEMU 9.x qemu-img dd computes output size from count
+                # BEFORE applying skip. An absolute end-block count is
+                # required for nonzero skip (count=lba+sectors).
+                # count=sectors, skip=lba can yield zero output bytes.
+                f"bs={SECTOR}", f"count={lba+sectors}", f"skip={lba}",
                 "if="+str(image), "of="+str(out)
             ]
             try:
