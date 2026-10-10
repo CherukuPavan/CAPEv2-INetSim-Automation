@@ -62,8 +62,10 @@ def names(count):
 def planned(count):
     return [{"name":name,"windows_hostname":f"WIN11-{i}",
              "future_ipv4":f"192.168.240.{100+i}",
-             "disk":str(BASE/(name+".qcow2")),
-             "nvram":str(NVBASE/(name+"_VARS.fd"))}
+             # Reserved names distinguish Command 2 artifacts from
+             # existing SSL-55 recovery disks, including win11_1.qcow2.
+             "disk":str(BASE/(name+".command2.qcow2")),
+             "nvram":str(NVBASE/(name+".command2_VARS.fd"))}
             for i,name in enumerate(names(count),1)]
 
 def stamp(path):
