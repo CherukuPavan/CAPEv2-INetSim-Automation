@@ -261,6 +261,28 @@ snapshot and networking procedures. Do not start or stop any VM, run
 `qemu-img check` on a running guest disk, touch master snapshots, attach
 NICs or enable/restart global nftables.service.
 
+## NEW development-only next acceptance: read-only SSL-55 host checkpoint
+
+- `scripts/command2_postrestart_host_checkpoint.sh`: guarded,
+  **read-only**, one-report host acceptance after guest-side successful
+  Windows restart. The only write is a 0600 TXT report under the
+  invoking operator's HOME. Checks exact original/trial/new guest
+  states and UUIDs; reads active/inactive `win11_1` XML for exact
+  separate disk, UEFI variables, TPM emulator and zero NIC/host
+  passthrough; lists libvirt clone snapshots; checks the lab network
+  is inactive/non-autostart and dedicated nftables guard table exists;
+  collects file metadata and host free resources.
+- `scripts/test_command2_postrestart_host_checkpoint.py`: offline
+  Bash syntax, no-mutation and safety-marker regressions.
+- The guard's existence **is not proof** of reboot persistence,
+  IPv4/IPv6 containment or safe network attachment. The checkpoint
+  does not snapshot, start/stop guests, read live QCOW2 contents,
+  change AppArmor, modify firewall, or create networks.
+- This next acceptance is **NOT HOST EXECUTED YET**. The actual report
+  must be examined before a clone-only snapshot/restore plan can be
+  approved. No new VM, port or network may be enabled as a result
+  of the preflight alone.
+
 ## Previous guest-verification procedure (historical; do not repeat completed steps)
 
 1. Open the **specific win11_1** console in virt-manager. Verify Windows
