@@ -263,7 +263,8 @@ def stage():
                not parsed.findall("./devices/redirdev") and
                not parsed.findall("./devices/channel") and
                len(parsed.findall("./devices/tpm"))==1 and
-               parsed.find("./devices/disk/source").get("file")==str(DISK) and
+               parsed.find("./devices/disk[@device='disk']/source") is not None and
+               parsed.find("./devices/disk[@device='disk']/source").get("file")==str(DISK) and
                parsed.findtext("./os/nvram")==str(NVRAM),
                "Libvirt clone definition differs from expected, DO NOT BOOT")
         return {"result":"DISPOSABLE_CLONE_STAGED_NOT_BOOTED",
