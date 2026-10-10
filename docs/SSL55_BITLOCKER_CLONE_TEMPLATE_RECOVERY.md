@@ -941,3 +941,44 @@ IPv4 forwarding toggle, no global firewall flush, no libvirt
 default NAT deletion. An XML without `<forward>` remains only a
 candidate until host FORWARD/OUTPUT/bridge and guest negative
 egress probes succeed. Preserve management access to SSL-55.
+
+## SSL-55 host route and firewall topology audit passed — 2026-10-10 21:47 UTC
+
+Operator uploaded `CAPE_Host_Network_Safety_Audit_20261010_214720_c0oDWV1d.txt`
+(652 lines). Results:
+- `RESULT: HOST_NETWORK_SAFETY_AUDIT_COMPLETED`;
+  original `win11` shut off and live `win11_trial_1` has ZERO NICs.
+  No host network, guest network or firewall modifications were made.
+- Two simultaneous IPv4 default-route interface entries,
+  `enp0s31f6` (Ethernet) and `wlp0s20f3` (Wi-Fi).
+- Local IPv4 subnets: `10.23.104.0/22` Ethernet,
+  `10.23.64.0/19` Wi-Fi, `192.168.122.0/24` libvirt
+  default NAT, `172.17.0.0/16` Docker,
+  `172.18.0.0/16` and `172.19.0.0/16` Docker bridges.
+- IPv4 and IPv6 iptables `FORWARD` default policy **ACCEPT**.
+  The nftables-compat `ip filter FORWARD` and
+  `ip6 filter FORWARD` base chain policies are **accept**;
+  individual Docker/libvirt chains include conditional
+  ACCEPT/DROP/REJECT, but priority/order/match conditions were
+  *not in the report*. Do not conclude that traffic is all allowed,
+  or that traffic is safely contained, from the policy alone.
+- UFW status: **inactive**.
+- IPv4 policy rule count 3; IPv6 count 2; 4 IPv6 route entries.
+- Preliminary private /24 candidates with no *local* route
+  overlap: `10.202.253.0/24`, `172.29.250.0/24`,
+  `192.168.240.0/24`. All remain `approved_for_analysis=false`;
+  remote organizational-route collisions and host container
+  forwarding were not validated.
+- `egress_isolation_verified=false` remains a **hard block** on
+  attaching any Windows trial or production VM to host forwarding
+  or NAT networks. Do not change global `ip_forward`, flush
+  firewalls, stop Docker, disable Wi-Fi/Ethernet, or modify virbr0.
+
+Next gate: targeted **read-only** inspection of ordered iptables
+FILTER/FORWARD, LIBVIRT and Docker rule targets and nftables base-chain
+priority. The summary report should omit arbitrary match expressions
+and credentials while making interface references, chain/hook priority
+and jump verdict order visible. This is still NOT runtime isolation.
+The dedicated no-forward lab bridge/subnet must be installed only
+after approved networking design and evaluated with guest negative
+IPv4/IPv6 reachability tests and allowed CAPE-agent communication.
