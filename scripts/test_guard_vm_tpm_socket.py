@@ -20,7 +20,7 @@ class TPMTests(unittest.TestCase):
         self.assertEqual(target.name,"98-cape-swtpm-"+UUID)
         self.assertEqual(
             rule,
-            "  /run/libvirt/qemu/swtpm/*-win11_trial_1-swtpm.sock rw,\\n"
+            "  /run/libvirt/qemu/swtpm/*-win11_trial_1-swtpm.sock rw,\n"
         )
         self.assertNotIn("*-win11-swtpm.sock",rule)
 
