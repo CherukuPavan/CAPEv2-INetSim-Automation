@@ -226,8 +226,8 @@ def boot():
         # Pause ONLY the exact newly registered VM. Do not stop/delete
         # the master, running trial, domain definition, TPM or disk.
         try:
-            if virsh("domuuid",NAME)==IDENT and
-               virsh("domstate",NAME)=="running":
+            if (virsh("domuuid",NAME)==IDENT and
+                virsh("domstate",NAME)=="running"):
                 virsh("suspend",NAME)
                 print("SAFETY_PAUSE: newly started win11_1 only",flush=True)
         except Exception:
