@@ -106,6 +106,52 @@ Actual operator report:
   been performed. **Do not repeat the boot wrapper** on the now-running
   guest; it expects an initially shut-off domain.
 
+## NEW guest-side screenshot acceptance (2026-10-10 23:12-23:15)
+
+Operator supplied four screenshots of the **win11_1 on QEMU/KVM**
+virt-manager console. Screenshots establish:
+- Windows 11 desktop opened and Administrator Windows PowerShell running.
+  This is a guest-session acceptance for newly staged win11_1.
+- `python --version` and `py --version` both output Python 3.10.11.
+- Local request to `http://127.0.0.1:8000/status` returned a
+  series of decimal UTF-8 byte values starting `123 34 109 101 115...`,
+  representing JSON starting `{"mess...`. This **proves an HTTP response
+  was obtained**, but HTTP code and full JSON status have NOT yet been
+  captured in plaintext. Do not claim the specific agent status or version.
+- `Get-NetAdapter` showed no adapters in its default output, consistent
+  with the boot-script verified libvirt zero-NIC definition. No active
+  guest network is authorized.
+- `Get-Tpm` reported TpmPresent, TpmReady, TpmEnabled and TpmActivated
+  all True. The operator screenshot also displays a sensitive `OwnerAuth`
+  value; **never commit the screenshot or copy that value to documentation**.
+  The new guest observation script deliberately outputs only nonsecret
+  TPM readiness fields.
+- `manage-bde -status C:` showed Fully Decrypted, 0.0% encrypted,
+  Encryption Method None, Protection Off, Unlocked, no protectors.
+- Current guest **Windows hostname remains unverified**. Guest static IP,
+  network containment, snapshot/revert and independent CAPE agent version
+  remain unverified.
+
+**Next minimal, safe guest commands**, in the already running win11_1
+PowerShell (do not run on Ubuntu or on the original master):
+
+```powershell
+hostname
+curl.exe -sS -i --noproxy "*" --max-time 8 "http://127.0.0.1:8000/status"
+```
+
+Capture ONE screenshot showing hostname, HTTP status and actual JSON
+response. The `curl.exe` invocation does only a localhost GET and does
+not attach/enable a NIC or contact the Internet. Do not execute malware
+or modify the guest/host networking. Once captured, the result can
+be checked against the expected agent protocol, and guest
+personalization can be planned (NOT applied yet).
+
+The read-only optional PowerShell observation script now decodes
+byte-array HTTP content as UTF-8; this code is not yet guest-executed
+and its SHA was revised in development. A no-NIC guest has no guaranteed
+copy/paste channel; screenshots are sufficient for this milestone.
+
 ## Next operator action: inspect the already RUNNING win11_1 Windows session
 
 1. Open the **specific win11_1** console in virt-manager. Verify Windows
