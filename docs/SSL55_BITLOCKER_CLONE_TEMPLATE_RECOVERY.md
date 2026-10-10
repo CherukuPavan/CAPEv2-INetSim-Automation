@@ -873,3 +873,38 @@ and
 `curl.exe --noproxy "*" --max-time 5 http://127.0.0.1:8000/status`.
 Inspect the response status and agent identity. Do not change guest
 firewalls, attach NAT, or run samples.
+
+## CAPE agent HTTP verified from new-TPM zero-NIC clone — 2026-10-10 18:00
+
+Operator provided screenshot from the elevated command prompt inside
+`win11_trial_1 on QEMU/KVM`. After the earlier typo using HTTPS,
+both plaintext HTTP queries to the Windows loopback address succeeded:
+
+- `curl.exe --noproxy "*" --max-time 5 http://127.0.0.1:8000/status`
+  returned `{"message":"Analysis status","status":"init","description":""}`.
+- `curl.exe --noproxy "*" --max-time 5 http://127.0.0.1:8000/`
+  returned a `CAPE Agent!` identity, `"version":"0.23"`,
+  `"features":[...]`, and `"is_user_admin":true`.
+
+The prior `netstat` result associated `python.exe` PID 5648 with
+`0.0.0.0:8000 LISTENING`. This confirms that the copied,
+running Python process **really is a responsive CAPEv2 agent**, not
+merely a generic Python console. Status `init` is normal idle
+readiness; no analysis job was submitted.
+
+**ACCEPTED:** An independently defined Windows 11 test VM cloned
+from the decrypted standalone template with a new libvirt UUID,
+separate UEFI NVRAM and a fresh TPM state **boots to the Windows
+desktop**, has **BitLocker C: fully decrypted 0.0%**, installed
+Python **3.10.11**, and a working elevated CAPE agent HTTP API
+on localhost port 8000, all while the guest has **zero NICs**.
+The original `win11` master remained shut off and preserved.
+
+**Not accepted yet:** host-to-agent access, a new NIC retaining the
+old Windows Registry interface GUID, unique static IPv4/hostname
+personalization, guest egress containment / INetSim, CAPE machine
+registry, memory/disk snapshot rollback, and multiple parallel
+clones. In particular the SSL-55 `default` libvirt network has
+NAT-to-campus connectivity and **must never be used as the analysis
+VM network**. Next safe work is a **read-only libvirt and CAPE host
+network inventory** (with no guest shutdown or NIC hotplug).
