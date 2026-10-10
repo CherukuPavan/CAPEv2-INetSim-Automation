@@ -29,6 +29,27 @@ class Tests(unittest.TestCase):
         self.assertEqual(root.find("./devices/graphics").get("listen"),
                          "127.0.0.1")
 
+    def test_command2_unique_disk_and_nvram_rendered_without_legacy_aliases(self):
+        name="win11_1"
+        disk=s.DISK.parent/(name+".command2.qcow2")
+        vars=s.NVRAM.parent/(name+".command2_VARS.fd")
+        root=ET.fromstring(s.render(fixture(),identifier=U,
+                name=name,disk=disk,nvram=vars))
+        self.assertEqual(root.findtext("name"),name)
+        self.assertEqual(root.find("./devices/disk[@device='disk']/source").get("file"),
+                         str(disk))
+        self.assertEqual(root.findtext("./os/nvram"),str(vars))
+        self.assertFalse(root.findall("./devices/interface"))
+        self.assertNotEqual(root.findtext("./os/nvram"),
+                            str(s.NVRAM.parent/(name+"_VARS.fd")))
+
+    def test_mismatched_disk_nvram_generation_refused(self):
+        name="win11_1"
+        with self.assertRaisesRegex(s.StageError,"protected staging"):
+            s.render(fixture(),identifier=U,name=name,
+                disk=s.DISK.parent/(name+".command2.qcow2"),
+                nvram=s.NVRAM.parent/(name+"_VARS.fd"))
+
     def test_reject_unsafe_guest_share(self):
         xml=fixture().replace("</devices>",
                               "<filesystem type='mount'/></devices>")
