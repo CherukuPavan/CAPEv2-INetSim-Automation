@@ -115,16 +115,21 @@ def inspect(hive: object, *, expected_ip: str | None) -> dict:
             values = as_multisz(ip_raw, "IPAddress")
             if expected_ip is not None and expected_ip not in values:
                 continue
-            dhcp = as_dword(
-                require_value(hive, node, "EnableDHCP", REG_DWORD), "EnableDHCP"
-            )
-            subnet = as_multisz(
-                require_value(hive, node, "SubnetMask", REG_MULTI_SZ), "SubnetMask"
-            )
+            dhcp_raw = optional_value(hive, node, "EnableDHCP", REG_DWORD)
+            if dhcp_raw is None or as_dword(dhcp_raw, "EnableDHCP") != 0:
+                if expected_ip is None:
+                    # Inventory mode: other DHCP-enabled or partial adapter
+                    # entries are not candidate static clone interfaces.
+                    continue
+                raise HiveReadError("Selected interface is not statically configured")
+            subnet_raw = optional_value(hive, node, "SubnetMask", REG_MULTI_SZ)
+            if subnet_raw is None:
+                if expected_ip is None:
+                    continue
+                raise HiveReadError("Selected NIC has no static subnet mask")
+            subnet = as_multisz(subnet_raw, "SubnetMask")
             if len(values) != 1 or len(subnet) != 1:
                 raise HiveReadError("Selected NIC has multiple static IPs/subnets")
-            if dhcp != 0:
-                raise HiveReadError("Selected interface is not statically configured")
             try:
                 ipaddress.IPv4Address(values[0])
                 ipaddress.IPv4Network("0.0.0.0/" + subnet[0])
