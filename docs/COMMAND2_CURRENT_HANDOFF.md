@@ -1,4 +1,4 @@
-# Command 2 — current handoff after first independent clone staging (2026-10-10)
+# Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
 This is a state handoff, not a complete deployment approval. User builds
@@ -29,7 +29,8 @@ terminal commands and uploads one report instead of repeated console output.
   `/var/lib/libvirt/images/cape-clones-staging/win11_1.command2.qcow2`,
   UEFI variables
   `/var/lib/libvirt/qemu/nvram/win11_1.command2_VARS.fd`.
-  Separate swtpm expected on first boot (NOT YET BOOT TESTED).
+  Separate swtpm expected at staging; **its first start is now host-verified**
+  in the 23:02 operator acceptance report below.
   Planned IP `192.168.240.101`, hostname `WIN11-1`, planned MAC
   `02:75:dc:63:ca:e1` are NOT yet installed or attached.
   No snapshot has been created.
@@ -64,8 +65,8 @@ terminal commands and uploads one report instead of repeated console output.
 - `scripts/command2_first_clone_benign_boot_acceptance.sh` is the
   gated **one-report** wrapper; it runs read-only `--mode plan` first,
   prompts `BOOT-NONET-WIN11-1`, then `--mode boot`, emits a private
-  `CAPE_Command2A_BenignBoot_*.txt` for review. THIS SCRIPT HAS NOT
-  BEEN EXECUTED ON SSL-55 YET.
+  `CAPE_Command2A_BenignBoot_*.txt` for review. **The wrapper has now
+  passed a real SSL-55 boot acceptance (see below).**
 - Synthetic offline Python and Bash checks passed in
   [CI run 38093326064](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38093326064).
   Test pass is NOT proof that real boot works.
@@ -83,23 +84,57 @@ terminal commands and uploads one report instead of repeated console output.
   verified. Prototype hardcodes unverified `OLD_IP`: do NOT assume it
   matches the actual template. Never use it directly against the master.
 
-## Immediate next step, only after fresh checkout+SHA validation
+## NEW HOST-VERIFIED milestone: first automated Command 2A clone benign boot (2026-10-10 23:02)
 
-The operator should run the first-clone benign boot **acceptance wrapper**
-on SSL-55, after checking the latest `development` commit and passing CI.
-Use an **interactive terminal-preserving** `bash -c '...'` launcher,
-NOT `bash <<'BASH'`: heredocs consume stdin so interactive confirmation
-fails. Exact relevant files are the two `command2_*boot*` scripts above.
-One report; if preflight BLOCKED or partial, STOP and review before retry.
+Actual operator report:
+`CAPE_Command2A_BenignBoot_20261010_230239_cgKsSLVY.txt`
 
-The new VM will be networkless. Open ONLY `win11_1` in virt-manager
-after boot and inspect Windows desktop, Python version and local agent
-`http://127.0.0.1:8000/status` from INSIDE it. Do not presume it has
-agent installed because the trial did.
+- Preflight `COMMAND2A_FIRST_BOOT_PREFLIGHT_PASSED`.
+- Boot result `COMMAND2A_NEW_CLONE_BOOTED_ZERO_NICS`.
+- `win11_1` UUID `732b2256-ee99-41fa-881d-fbf5c476d960`
+  went from SHUT OFF to **RUNNING** after paused QEMU start, zero-NIC live
+  XML check and successful CPU resume.
+- New clone's exact per-domain AppArmor swtpm socket rule **INSTALLED**.
+  This confirms policy preparation and successful QEMU start, **not**
+  guest-side TPM readiness or Windows login.
+- Master remained unchanged, the running trial remained untouched,
+  analysis network remained INACTIVE, NIC count stayed ZERO.
+- `windows_boot_verified`, `windows_login_verified`,
+  `cape_agent_verified_in_new_guest`, hostname personalization and
+  static IPv4 assignment **all remain false** in the operator report.
+- No malware execution is authorized. No negative egress tests have
+  been performed. **Do not repeat the boot wrapper** on the now-running
+  guest; it expects an initially shut-off domain.
+
+## Next operator action: inspect the already RUNNING win11_1 Windows session
+
+1. Open the **specific win11_1** console in virt-manager. Verify Windows
+   completed its boot and a user session can be opened. Do not start
+   original `win11`, re-run clone staging, attach NICs or start a network.
+2. Run the new **read-only, no-network** guest observation file
+   `scripts/command2_win11_1_guest_observation.ps1` **INSIDE**
+   `win11_1` PowerShell. Because this VM has zero NICs, copy its code
+   from the host browser / supported VM clipboard; do not try to fetch
+   files using the guest Internet or add host folders/device passthrough.
+   The probe writes one private desktop TXT and prints its contents.
+3. Return the TXT or captured visible text to the engineering chat.
+   Check actual Windows hostname, Python interpreter, localhost agent
+   `http://127.0.0.1:8000/status`, local 8000 listener, adapters/IPs,
+   BitLocker and TPM observations. A missing agent must be repaired
+   on this clone without compromising the original. Guest observation
+   is not authorization for network activation.
+4. Only after independent guest evidence, plan targeted clone-only
+   hostname/IP personalization, safely contained NIC attachment,
+   boot guard persistence and negative IPv4/IPv6 egress acceptance.
+
+**No guest software, hostname, IP, snapshot, firewall or networking
+changes are made by the observation script.** Its PowerShell behavior
+remains host-unverified until executed inside win11_1.
 
 ## Still unfinished before full Command 2
-1. Verify benign `win11_1` boot, isolated TPM/AppArmor, Windows/agent;
-   plan clean restoration to preboot baseline if needed.
+1. Complete inside-guest Windows desktop, TPM, Python and CAPE agent
+   validation on already-running `win11_1`; plan clean restoration to a
+   verified clone-only baseline if needed.
 2. Safe full Windows personalization (NIC GUID + hostname/static IP) on
    clone only, proven new NIC adapter binding; approved no-egress bridge.
 3. Boot-ordered dedicated guard service and persistence without flush,
