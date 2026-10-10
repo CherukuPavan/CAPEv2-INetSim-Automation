@@ -159,6 +159,9 @@ def perform(mode:str)->dict:
     fd=os.open(LOCK,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     temp=None
     try:
+        lockstat=os.fstat(fd)
+        ensure(lockstat.st_uid==0 and (lockstat.st_mode & 0o077)==0,
+               "Shared or untrusted export lock file")
         fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
         initial,summary=read_preflight()
         before=fingerprint(initial)
@@ -209,6 +212,9 @@ def perform(mode:str)->dict:
         os.close(fd)
 
 def main(argv=None)->int:
+    # qemu-img writes sensitive plaintext Windows data; never let the
+    # temporary conversion file become group/world readable mid-copy.
+    os.umask(0o077)
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode",choices=("plan","export"),default="plan")
     args=parser.parse_args(argv)
