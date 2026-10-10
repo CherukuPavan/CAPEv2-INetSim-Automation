@@ -1,0 +1,121 @@
+# Command 2 — current handoff after first independent clone staging (2026-10-10)
+
+**CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+This is a state handoff, not a complete deployment approval. User builds
+incrementally on shared Ubuntu host SSL-55; user pastes carefully guarded
+terminal commands and uploads one report instead of repeated console output.
+
+## Verified on SSL-55 (actual operator TXT reports)
+- Protected original Windows master `win11` (UUID
+  `289d89be-68ec-4c62-90e1-ea930849266f`) **SHUT OFF**;
+  BitLocker-derived protected QCOW2 chain, original UEFI variables and
+  original swtpm must remain unchanged. Original VM currently references
+  `/var/lib/libvirt/images/win11.cape-bitlocker-maintenance.qcow2`
+  in its inactive libvirt domain; master preservation backup:
+  `/var/backups/cape-win11-preservation/win11-state-92POdfNc`.
+- Independent flat decrypted Windows 11 source:
+  `/var/lib/libvirt/images/cape-clones-staging/win11_decrypted_template.qcow2`
+  (64 GiB virtual; no backing). Never clone from encrypted snapshot.
+- First manually proven `win11_trial_1` UUID
+  `e75f6fef-347d-462f-9738-4de3df6bfa74` currently RUNNING, ZERO NICs.
+  Windows desktop, Python 3.10.11, CAPE Agent v0.23 localhost TCP/8000
+  `/status` confirmed INSIDE **trial only**. This DOES NOT prove that
+  the standalone source template or new clone already contains Python/agent.
+- **NEW ACTUAL HOST SUCCESS**, operator report
+  `CAPE_Command2A_FirstClone_20261010_225052_N9tH7v9D.txt`:
+  `INDEPENDENT_ZERO_NIC_CLONES_STAGED`; independent clone `win11_1`
+  UUID `732b2256-ee99-41fa-881d-fbf5c476d960` created and registered
+  SHUT OFF, ZERO NICs; disk
+  `/var/lib/libvirt/images/cape-clones-staging/win11_1.command2.qcow2`,
+  UEFI variables
+  `/var/lib/libvirt/qemu/nvram/win11_1.command2_VARS.fd`.
+  Separate swtpm expected on first boot (NOT YET BOOT TESTED).
+  Planned IP `192.168.240.101`, hostname `WIN11-1`, planned MAC
+  `02:75:dc:63:ca:e1` are NOT yet installed or attached.
+  No snapshot has been created.
+- A pre-existing `win11_1.qcow2` made the earlier plan stop safely.
+  **Never delete, overwrite, rename or reuse** this prior unknown disk;
+  new Command 2 naming uses distinct `.command2.qcow2` /
+  `.command2_VARS.fd` destination files.
+- Lab libvirt network `cape-analysis-isolated` DEFINED, INACTIVE,
+  autostart OFF, bridge `cape-lab0`, IPv4 `192.168.240.0/24`,
+  no NAT, DHCP or libvirt DNS. It has NOT been brought up or given NICs.
+- Dedicated live guard `table inet cape_analysis_guard` installed
+  (hooks priority -50) matching verified
+  SHA-256 `58b84446ad74ac7ea8b14aa57d94c19945baa3db7330e54c7fb2312a9577ea14`.
+  **NOT reboot persistent** and **NOT runtime egress tested**. Default
+  nftables.service is DISABLED; existing /etc/nftables.conf contains
+  `flush ruleset`; NEVER enable/restart it blindly on this shared Docker,
+  UFW, libvirt/campus host.
+- Private GitHub login from SSL-55 is now confirmed:
+  `gh auth login`, `gh auth setup-git`, `gh repo view` returned
+  repository name. Do NOT request/reveal tokens or one-time browser codes.
+
+## Latest newly written and OFFLINE-CI-TESTED boot gate
+- `scripts/command2_boot_first_cloned_windows.py` checks EXACT
+  `win11_1` UUID/disk/NVRAM, original master and running zero-NIC trial,
+  inactive analysis network, AppArmor swtpm rule and RAM reserve.
+  With operator authorization it installs ONLY a narrow per-clone TPM
+  AppArmor policy, starts win11_1 with `virsh start --paused`,
+  checks live XML has ZERO NICs / forbidden host devices, and
+  `virsh resume` for benign Windows boot. A postresume safety failure
+  triggers a bounded attempt to suspend ONLY `win11_1` if exact UUID.
+  Script does NOT claim Windows desktop or CAPE agent actually checked.
+- `scripts/command2_first_clone_benign_boot_acceptance.sh` is the
+  gated **one-report** wrapper; it runs read-only `--mode plan` first,
+  prompts `BOOT-NONET-WIN11-1`, then `--mode boot`, emits a private
+  `CAPE_Command2A_BenignBoot_*.txt` for review. THIS SCRIPT HAS NOT
+  BEEN EXECUTED ON SSL-55 YET.
+- Synthetic offline Python and Bash checks passed in
+  [CI run 38093326064](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38093326064).
+  Test pass is NOT proof that real boot works.
+- `scripts/command2_stage_independent_clones.py` is the already
+  HOST-ACCEPTED staging implementation; count 1-16, independent
+  plaintext QCOW2, TPM/EFI identities, zero-NIC shut-off domains,
+  partial-failure preservation. Not complete Command 2.
+- `scripts/command2_clone_vms.py --apply` legacy encrypted-master
+  route is explicitly BLOCKED; do not reenable without redesign.
+- `scripts/guard_cape_lab_boot.py` is a tested non-destructive nft
+  reconciliation library ONLY; boot service is NOT installed/enabled.
+- `scripts/patch_clone_hivex_system_copy.py` is a mocked proof of
+  concept for editing only a separate extracted SYSTEM hive. No disk
+  writeback, production Windows personalization or NIC GUID mapping
+  verified. Prototype hardcodes unverified `OLD_IP`: do NOT assume it
+  matches the actual template. Never use it directly against the master.
+
+## Immediate next step, only after fresh checkout+SHA validation
+
+The operator should run the first-clone benign boot **acceptance wrapper**
+on SSL-55, after checking the latest `development` commit and passing CI.
+Use an **interactive terminal-preserving** `bash -c '...'` launcher,
+NOT `bash <<'BASH'`: heredocs consume stdin so interactive confirmation
+fails. Exact relevant files are the two `command2_*boot*` scripts above.
+One report; if preflight BLOCKED or partial, STOP and review before retry.
+
+The new VM will be networkless. Open ONLY `win11_1` in virt-manager
+after boot and inspect Windows desktop, Python version and local agent
+`http://127.0.0.1:8000/status` from INSIDE it. Do not presume it has
+agent installed because the trial did.
+
+## Still unfinished before full Command 2
+1. Verify benign `win11_1` boot, isolated TPM/AppArmor, Windows/agent;
+   plan clean restoration to preboot baseline if needed.
+2. Safe full Windows personalization (NIC GUID + hostname/static IP) on
+   clone only, proven new NIC adapter binding; approved no-egress bridge.
+3. Boot-ordered dedicated guard service and persistence without flush,
+   safe libvirt startup gates, genuine benign IPv4/IPv6 negative egress tests
+   against campus, Docker, NAT, host management; host-to-guest TCP/8000
+   positive test.
+4. Create and verify per-guest snapshots including revert/reboot,
+   parallel two-guest CAPE agent tests and registration.
+5. Build host-portable count-driven `Command 2` from fully proven SSL-55
+   stages, not hardcoded host paths, and test resource limits; initial
+   staging plan reported **125 GiB host free** versus 94 GiB conservative
+   required BEFORE the new copy, so check remaining space before
+   requesting more VMs.
+6. CAPE (Command 3) and INetSim (Command 4) remain future work.
+   No malware samples may run until isolation is independently proven.
+
+**Never modify original master chain/TPM/NVRAM, campus Ethernet
+`enp0s31f6`, Wi-Fi, Docker bridges, global forwarding/firewall,
+or broad AppArmor protections. All GitHub writes: development ONLY.**
