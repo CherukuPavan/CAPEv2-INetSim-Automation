@@ -337,6 +337,27 @@ Windows IP, second clone or networking is authorized by the audit.
 With 97 GiB free and a 94 GiB conservative copy+reserve model, capacity
 is only marginal and will need fresh revalidation before allocation.
 
+## Snapshot audit first attempt blocked by OFFLINE TEST import (2026-10-10)
+
+Operator ran the pinned development acceptance launcher. It confirmed
+`PASS: All development files verified`, but the Python 3.12 unit-test
+loader stopped before any tests ran:
+
+```
+ImportError: cannot import name 'SimpleNamespace' from 'unittest.mock'
+```
+
+This is a **test-only bug**: `SimpleNamespace` is in Python's `types`
+module, not `unittest.mock`. Corrected
+`scripts/test_command2_snapshot_feasibility_audit.py` to import
+`from types import SimpleNamespace` and
+`from unittest.mock import patch` on development.
+The `set -e` launcher stopped before invoking the snapshot feasibility
+host audit; **no new host acceptance report, snapshot or network change
+was performed**. Re-run after a fresh SHA-pinned file download and
+review actual unit-test and host audit results before continuing.
+This code edit is NOT a claim that the full test suite passed.
+
 ## Previous guest-verification procedure (historical; do not repeat completed steps)
 
 1. Open the **specific win11_1** console in virt-manager. Verify Windows
