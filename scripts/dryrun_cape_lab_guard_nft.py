@@ -53,16 +53,21 @@ def policy_text():
     return f'''table inet {TABLE} {{
     chain cape_forward {{
         type filter hook forward priority -50; policy accept;
+
         iifname "{BRIDGE}" drop
         oifname "{BRIDGE}" drop
     }}
+
     chain cape_input {{
         type filter hook input priority -50; policy accept;
+
         iifname "{BRIDGE}" ip daddr {ADDRESS} ct state established,related accept
         iifname "{BRIDGE}" drop
     }}
+
     chain cape_output {{
         type filter hook output priority -50; policy accept;
+
         oifname "{BRIDGE}" ip daddr {SUBNET} tcp dport 8000 accept
         oifname "{BRIDGE}" drop
     }}
