@@ -83,6 +83,16 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(hive.HiveReadError,"absent: Current"):
             hive.inspect(fake,expected_ip=None)
 
+    def test_inventory_skips_dhcp_interface(self):
+        result=hive.inspect(FakeHive(dhcp=1),expected_ip=None)
+        self.assertEqual(result["matched_static_interfaces"],[])
+
+    def test_inventory_skips_missing_dhcp_value(self):
+        fake=FakeHive()
+        fake.handles.pop((8,"EnableDHCP"))
+        result=hive.inspect(fake,expected_ip=None)
+        self.assertEqual(result["matched_static_interfaces"],[])
+
     def test_missing_expected_ip_refused(self):
         with self.assertRaisesRegex(hive.HiveReadError,"found 0"):
             hive.inspect(FakeHive(),expected_ip="192.0.2.19")
