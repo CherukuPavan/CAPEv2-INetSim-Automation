@@ -171,6 +171,21 @@ class PurePreflight(unittest.TestCase):
         with patch.object(p.platform, "node", return_value="test-new-host"):
             self.assertFalse(p.local_ref_host())
 
+    def test_module_contains_no_write_capable_host_actions(self):
+        source = Path(p.__file__).read_text(encoding="utf-8")
+        for mutation in (
+            'virsh", "start"', 'virsh", "shutdown"', 'virsh", "define"',
+            '"net-start"', '"net-autostart"', '"attach-interface"',
+            '"destroy"', '"qemu-img", "convert"', '"nft", "add"',
+            '"systemctl"', '"apt-get"', '"ip", "link", "set"',
+            '"ip", "addr", "add"', 'subprocess.run("bash"',
+        ):
+            with self.subTest(mutation=mutation):
+                self.assertNotIn(mutation, source)
+        self.assertIn('"route", "get", "1.1.1.1"', source)
+        self.assertIn('"deploy_authorized": False', source)
+        self.assertIn('"host_modified": False', source)
+
     def test_read_only_subprocess_uses_no_shell(self):
         def fake_run(args, capture_output, text, timeout, check):
             self.assertFalse(check)
