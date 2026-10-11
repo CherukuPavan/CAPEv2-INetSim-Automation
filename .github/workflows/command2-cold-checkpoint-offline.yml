@@ -10,6 +10,8 @@ on:
       - "scripts/test_command2_stage_independent_clones.py"
       - "scripts/command2_portable_fresh_count_plan.py"
       - "scripts/test_command2_portable_fresh_count_plan.py"
+      - "scripts/command2_portable_sequence_model.py"
+      - "scripts/test_command2_portable_sequence_model.py"
       - "scripts/command2_guest_identity_blueprint.py"
       - "scripts/test_command2_guest_identity_blueprint.py"
       - "scripts/command2_target_host_preflight.py"
@@ -33,6 +35,8 @@ on:
       - "scripts/test_command2_stage_independent_clones.py"
       - "scripts/command2_portable_fresh_count_plan.py"
       - "scripts/test_command2_portable_fresh_count_plan.py"
+      - "scripts/command2_portable_sequence_model.py"
+      - "scripts/test_command2_portable_sequence_model.py"
       - "scripts/command2_guest_identity_blueprint.py"
       - "scripts/test_command2_guest_identity_blueprint.py"
       - "scripts/command2_target_host_preflight.py"
@@ -88,6 +92,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_guest_identity_blueprint.py' -v
+      - name: Python 3.10 portable provisioning stage gate tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_portable_sequence_model.py' -v
       - name: Python 3.10 mock Drive auto-upload safety tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -124,6 +132,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_guest_identity_blueprint.py' -v
+      - name: Python 3.12 portable provisioning stage gate tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_portable_sequence_model.py' -v
       - name: Python 3.12 mock Drive auto-upload safety tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
