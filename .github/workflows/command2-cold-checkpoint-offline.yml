@@ -1,0 +1,41 @@
+name: Command 2 cold clone checkpoint (offline)
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command2_cold_checkpoint.py"
+      - "scripts/test_command2_cold_checkpoint*.py"
+      - "scripts/command2_cold_checkpoint_plan_acceptance.sh"
+      - ".github/workflows/command2-cold-checkpoint-offline.yml"
+  pull_request:
+    branches: [development]
+    paths:
+      - "scripts/command2_cold_checkpoint.py"
+      - "scripts/test_command2_cold_checkpoint*.py"
+      - "scripts/command2_cold_checkpoint_plan_acceptance.sh"
+      - ".github/workflows/command2-cold-checkpoint-offline.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate shell syntax
+        run: bash -n scripts/command2_cold_checkpoint_plan_acceptance.sh
+      - name: Python 3.10 offline mocks
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_cold_checkpoint*.py' -v
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python 3.12 offline mocks
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_cold_checkpoint*.py' -v
