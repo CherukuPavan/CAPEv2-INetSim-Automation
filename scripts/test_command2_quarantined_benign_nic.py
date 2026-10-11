@@ -31,6 +31,8 @@ def fake_host(*argv,**kw):
         return '[{"ifname":"eno1","address":"00:ab:cd:ef:12:34"}]'
     if argv==("ip","-j","-4","route","show","table","all"):
         return '[{"dst":"192.168.240.0/24","dev":"cape-lab0"},{"dst":"10.23.96.0/20","dev":"eno1"}]'
+    if argv==("ip","-j","-4","addr","show"):
+        return '[{"ifname":"eno1","addr_info":[{"family":"inet","local":"10.23.105.55","prefixlen":20}]}]'
     raise AssertionError("Unexpected ip command "+str(argv))
 
 def patch_plan():
@@ -60,6 +62,16 @@ class BenignQualificationTests(unittest.TestCase):
         with patch.object(nic,"virsh",side_effect=fake_virsh),\
              patch.object(nic,"cmd",side_effect=colliding):
             with self.assertRaisesRegex(q.BenignNicBlocked,"overlaps"):
+                q.collision_check(VM,MAC,NET)
+
+    def test_host_interface_cidr_overlap_is_refused(self):
+        def colliding(*argv,**kw):
+            if argv==("ip","-j","-4","addr","show"):
+                return '[{"ifname":"campus0","addr_info":[{"family":"inet","local":"192.168.240.10","prefixlen":24}]}]'
+            return fake_host(*argv,**kw)
+        with patch.object(nic,"virsh",side_effect=fake_virsh),\
+             patch.object(nic,"cmd",side_effect=colliding):
+            with self.assertRaisesRegex(q.BenignNicBlocked,"interface address"):
                 q.collision_check(VM,MAC,NET)
 
     def test_incomplete_host_inventory_never_implies_safe(self):
