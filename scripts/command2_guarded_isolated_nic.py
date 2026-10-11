@@ -210,9 +210,11 @@ def attach(vm,host,uid,mac,subnet,receipt):
         fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
         second=plan(vm,host,uid,mac,subnet,receipt)
         need(second==first,"NIC network/host plan changed under lock")
+        # Match proven original Windows e1000e adapter model; do not
+        # assume the standalone Windows template includes virtio-net.
         virsh("attach-interface","--domain",vm,
               "--type","network","--source",NETWORK,
-              "--model","virtio","--mac",mac,"--config")
+              "--model","e1000e","--mac",mac,"--config")
         root=ET.fromstring(virsh("dumpxml","--inactive",vm))
         nics=root.findall("./devices/interface")
         need(len(nics)==1 and
