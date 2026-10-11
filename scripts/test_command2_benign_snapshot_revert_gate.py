@@ -74,7 +74,7 @@ class RevertTests(unittest.TestCase):
                  patch.object(gate,"plan",return_value={
                      "snapshot":"cape_ready_win11_1"}),\
                  patch.object(snap,"virsh",side_effect=AssertionError("No revert")):
-                with self.assertRaisesRegex(gate.RevertBlocked,"cold checkpoint"):
+                with self.assertRaisesRegex(gate.RevertBlocked,"QCOW2\\+UEFI\\+swtpm rollback"):
                     gate.revert_benign(VM,HOST,UID,MAC,IP,receipt)
 
     def test_success_mock_revert_does_not_claim_tpm_proven(self):
