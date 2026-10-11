@@ -47,11 +47,15 @@ class NetworkAuditTests(unittest.TestCase):
                 return "Active: no\nAutostart: no\nBridge: cape-lab0\n"
             self.fail("unreviewed command: "+str(args))
         with patch.object(audit.socket,"gethostname",return_value="CSE-SSL-55.edu"),\
+             patch.object(audit,"preserved_master_interfaces",return_value={
+                 "backup_available":True,"saved_interfaces":[]}),\
              patch.object(audit,"virsh",side_effect=fake_virsh):
             out=audit.inventory()
         self.assertEqual(out["protected_domains"]["win11"]["interface_counts"]["inactive"],1)
         self.assertEqual(out["protected_domains"]["win11_1"]["interface_counts"]["live"],0)
         self.assertTrue(out["analysis_network_known_off"])
+        self.assertTrue(out["master_preservation_xml_comparison"]
+                        ["current_master_nic_differs_from_preserved_xml"])
         self.assertFalse(out["win11_1_nic_attach_authorized"])
         self.assertFalse(out["host_changed"])
 
@@ -60,6 +64,25 @@ class NetworkAuditTests(unittest.TestCase):
              patch.object(audit,"virsh",side_effect=AssertionError("Should not query libvirt")):
             with self.assertRaisesRegex(audit.AuditBlocked,"SSL-55"):
                 audit.inventory()
+
+    def test_private_preservation_source_differs_without_repair(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp:
+            backup=Path(tmp)/"domain.xml"
+            backup.write_text(xml("win11",audit.VM_IDS["win11"],
+                '<interface type="network"><source network="default"/>'
+                '</interface>'),encoding="utf-8")
+            with patch.object(audit,"MASTER_BACKUP_XML",backup),\
+                 patch.object(audit.Path,"lstat",wraps=Path.lstat) as metadata:
+                # No real root-owned files are available to CI users.
+                # Synthetic mock metadata only, then parse the actual XML.
+                fake=type("FileStat",(),{"st_mode":0o100600,"st_uid":0,
+                                        "st_size":backup.stat().st_size})()
+                metadata.return_value=fake
+                read=audit.preserved_master_interfaces()
+            self.assertTrue(read["backup_available"])
+            self.assertEqual(read["saved_interfaces"][0]["source_network"],"default")
 
     def test_no_write_commands_present(self):
         from pathlib import Path
