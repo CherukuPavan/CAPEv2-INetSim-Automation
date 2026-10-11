@@ -101,7 +101,8 @@ class Tests(unittest.TestCase):
         def fake(entry,*args):
             if entry["name"]=="win11_2":raise m.MultiStageError("synthetic failed copy")
             return dict(entry,result="STAGED_SHUT_OFF_ZERO_NICS")
-        with patch.object(m,"preflight",return_value=(item,fixture(),("template",),("vars",),
+        with patch.object(m.socket,"gethostname",return_value="unit-test-host"),\
+             patch.object(m,"preflight",return_value=(item,fixture(),("template",),("vars",),
                                               {"host_free_gib":512,"conservative_required_gib":158})),\
              patch.object(m,"provision",side_effect=fake),\
              patch.object(m.os,"open",return_value=99),\
