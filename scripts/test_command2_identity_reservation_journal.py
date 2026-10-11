@@ -76,6 +76,22 @@ class JournalTests(unittest.TestCase):
                     journal.reserve(bp,link,expected_host="test-server")
             self.assertFalse((real/journal.RECORD_NAME).exists())
 
+    def test_symlinked_ancestor_directory_is_blocked(self):
+        with tempfile.TemporaryDirectory() as td:
+            real=Path(td)/"real"
+            real.mkdir(mode=0o700)
+            private=real/"private"
+            private.mkdir(mode=0o700)
+            alias=Path(td)/"alias"
+            alias.symlink_to(real, target_is_directory=True)
+            with patch.object(journal.socket,"gethostname",
+                              return_value="approved-test-host"):
+                with self.assertRaisesRegex(journal.ReservationBlocked,
+                                            "Symlinked ancestor"):
+                    journal.reserve(sample(1),alias/"private",
+                                    expected_host="approved-test-host")
+            self.assertFalse((private/journal.RECORD_NAME).exists())
+
     def test_world_accessible_directory_refused(self):
         with tempfile.TemporaryDirectory() as td:
             folder=Path(td)/"open"
