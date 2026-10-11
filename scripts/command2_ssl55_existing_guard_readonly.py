@@ -7,6 +7,7 @@ rules is NOT real IPv4/IPv6 isolation or reboot-persistence proof.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -179,6 +180,55 @@ def guard_policy_structure(json_text, nft_text):
             "l2_between_guests_tested":False}
 
 
+def proposed_analysis_mac():
+    """Deterministic local-unicast NIC plan for the existing clone only.
+
+    The MAC is a candidate, not a reserved/attached address. Compare
+    against ALL live/inactive libvirt NICs and host interfaces.
+    """
+    payload=("CAPE_COMMAND2_SSL55_WIN11_1|" + CLONE_UUID).encode("ascii")
+    digest=hashlib.sha256(payload).digest()[:5]
+    wanted="02:"+":".join(f"{x:02x}" for x in digest)
+    names=[x.strip() for x in virsh("list","--all","--name").splitlines()
+           if x.strip()]
+    need("win11_1" in names and len(set(names))==len(names),
+         "Libvirt inventory incomplete/duplicate VM names")
+    occupied=set()
+    for name in names:
+        views=[virsh("dumpxml","--inactive",name)]
+        if virsh("domstate",name).strip() in ("running","paused"):
+            views.append(virsh("dumpxml",name))
+        for text in views:
+            root=ET.fromstring(text)
+            need(root.tag=="domain" and root.findtext("name")==name,
+                 "Cannot associate libvirt MAC inventory with exact domain")
+            for mac in root.findall("./devices/interface/mac"):
+                value=mac.get("address")
+                if value:
+                    occupied.add(value.lower())
+    links=command("ip","-j","link","show")
+    need(links is not None,
+         "Cannot read host NIC MAC inventory")
+    try:
+        data=json.loads(links)
+    except (ValueError,TypeError) as exc:
+        raise AuditBlocked("Invalid host link inventory JSON") from exc
+    need(type(data) is list and len(data)<=8192,
+         "Unexpected/oversized host NIC list")
+    for link in data:
+        need(type(link) is dict,"Unexpected host NIC item")
+        mac=link.get("address")
+        if type(mac) is str:
+            occupied.add(mac.lower())
+    return {"proposed_mac":wanted,
+            "mac_inventory_complete":True,
+            "host_or_libvirt_mac_collision":wanted in occupied,
+            "guest_ipv4_proposal":"192.168.240.101",
+            "guest_hostname_proposal":"WIN11-1",
+            "mac_reserved_or_attached":False,
+            "approval_to_attach":False}
+
+
 def service_state(name):
     enabled=command("systemctl","is-enabled",name)
     active=command("systemctl","is-active",name)
@@ -211,6 +261,7 @@ def audit():
             firewall={"guard_present":True,
                       "expected_guard_shape":True,
                       "shape_details":parsed}
+    nic_candidate=proposed_analysis_mac()
     services={
         "nftables.service":service_state("nftables.service"),
         "cape-analysis-guard.service":service_state(
@@ -222,6 +273,7 @@ def audit():
         "analysis_network":network,
         "existing_lab_firewall":firewall,
         "service_observations":services,
+        "win11_1_candidate_nic_not_applied":nic_candidate,
         "boot_replay_dependency_verified":False,
         "reboot_persistence_actually_tested":False,
         "ipv4_external_egress_negative_test":False,
