@@ -19,8 +19,9 @@ terminal commands and uploads one report instead of repeated console output.
   win11_2..win11_5 when total=5; refuses collisions and never stages VMs.
 - scripts/command2_cold_and_count_plan_acceptance.sh performs a single
   read-only TXT plan on the host AFTER offline unit tests.
-- Three new unit test modules: 19 local synthetic tests passed, including
-  full fake capture/verify, partial failure and malicious path cases.
+- Four new unit test modules: 22 local synthetic tests passed, including
+  full fake capture/verify, partial failure, peer shared-disk/NVRAM
+  collision and malicious path cases.
   New GitHub Actions workflow targets Python 3.10 and 3.12;
   CI conclusion is not yet independently confirmed.
 - **Extra shared-host storage safety gate**: capture now needs at least
