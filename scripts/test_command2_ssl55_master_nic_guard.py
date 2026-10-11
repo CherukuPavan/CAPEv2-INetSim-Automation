@@ -128,6 +128,9 @@ class GuardTests(unittest.TestCase):
                  patch.object(g,"virsh",side_effect=host):
                 plan,_=g.read_state()
                 with patch.object(g,"LOCK",Path(tmp)/"lock"),\
+                     patch.object(g.os,"fstat",return_value=type(
+                         "RootLock",(),{"st_mode":0o100600,
+                                        "st_uid":0,"st_nlink":1})()),\
                      patch.object(g.sys.stdin,"isatty",return_value=True),\
                      patch("builtins.input",return_value="RESTORE-ONLY-SHUTOFF-WIN11-SAVED-NIC"),\
                      patch.object(g.tempfile,"mkstemp",side_effect=lambda prefix,suffix,dir:
