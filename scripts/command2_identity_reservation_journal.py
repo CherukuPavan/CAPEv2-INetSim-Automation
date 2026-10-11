@@ -167,9 +167,20 @@ def reserve(blueprint, directory, *, expected_host):
             statdir.st_uid == os.geteuid(),
             "Reservation directory must be owned by user with mode 0700")
     wanted = serialize(payload(blueprint, local))
+    # Reject symlinks in *every* directory component, not just the leaf.
+    # Avoid ambiguous or redirected reservation locations.
+    for component in (folder, *folder.parents):
+        require(not component.is_symlink(),
+                "Symlinked ancestor in reservation directory")
     dirfd = os.open(folder, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     lockfd = None
     try:
+        fdstat = os.fstat(dirfd)
+        require(fdstat.st_dev == statdir.st_dev and
+                fdstat.st_ino == statdir.st_ino and
+                fdstat.st_uid == os.geteuid() and
+                stat.S_IMODE(fdstat.st_mode) == 0o700,
+                "Reservation directory changed during open")
         lockfd = os.open(LOCK_NAME, os.O_CREAT | os.O_RDWR | os.O_CLOEXEC |
                          os.O_NOFOLLOW, 0o600, dir_fd=dirfd)
         ls = os.fstat(lockfd)
