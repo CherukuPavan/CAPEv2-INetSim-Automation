@@ -1,6 +1,48 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+
+## VERIFIED GitHub Actions regression recovery — 2026-10-11 11:54 UTC
+
+Operator's GitHub Actions screenshot showed repeated red runs on
+`development`. Examined actual connected GitHub Actions job logs.
+Found and FIXED two independent **test-fixture** problems:
+
+1. `scripts/test_command2_cold_checkpoint.py`
+   `test_source_change_while_copying_refused` used same-size immediate
+   rewrites (mtime/ctime could be indistinguishable on CI); then tried
+   to access an SSL-55-only storage path. Changed synthetic write length
+   from 30 to 31 bytes, assert failure before any storage check, and
+   ensure no output artifact is created. Commit `168edb15ea12add43a9dcf6bb174b9e68a54a487`.
+2. `scripts/test_command2_upload_approved_reports.py`
+   literal `assertNotIn("sudo ", text)` failed on the safe COMMENT
+   `# No sudo or VM access` in uploader. Restrict static prohibited
+   command tests to uncommented shell source, add regression proving
+   executable sudo remains detected, leave live uploader unchanged.
+   Commit `16bebe20adb5e263c92c9dfd6b89473c67c6884f`.
+
+**ACTUAL GitHub Actions evidence:** workflow
+`Command 2 cold clone checkpoint (offline)`, run **#44**
+(ID `38137282518`), head SHA
+`16bebe20adb5e263c92c9dfd6b89473c67c6884f`, final
+`status=completed`, `conclusion=success` on 2026-10-11T11:54:49Z.
+`https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38137282518`.
+Python 3.10 and 3.12 offline test stages passed, including staged
+model and count-scaling tests. This is verified CI, but does NOT
+prove real VM deployment, networking, guest identity application,
+host portability or cold-state restoration.
+
+STOP editing unrelated logic merely to fix previous historical red
+runs; GitHub history preserves earlier failures, but run #44 is the
+latest validated fix. On new code changes, inspect NEW CI run and
+job logs through the GitHub connector's generic fetch endpoint
+(`https://api.github.com/repos/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs?branch=development&per_page=10`),
+then the run jobs/logs connectors, and do not claim a new run passed
+until the run conclusion is SUCCESS.
+
+SSL-55 reference-only hard ban remains. No VM, host, network or
+cold-backup actions were executed to fix CI.
+
 ## Active development continuation — 2026-10-11
 
 The operator requested independent continuation and a return only for
