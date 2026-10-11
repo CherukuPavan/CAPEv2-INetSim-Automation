@@ -277,6 +277,8 @@ def suggest_nonoverlapping_subnet(routes, addresses, networks):
 
 def evaluate(profile, count, disk_dir, nvram_dir, cidr):
     """Fail-closed readiness on supplied/synthetic inventory; no mutations."""
+    if type(count) is not int or not (1 <= count <= count_plan.MAX_COUNT):
+        raise count_plan.PortablePlanBlocked("Count exceeds portable planner safety bounds")
     errors = []
     def require(test, reason):
         if not test:
