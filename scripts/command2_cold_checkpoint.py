@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import stat
 import subprocess
 import sys
@@ -316,6 +317,11 @@ def plan():
 
 
 def capture():
+    # A second independent safety boundary in the legacy SSL-55 adapter.
+    # Never allocate storage-heavy cold backups on the reference machine.
+    reference = socket.gethostname().split(".", 1)[0].casefold()
+    require(reference not in ("cse-ssl-55", "ssl-55"),
+            "SSL55_REFERENCE_ONLY: cold checkpoint capture prohibited")
     # Called only after interactive confirmation; no automatic VM shutdown.
     facts = guards("capture")
     # Single operator lock; no removal of pre-existing unknown lock files.
@@ -460,6 +466,9 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         if args.mode == "capture":
+            require(socket.gethostname().split(".", 1)[0].casefold()
+                    not in ("cse-ssl-55", "ssl-55"),
+                    "SSL55_REFERENCE_ONLY: cold checkpoint capture prohibited")
             require(sys.stdin.isatty(), "Interactive terminal needed for capture")
             phrase = "CAPTURE-COLD-WIN11-1"
             ack = input("Type " + phrase + " to authorize shutoff clone checkpoint: ")
