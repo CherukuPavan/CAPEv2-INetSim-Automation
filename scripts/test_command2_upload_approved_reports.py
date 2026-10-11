@@ -77,7 +77,7 @@ fi
             (home/"CAPE_Approved_Reports").mkdir(mode=0o700)
             shimdir = home/"bin"; shimdir.mkdir()
             shim = shimdir/"rclone"
-            shim.write_text("#!/bin/sh\\nexit 1\\n")
+            shim.write_text("#!/bin/sh\nexit 1\n")
             shim.chmod(0o700)
             env = dict(os.environ,HOME=str(home),
                        PATH=str(shimdir)+os.pathsep+os.environ.get("PATH", ""))
