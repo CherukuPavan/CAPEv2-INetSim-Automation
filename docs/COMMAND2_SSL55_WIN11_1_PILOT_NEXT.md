@@ -1,4 +1,45 @@
 # Command 2 — SSL-55 win11_1 pilot and sequential IP policy
+## Actual user-uploaded readiness on 2026-10-11 14:53 UTC
+
+User report CAPE_Command2_Win11_1_Readiness_20261011_145324_kJ5Azpm5.txt:
+- win11_1 UUID 732b2256-ee99-41fa-881d-fbf5c476d960 SHUT OFF.
+- EXACTLY ZERO saved NICs, independent clone qcow2 path
+  /var/lib/libvirt/images/cape-clones-staging/win11_1.command2.qcow2,
+  unique NVRAM path /var/lib/libvirt/qemu/nvram/win11_1.command2_VARS.fd
+  and emulated TPM2 in inactive XML.
+- cape-analysis-isolated defined persistent but INACTIVE,
+  AUTOSTART=no, bridge cape-lab0, IPv4 192.168.240.1,
+  no forward/DHCP/IPv6 libvirt config elements.
+- 192.168.240.0/24 has NO nonbridge route/interface overlap detected.
+- Legacy inet cape_analysis_guard is present with INPUT/FORWARD hook
+  names. The different cape_analysis_cmd2_guard name is absent.
+  Presence of rules is NOT verification of their effectiveness.
+- NO snapshot names for win11_1; guest static IP and CAPE agent port
+  not verified. Snapshot capture/revert and host IPv4+IPv6 egress
+  negative tests have NOT been performed.
+- Images filesystem available 95.59 GiB; not permission to create
+  new VM disks or allocate full cold backup on shared SSL-55.
+- The read-only script reported ZERO host/clone/master changes.
+
+Subsequent GitHub work:
+- scripts/command2_ssl55_existing_guard_readonly.py plus tests
+  read live nft cape_analysis_guard JSON/verdict ordering and
+  expected bridge/IP/port text; inspect systemctl enable/active
+  state without changing systemd; collect stable proposed unique
+  MAC from existing win11_1 UUID after cross-check with ALL libvirt
+  domains/host link MACs. It is ONLY a read-only candidate, not a
+  reservation or NIC-attachment grant.
+- This audit STILL cannot prove reboot persistence, real packet
+  isolation, guest L2 containment, or host-to-guest CAPE agent access.
+  It sets safe_to_attach_analysis_nic=false even if all observed
+  policy structure matches.
+
+NEXT USER ACTION: ONE new guarded read-only audit TXT, then design
+and separately authorize narrowly scoped runtime network activation
+and one existing-VM NIC attachment if acceptance gates can be met.
+Do not attach via libvirt default network, alter original win11
+or trial guest, or take a large disk backup on SSL-55.
+
 
 ## Requested development order (2026-10-11)
 
