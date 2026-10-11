@@ -1,5 +1,15 @@
 # CAPEv2 + INetSim Automation
 
+> **Command 2 (2026-10-11): developer-stage zero-NIC staging engine exists,
+> but the complete two-command deployment is NOT ready.**
+> [Integrated count entrypoint](scripts/command2_portable_zero_nic_entrypoint.py)
+> can plan and (with explicit approval on a separate supported host)
+> attempt a group of shut-off, networkless clones with individual
+> UUIDs, disks, UEFI state and reserved Windows configs. It does NOT
+> apply Windows hostnames or static IPs, attach safely isolated NICs,
+> verify CAPE/INetSim, or restore full cold checkpoints. Do not run
+> staging on SSL-55. [Safety/limitations](docs/COMMAND2_PORTABLE_ZERO_NIC_STAGER.md).
+
 > **SSL-55 is reference-only.** Do not create any additional VMs or
 > storage-heavy clone copies on SSL-55. Preserve existing `win11`,
 > `win11_trial_1`, and verified `win11_1`. All count-driven multi-VM
