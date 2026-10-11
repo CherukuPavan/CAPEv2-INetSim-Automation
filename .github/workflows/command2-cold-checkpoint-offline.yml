@@ -9,6 +9,7 @@ on:
       - "scripts/command2_continuation_plan.py"
       - "scripts/test_command2_continuation_plan.py"
       - "scripts/command2_cold_checkpoint_plan_acceptance.sh"
+      - "scripts/command2_cold_and_count_plan_acceptance.sh"
       - ".github/workflows/command2-cold-checkpoint-offline.yml"
   pull_request:
     branches: [development]
@@ -18,6 +19,7 @@ on:
       - "scripts/command2_continuation_plan.py"
       - "scripts/test_command2_continuation_plan.py"
       - "scripts/command2_cold_checkpoint_plan_acceptance.sh"
+      - "scripts/command2_cold_and_count_plan_acceptance.sh"
       - ".github/workflows/command2-cold-checkpoint-offline.yml"
 
 permissions:
@@ -30,7 +32,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Validate shell syntax
-        run: bash -n scripts/command2_cold_checkpoint_plan_acceptance.sh
+        run: |-
+          bash -n scripts/command2_cold_checkpoint_plan_acceptance.sh
+          bash -n scripts/command2_cold_and_count_plan_acceptance.sh
       - name: Python 3.10 offline mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
