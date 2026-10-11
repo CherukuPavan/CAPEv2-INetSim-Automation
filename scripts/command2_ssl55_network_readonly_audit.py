@@ -8,6 +8,8 @@ No sudo, files, guest boots, snapshots, or host firewall changes.
 from __future__ import annotations
 import argparse
 import json
+from pathlib import Path
+import stat
 import re
 import socket
 import subprocess
@@ -20,6 +22,7 @@ VM_IDS = {
     "win11_1": "732b2256-ee99-41fa-881d-fbf5c476d960",
 }
 LAB_NETWORK = "cape-analysis-isolated"
+MASTER_BACKUP_XML = Path("/var/backups/cape-win11-preservation/win11-state-92POdfNc/metadata/domain.xml")
 
 
 class AuditBlocked(RuntimeError):
@@ -65,6 +68,24 @@ def network_interfaces(xml_text, expected_name, expected_uuid):
     return interfaces
 
 
+def preserved_master_interfaces():
+    """Read only the exact private XML backup; no saved disks or TPM."""
+    path = MASTER_BACKUP_XML
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return {"backup_available": False, "saved_interfaces": None}
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != 0 or \
+       (metadata.st_mode & 0o022) or metadata.st_size > 1024 * 1024:
+        raise AuditBlocked("Original master preservation XML metadata unsafe")
+    text = path.read_text(encoding="utf-8")
+    return {
+        "backup_available": True,
+        "saved_interfaces": network_interfaces(
+            text, "win11", VM_IDS["win11"]),
+    }
+
+
 def inventory():
     seen = socket.gethostname().split(".", 1)[0].lower()
     if seen not in ("ssl-55", "cse-ssl-55"):
@@ -88,6 +109,11 @@ def inventory():
             "state": state, "uuid": actual, "interface_views": views,
             "interface_counts": {view: len(items) for view, items in views.items()},
         }
+    original = preserved_master_interfaces()
+    saved_current = results["win11"]["interface_views"]["inactive"]
+    original["current_master_nic_differs_from_preserved_xml"] = (
+        saved_current != original["saved_interfaces"]
+        if original["backup_available"] else None)
     info = virsh("net-info", LAB_NETWORK)
     status = {}
     for key in ("Active", "Autostart", "Bridge"):
@@ -100,6 +126,7 @@ def inventory():
     return {
         "result": "SSL55_NETWORK_INVENTORY_READ_ONLY",
         "protected_domains": results, "analysis_network": status,
+        "master_preservation_xml_comparison": original,
         "analysis_network_known_off": status["active"] == "no" and
                                       status["autostart"] == "no",
         "win11_master_nic_repair_authorized": False,
