@@ -110,19 +110,10 @@ class ColdBundleTests(unittest.TestCase):
             disk,vars,tpm=fixture(root)
             (tpm/"tpm2-00.permall").unlink()
             (tpm/"tpm2-00.permall").symlink_to(disk)
-            with patch.object(b,"virsh",side_effect=lambda *a:
-                   UID if a[0]=="domuuid" else "shut off" if a[0]=="domstate"
-                   else '<domain type="kvm"><name>win11_1</name><uuid>'+
-                        UID+'</uuid><os><nvram>'+str(vars)+'</nvram></os>'
-                        '<devices><disk type="file" device="disk"><driver type="qcow2"/>'
-                        '<source file="'+str(disk)+'"/></disk>'
-                        '<tpm><backend type="emulator" version="2.0"/></tpm>'
-                        '</devices></domain>'):
-                with patch.object(b.Path,"__truediv__",side_effect=None):
-                    # The OS-level path guard must reject an explicit symlink,
-                    # independent of hypervisor XML/data fixture.
-                    with self.assertRaisesRegex(b.ColdBlocked,"linked"):
-                        b.safe_regular(tpm/"tpm2-00.permall")
+            # Explicit symlink is disallowed even if it points to a
+            # regular disk file, without any libvirt command invocation.
+            with self.assertRaisesRegex(b.ColdBlocked,"linked"):
+                b.safe_regular(tpm/"tpm2-00.permall")
 
     def test_restore_requires_exact_manifest_sha_and_tty(self):
         with patch.object(b,"host_guard"),\
