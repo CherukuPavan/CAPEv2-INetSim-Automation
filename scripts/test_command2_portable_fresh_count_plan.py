@@ -31,6 +31,21 @@ class Tests(unittest.TestCase):
         self.assertEqual(x["planned_vms"][-1]["hostname"],"WIN11-16")
         self.assertEqual(x["planned_vms"][-1]["planned_ipv4"],"192.168.240.116")
 
+    def test_count_above_sixteen_is_modelled_when_network_has_capacity(self):
+        profile = dict(PROFILE, analysis_subnet="192.168.0.0/16",
+                       free_gib=5000)
+        output = p.plan_fresh(32, **profile)
+        self.assertEqual(output["target_vm_total"], 32)
+        self.assertEqual(output["planned_vms"][-1]["hostname"], "WIN11-32")
+        self.assertEqual(output["planned_vms"][-1]["planned_ipv4"],
+                         "192.168.0.132")
+        self.assertTrue(output["capacity_estimate_pass"])
+        self.assertFalse(output["deployment_authorized"])
+
+    def test_network_capacity_limits_vm_count_regardless_of_host_resources(self):
+        with self.assertRaisesRegex(p.PortablePlanBlocked, "subnet too small"):
+            p.plan_fresh(155, **dict(PROFILE, free_gib=100000))
+
     def test_insufficient_host_capacity_denies_deploy(self):
         x=p.plan_fresh(5,**dict(PROFILE,free_gib=96.11))
         self.assertFalse(x["capacity_estimate_pass"])
@@ -52,7 +67,7 @@ class Tests(unittest.TestCase):
                 p.plan_fresh(1,**dict(PROFILE,disk_dir=path))
 
     def test_invalid_count_and_unreviewed_trial(self):
-        for count in (0,17,-1,1.2,True):
+        for count in (0,p.MAX_COUNT+1,-1,1.2,True):
             with self.subTest(count=count), self.assertRaises(p.PortablePlanBlocked):
                 p.plan_fresh(count,**PROFILE)
         with self.assertRaisesRegex(p.PortablePlanBlocked,"trial VM"):
