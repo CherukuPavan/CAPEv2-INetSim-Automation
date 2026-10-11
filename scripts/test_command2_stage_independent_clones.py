@@ -96,6 +96,16 @@ class Tests(unittest.TestCase):
             with self.assertRaisesRegex(m.MultiStageError,"REFERENCE-ONLY"):
                 m.prohibit_reference_host_staging()
 
+    def test_renamed_reference_host_blocked_by_backup_sentinel(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            protected=Path(temp)/"win11-state-92POdfNc"
+            protected.mkdir()
+            with patch.object(m.socket,"gethostname",return_value="renamed-host"), \
+                 patch.object(m.verified,"BACKUP",protected):
+                with self.assertRaisesRegex(m.MultiStageError,"REFERENCE-ONLY"):
+                    m.prohibit_reference_host_staging()
+
     def test_failure_retains_previously_created_clones(self):
         item=m.planned(2)
         def fake(entry,*args):
