@@ -13,6 +13,9 @@ on:
       - "scripts/command2_target_host_preflight.py"
       - "scripts/test_command2_target_host_preflight.py"
       - "scripts/command2_target_host_preflight_offline_acceptance.sh"
+      - "scripts/command2_setup_auto_report_sync.sh"
+      - "scripts/command2_upload_approved_reports.sh"
+      - "scripts/test_command2_upload_approved_reports.py"
       - "scripts/command2_continuation_plan.py"
       - "scripts/test_command2_continuation_plan.py"
       - "scripts/test_command2_shared_artifacts.py"
@@ -31,6 +34,9 @@ on:
       - "scripts/command2_target_host_preflight.py"
       - "scripts/test_command2_target_host_preflight.py"
       - "scripts/command2_target_host_preflight_offline_acceptance.sh"
+      - "scripts/command2_setup_auto_report_sync.sh"
+      - "scripts/command2_upload_approved_reports.sh"
+      - "scripts/test_command2_upload_approved_reports.py"
       - "scripts/command2_continuation_plan.py"
       - "scripts/test_command2_continuation_plan.py"
       - "scripts/test_command2_shared_artifacts.py"
@@ -52,6 +58,8 @@ jobs:
           bash -n scripts/command2_cold_checkpoint_plan_acceptance.sh
           bash -n scripts/command2_cold_and_count_plan_acceptance.sh
           bash -n scripts/command2_target_host_preflight_offline_acceptance.sh
+          bash -n scripts/command2_setup_auto_report_sync.sh
+          bash -n scripts/command2_upload_approved_reports.sh
       - name: Python 3.10 offline mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -72,6 +80,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_target_host_preflight.py' -v
+      - name: Python 3.10 mock Drive auto-upload safety tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_upload_approved_reports.py' -v
       - name: Python 3.10 peer collision guard tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -100,6 +112,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_target_host_preflight.py' -v
+      - name: Python 3.12 mock Drive auto-upload safety tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_upload_approved_reports.py' -v
       - name: Python 3.12 peer collision guard tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
