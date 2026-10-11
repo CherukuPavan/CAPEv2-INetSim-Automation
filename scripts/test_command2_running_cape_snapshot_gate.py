@@ -47,8 +47,7 @@ class RunningSnapshotTests(unittest.TestCase):
             calls.append(a)
             return virsh_fake(*a,**kw)
         with patch.object(s.socket,"gethostname",return_value=HOST),\
-             patch.object(s.SENTINEL,"exists",return_value=False),\
-             patch.object(s.SENTINEL,"is_symlink",return_value=False),\
+             patch.object(s,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
              patch.object(s,"virsh",side_effect=read):
             report=s.plan(NAME,HOST,UUID,MAC,IP)
         self.assertEqual(report["snapshot_name"],"cape_ready_win11_1")
@@ -64,7 +63,7 @@ class RunningSnapshotTests(unittest.TestCase):
 
     def test_renamed_reference_with_backup_still_blocked(self):
         with patch.object(s.socket,"gethostname",return_value=HOST),\
-             patch.object(s.SENTINEL,"exists",return_value=True),\
+             patch.object(s,"SENTINEL",Path(__file__).parent),\
              patch.object(s,"virsh",side_effect=AssertionError("libvirt reached")):
             with self.assertRaisesRegex(s.SnapshotBlocked,"REFERENCE_HOST_PROTECTED"):
                 s.plan(NAME,HOST,UUID,MAC,IP)
@@ -106,14 +105,12 @@ class RunningSnapshotTests(unittest.TestCase):
 
     def test_capture_must_be_direct_interactive_and_root(self):
         with patch.object(s.socket,"gethostname",return_value=HOST),\
-             patch.object(s.SENTINEL,"exists",return_value=False),\
-             patch.object(s.SENTINEL,"is_symlink",return_value=False),\
+             patch.object(s,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
              patch.object(s.os,"geteuid",return_value=1000):
             with self.assertRaisesRegex(s.SnapshotBlocked,"Root"):
                 s.capture(NAME,HOST,UUID,MAC,IP,"/nonexistent")
         with patch.object(s.socket,"gethostname",return_value=HOST),\
-             patch.object(s.SENTINEL,"exists",return_value=False),\
-             patch.object(s.SENTINEL,"is_symlink",return_value=False),\
+             patch.object(s,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
              patch.object(s.os,"geteuid",return_value=0),\
              patch.object(s.sys.stdin,"isatty",return_value=False):
             with self.assertRaisesRegex(s.SnapshotBlocked,"interactive"):
@@ -133,8 +130,7 @@ class RunningSnapshotTests(unittest.TestCase):
                     if a[:1]==("snapshot-dumpxml",):return xml
                     return "running"
                 with patch.object(s.socket,"gethostname",return_value=HOST),\
-                     patch.object(s.SENTINEL,"exists",return_value=False),\
-                     patch.object(s.SENTINEL,"is_symlink",return_value=False),\
+                     patch.object(s,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
                      patch.object(s.os,"geteuid",return_value=0),\
                      patch.object(s.sys.stdin,"isatty",return_value=True),\
                      patch("builtins.input",return_value="CAPTURE-RUNNING-WIN11_1"),\
@@ -152,8 +148,7 @@ class RunningSnapshotTests(unittest.TestCase):
             pre={"domain_live_xml_sha256":"a"*64,"receipt_sha256":"b"*64,
                  "snapshot_name":"cape_ready_win11_1"}
             with patch.object(s.socket,"gethostname",return_value=HOST),\
-                 patch.object(s.SENTINEL,"exists",return_value=False),\
-                 patch.object(s.SENTINEL,"is_symlink",return_value=False),\
+                 patch.object(s,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
                  patch.object(s.os,"geteuid",return_value=0),\
                  patch.object(s.sys.stdin,"isatty",return_value=True),\
                  patch("builtins.input",return_value="CAPTURE-RUNNING-WIN11_1"),\
