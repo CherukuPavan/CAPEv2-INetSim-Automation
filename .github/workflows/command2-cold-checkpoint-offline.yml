@@ -12,6 +12,8 @@ on:
       - "scripts/test_command2_portable_fresh_count_plan.py"
       - "scripts/command2_portable_sequence_model.py"
       - "scripts/test_command2_portable_sequence_model.py"
+      - "scripts/command2_portable_zero_nic_stager.py"
+      - "scripts/test_command2_portable_zero_nic_stager.py"
       - "scripts/command2_portable_zero_nic_xml.py"
       - "scripts/test_command2_portable_zero_nic_xml.py"
       - "scripts/command2_identity_reservation_journal.py"
@@ -43,6 +45,8 @@ on:
       - "scripts/test_command2_portable_fresh_count_plan.py"
       - "scripts/command2_portable_sequence_model.py"
       - "scripts/test_command2_portable_sequence_model.py"
+      - "scripts/command2_portable_zero_nic_stager.py"
+      - "scripts/test_command2_portable_zero_nic_stager.py"
       - "scripts/command2_portable_zero_nic_xml.py"
       - "scripts/test_command2_portable_zero_nic_xml.py"
       - "scripts/command2_identity_reservation_journal.py"
@@ -116,6 +120,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_portable_zero_nic_xml.py' -v
+      - name: Python 3.10 portable zero-NIC real staging refusal mocks
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_portable_zero_nic_stager.py' -v
       - name: Python 3.10 portable provisioning stage gate tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -168,6 +176,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_portable_zero_nic_xml.py' -v
+      - name: Python 3.12 portable zero-NIC real staging refusal mocks
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_portable_zero_nic_stager.py' -v
       - name: Python 3.12 portable provisioning stage gate tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
