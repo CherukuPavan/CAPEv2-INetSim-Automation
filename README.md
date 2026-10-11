@@ -8,6 +8,10 @@
 > No complete portable deployer is yet approved; the new
 > [fresh-host count planning model](scripts/command2_portable_fresh_count_plan.py)
 > creates no VMs.
+> The [portable target-host preflight](docs/COMMAND2_TARGET_HOST_PREFLIGHT.md)
+> now checks KVM, memory, storage, guest-name conflicts, local IPv4
+> subnet overlap and discovers the host uplink dynamically. It is
+> **read-only**, not a VM installer or isolation certification.
 
 Private **development** work toward a portable **four-command** malware-analysis lab:
 1. **Host + first Windows master:** discover/bootstrap the host, configure CAPEv2 prerequisites and one Windows `win11` guest through its ready-to-clone snapshot.
