@@ -50,7 +50,7 @@ if ($actualHash -ine $ExpectedSha256) { Deny "Guest config SHA256 mismatch" }
 try { $cfg=Get-Content -LiteralPath $ConfigFile -Encoding UTF8 -Raw | ConvertFrom-Json }
 catch { Deny "Invalid JSON config" }
 if ($cfg.format -cne "COMMAND2_GUEST_PERSONALIZATION_V1") { Deny "Unexpected config schema" }
-if ([string]$cfg.guest_name -cnotmatch "^win11_([1-9][0-9]{0,2})$") {
+if (-not ([string]$cfg.guest_name -cmatch "^win11_([1-9][0-9]{0,2})$")) {
   Deny "Unexpected guest name"
 }
 $index=[int]$Matches[1]
@@ -65,7 +65,7 @@ if ($cfg.default_gateway -ne $null -or
 }
 $prefix=[int]$cfg.prefix_length
 if ($prefix -lt 16 -or $prefix -gt 30) { Deny "Invalid prefix length" }
-if ([string]$cfg.subnet -cnotmatch "^([0-9.]+)/([0-9]{1,2})$") {
+if (-not ([string]$cfg.subnet -cmatch "^([0-9.]+)/([0-9]{1,2})$")) {
   Deny "Malformed analysis subnet"
 }
 $netText=[string]$Matches[1]
