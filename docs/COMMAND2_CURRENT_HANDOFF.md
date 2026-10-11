@@ -103,6 +103,41 @@ RESULT: COMMAND2_OFFLINE_PREFLIGHT_TESTS_PASS.
 Tests are synthetic and do NOT prove host deploy, egress isolation
 or VM snapshot restore. This is the latest REAL operator report.
 
+## VERIFIED end-to-end automatic TXT upload — 2026-10-11 11:33 UTC
+
+New operator's SSL-55 screenshot showed user timer installed and enabled.
+The FIRST ACTUAL report transfer subsequently SUCCEEDED without
+manual Google Drive upload or another terminal command:
+
+- Auto Drive folder: CAPE_SSL55_AutoReports, ID
+  1_cqrywTq5FWD1APk97v3cNXiqOc7IMcH.
+- File ID: 1xICk9mTLU68eSV-pm4qk6rzJYthyscie;
+  CAPE_Command2_OfflinePreflightTests_20261011_103641_ZnSj1eKa.txt;
+  6,046 bytes; Drive created timestamp 2026-10-11T11:33:37Z.
+- Assistant actually fetched and read file via the connected
+  Google Drive tool, verifying 7/7 pure VM-count tests, 17/17
+  synthetic target-host preflight tests, 13/13 mock cold
+  checkpoint tests, total 37/37 passed, with explicit
+  RESULT: COMMAND2_OFFLINE_PREFLIGHT_TESTS_PASS.
+- This is REAL acceptance for the limited TXT upload pipeline
+  and Drive read integration, NOT VM deployment, network
+  isolation, snapshot restore, or future hourly scheduled runs.
+- Initial folder emptiness was expected: setup backfill creates
+  local copy with fresh mtime and uploader waits -mmin +1;
+  the later timer successfully transferred it.
+
+The hourly CAPE Report Review & Development automation was updated
+to treat this specific file as ALREADY REVIEWED, avoiding repetitive
+notification or repeat fixes. Future approved offline reports will
+be read and safe code fixes may be made on development only.
+Neither Cloud Drive nor ChatGPT exposes an arbitrary shell on SSL-55.
+Do not claim unattended operation survives user logout without
+first verifying the systemd user-manager lifecycle.
+
+The next offline-test acceptance runner now includes pure guest
+identity candidate tests so a future approved report can cover
+the additional code without changing VM state.
+
 ## 2026-10-11 continuation: automatic report verification and candidate identities
 
 Operator SSL-55 screenshot confirms the private user-level
