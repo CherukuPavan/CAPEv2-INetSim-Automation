@@ -229,6 +229,13 @@ def validate_inputs(entries, master_uuid, source_template, master_nvram,
     need(expected_master_disk is not None and expected_master_disk.get("file"),
          "Protected master missing exact OS disk path")
     master_disk = expected_master_disk.get("file")
+    # A source template MUST be independent of the protected master.
+    # Refuse both an identical path and an underlying hardlink alias.
+    need(str(source) != master_disk and str(source) != str(orig_vars),
+         "Clone template aliases protected master storage")
+    if Path(master_disk).exists():
+        need(not os.path.samefile(source, master_disk),
+             "Standalone template is the master's disk")
     for row in entries:
         expected_disk = Path(row["disk_target"])
         expected_vars = Path(row["uefi_nvram_target"])
@@ -370,15 +377,26 @@ def make_one(row, *, master_xml, master_disk, master_nvram,
             shutil.copyfileobj(src,target)
             target.flush()
             os.fsync(target.fileno())
+        need(digest_file(nvram) == digest_file(master_nvram),
+             "Independent guest UEFI firmware copy mismatch")
+        need(exact_file(master_nvram) == vars_stamp,
+             "Master UEFI variables changed during copy")
         os.link(temp_file,disk)
         os.unlink(temp_file)
         temp_file=None
+        # Sync both independent artifact directories BEFORE libvirt define.
+        for parent in {disk.parent, nvram.parent}:
+            dfd=os.open(parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+            try: os.fsync(dfd)
+            finally: os.close(dfd)
         with tempfile.TemporaryDirectory(prefix="command2-define-",dir="/run") as folder:
             path=Path(folder)/"vm.xml"
             path.write_text(xml,encoding="utf-8")
             path.chmod(0o600)
             virsh("define",str(path),"--validate")
         validate_after_definition(row)
+        need(virsh("dumpxml","--inactive","win11")==master_xml,
+             "Original master XML changed during clone staging")
         need(exact_file(template) == source_stamp and
              exact_file(master_nvram) == vars_stamp and
              virsh("domstate","win11").strip() == "shut off",
