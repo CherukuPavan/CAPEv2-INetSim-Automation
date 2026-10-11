@@ -73,12 +73,30 @@ class StageTests(unittest.TestCase):
                 with self.assertRaisesRegex(stage.StageBlocked,"Untrusted"):
                     stage.reservation_entries(folder,"approved")
 
+    def test_real_preflight_must_pass_and_match_reserved_plan(self):
+        with patch.object(stage.hostaudit,"collect",return_value={"synthetic":True}), \
+             patch.object(stage.hostaudit,"evaluate",return_value={
+                 "preflight_pass":False,"errors":["KVM_DEVICE_MISSING"]}):
+            with self.assertRaisesRegex(stage.StageBlocked,"KVM_DEVICE_MISSING"):
+                stage.target_host_preflight([entry()],"/template","192.168.240.0/24")
+        with patch.object(stage.hostaudit,"collect",return_value={"synthetic":True}), \
+             patch.object(stage.hostaudit,"evaluate",return_value={
+                 "preflight_pass":True,
+                 "planned_vms":[{"libvirt_name":"win11_1",
+                                 "hostname":"WIN11-1",
+                                 "planned_ipv4":"192.168.240.999",
+                                 "disk":entry()["disk_target"],
+                                 "nvram":entry()["uefi_nvram_target"]}]}):
+            with self.assertRaisesRegex(stage.StageBlocked,"differs"):
+                stage.target_host_preflight([entry()],"/template","192.168.240.0/24")
+
     def test_readonly_plan_no_mutating_calls(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp)/"journal";folder.mkdir(mode=0o700)
             with patch.object(stage.socket,"gethostname",return_value="approved"), \
                  patch.object(stage,"reservation_entries",return_value=[entry(),entry(2)]), \
                  patch.object(stage,"validate_inputs",return_value=(1,2,"/source/master.qcow2")), \
+                 patch.object(stage,"target_host_preflight",return_value={"preflight_pass":True}), \
                  patch.object(stage,"assert_no_collision"), \
                  patch.object(stage,"virsh",return_value="<domain/>"), \
                  patch.object(stage,"free_bytes",return_value=1000*stage.GIB), \
@@ -106,6 +124,7 @@ class StageTests(unittest.TestCase):
             with patch.object(stage.socket,"gethostname",return_value="approved"), \
                  patch.object(stage,"reservation_entries",return_value=[entry(),entry(2)]), \
                  patch.object(stage,"validate_inputs",return_value=(1,2,"/master")), \
+                 patch.object(stage,"target_host_preflight",return_value={"preflight_pass":True}), \
                  patch.object(stage,"assert_no_collision"), \
                  patch.object(stage,"virsh",return_value="<domain/>"), \
                  patch.object(stage,"free_bytes",return_value=96*stage.GIB), \
@@ -133,6 +152,7 @@ class StageTests(unittest.TestCase):
             with patch.object(stage.socket,"gethostname",return_value="approved"), \
                  patch.object(stage,"reservation_entries",return_value=[entry()]), \
                  patch.object(stage,"validate_inputs",return_value=(1,2,"/master")), \
+                 patch.object(stage,"target_host_preflight",return_value={"preflight_pass":True}), \
                  patch.object(stage,"assert_no_collision"), \
                  patch.object(stage,"virsh",return_value="<domain/>"), \
                  patch.object(stage,"free_bytes",return_value=500*stage.GIB):
