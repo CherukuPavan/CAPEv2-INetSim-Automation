@@ -1,6 +1,44 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 ~14:23 UTC — newly implemented Command2 CI fully GREEN
+
+Operator screenshot at ~14:17 showed many failed development workflows
+and ChatGPT UI 'Error in input stream'. Actual GitHub Action jobs inspected
+directly, not inferred from screenshot:
+
+- GitHub workflow 38146769987 ran 262 offline Python unittest cases;
+  260 passed, 2 failed. Root causes: a REAL Python bug using
+  Path.chown (nonexistent), and an overbroad test that searched the
+  safety docstring for a systemctl reference. Earlier jobs had
+  additional non-root CI lock fixture and regex mismatch failures.
+- Production full cold restore fixed to use os.chown for per-guest
+  swtpm directory; mocks now use real os.chown patch with strict root
+  policy preserved. Python tests updated to correctly mock privileged
+  lock fstat and Path replacement instead of immutable Path methods.
+- CAPE config module side-effect regression now scans executable
+  module content rather than a descriptive forbidden-word docstring.
+- Workflow run 38146865474 (commit 489e312cc84221be6168f0605f9e815d97e83f3d)
+  COMPLETED SUCCESS: offline Ubuntu and Windows PowerShell syntax jobs.
+- Most recent workflow run 38146877542 (commit
+  a1c2fe7b306e2a0d281d56bd62f1e790cbabac1d) also
+  COMPLETED SUCCESS. Offline job had all individual tests green;
+  aggregate Python 3.10 test discovery includes 262 tests.
+
+IMPORTANT: Old FAILED workflow runs are historical and won't turn
+green. The latest passing run confirms synthetic code gates ONLY.
+The project remains NOT production release approved: actual separate
+target host networking, Windows guest script auto-delivery, verified
+native guest static IPv4, independent stateful TPM/UEFI cold boot
+recovery, live CAPE running snapshot capture+revert, no IPv4/IPv6
+egress and parallel benign CAPE/INetSim end-to-end tests PENDING.
+
+Original SSL55 win11 e1000e NIC restoration previously verified;
+do not rerun. win11_1 intentionally has no NIC, no new VM/network
+operations permitted on SSL55. No SSL55 changes made during CI work.
+Command3 BLOCKED pending real fresh-machine Command2 acceptance.
+
+
 ## 2026-10-11 verified major Command2 development + GitHub CI GREEN
 
 User explicitly asks ALL Command2 features before starting Command3:
