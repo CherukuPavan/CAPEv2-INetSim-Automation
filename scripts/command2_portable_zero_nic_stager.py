@@ -28,6 +28,7 @@ import xml.etree.ElementTree as ET
 import command2_identity_reservation_journal as reservation
 import command2_portable_zero_nic_xml as renderer
 import probe_cold_windows_volume_crypto as crypto
+import command2_target_host_preflight as hostaudit
 
 GIB = 1024 ** 3
 VIRTUAL_BYTES = 64 * GIB
@@ -246,6 +247,37 @@ def validate_inputs(entries, master_uuid, source_template, master_nvram,
     return diskstamp, vars_stamp, master_disk
 
 
+def target_host_preflight(entries, template, subnet):
+    """Require actual fresh-host inventory, not a fabricated planning profile."""
+    import ipaddress
+    need(len(entries) > 0, "No reserved Windows guests")
+    first = entries[0]
+    disk_base = str(Path(first["disk_target"]).parent)
+    nvram_base = str(Path(first["uefi_nvram_target"]).parent)
+    need(all(Path(row["disk_target"]).parent == Path(disk_base) and
+             Path(row["uefi_nvram_target"]).parent == Path(nvram_base)
+             for row in entries), "Clone artifacts span unapproved directories")
+    facts = hostaudit.collect(disk_base, nvram_base, str(template), len(entries))
+    report = hostaudit.evaluate(facts, len(entries), disk_base, nvram_base, subnet)
+    need(report.get("preflight_pass") is True,
+         "Real target-host preflight blocked: " +
+         ",".join(report.get("errors") or ["unknown"]))
+    expected_rows = report["planned_vms"]
+    need(len(expected_rows) == len(entries), "Preflight count changed")
+    for candidate, inspected in zip(entries, expected_rows):
+        need(candidate["libvirt_name"] == inspected["libvirt_name"] and
+             candidate["windows_hostname_target"] == inspected["hostname"] and
+             candidate["guest_static_ipv4_target"] == inspected["planned_ipv4"] and
+             candidate["disk_target"] == inspected["disk"] and
+             candidate["uefi_nvram_target"] == inspected["nvram"],
+             "Reserved VM identity differs from independently checked host plan")
+    return {"preflight_pass":True,
+            "ipv4_overlap_checked":report["ipv4_overlap_checked"],
+            "verified_storage_free_gib":report["storage_reported_free_gib"],
+            "deployment_authorized":False,
+            "network_isolation_verified":False}
+
+
 def atomic_note(root, name, data):
     content = (json.dumps(data, sort_keys=True, separators=(",", ":"))+"\n").encode("utf-8")
     need(len(content) < MAX_FILE_BYTES, "Journal note too large")
@@ -370,11 +402,12 @@ def make_one(row, *, master_xml, master_disk, master_nvram,
 
 
 def execute(*, mode, approved_host, journal_dir, template, template_sha256,
-            master_nvram, master_uuid):
+            master_nvram, master_uuid, subnet="192.168.240.0/24"):
     need(mode in ("plan","stage"), "Unknown stage mode")
     host_guard(approved_host, for_stage=mode=="stage")
     logdir=exact_dir(journal_dir, root=mode=="stage", mode=0o700)
     entries=reservation_entries(logdir, approved_host)
+    host_summary=target_host_preflight(entries, template, subnet)
     source=Path(template)
     master_xml=virsh("dumpxml","--inactive","win11")
     # No action ever occurs when the master is running or identity differs.
@@ -395,7 +428,8 @@ def execute(*, mode, approved_host, journal_dir, template, template_sha256,
             "names":[row["libvirt_name"] for row in entries],
             "booted":False,"attached_nics":0,"network_modified":False,
             "windows_ip_assigned":False, "master_modified":False,
-            "restore_verified":False,"created":[]}
+            "restore_verified":False,"created":[],
+            "host_preflight":host_summary}
     if mode=="plan":
         return report
     need(sys.stdin.isatty(), "Interactive terminal required for stage")
@@ -412,6 +446,9 @@ def execute(*, mode, approved_host, journal_dir, template, template_sha256,
              "Unsafe staging lock metadata")
         fcntl.flock(lockfd,fcntl.LOCK_EX|fcntl.LOCK_NB)
         host_guard(approved_host,for_stage=True)
+        target_host_preflight(entries,template,subnet)
+        need(virsh("dumpxml","--inactive","win11")==master_xml,
+             "Master XML changed during staging authorization")
         need(not any((logdir/(INTENT_PREFIX+row["libvirt_name"]+".json")).exists()
                      for row in entries), "Prior incomplete stage requires manual review")
         assert_no_collision(entries)
@@ -438,12 +475,14 @@ def main():
     cli.add_argument("--template-sha256",required=True)
     cli.add_argument("--master-nvram",required=True,type=Path)
     cli.add_argument("--master-uuid",required=True)
+    cli.add_argument("--subnet",default="192.168.240.0/24")
     opt=cli.parse_args()
     try:
         data=execute(mode=opt.mode,approved_host=opt.approved_host,
                      journal_dir=opt.journal_dir,
                      template=opt.template,template_sha256=opt.template_sha256,
-                     master_nvram=opt.master_nvram,master_uuid=opt.master_uuid)
+                     master_nvram=opt.master_nvram,master_uuid=opt.master_uuid,
+                     subnet=opt.subnet)
         print(json.dumps(data,indent=2,sort_keys=True))
         return 0
     except (StageBlocked, reservation.ReservationBlocked, renderer.XMLBlocked,
