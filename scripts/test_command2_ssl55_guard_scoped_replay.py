@@ -112,11 +112,17 @@ class GuardReplayTests(unittest.TestCase):
                          "st_uid":0,"st_nlink":1})()
         states=iter(["missing","missing","present_verified"])
         commands=[]
+        from tempfile import mkstemp as original_mkstemp
+        # Run the simulated privileged file creation only inside the
+        # disposable CI fixture, never /run on a non-root runner.
         with self.context(report=synthetic_present(False)),\
              patch.object(replay,"approval_ok",return_value=True),\
              patch.object(replay,"LOCK_PATH",lock),\
              patch.object(replay.os,"fstat",return_value=fake_root),\
              patch.object(replay,"strict_state",side_effect=lambda:next(states)),\
+             patch.object(replay.tempfile,"mkstemp",side_effect=lambda
+                 prefix,suffix,dir: original_mkstemp(
+                     prefix=prefix,suffix=suffix,dir=self.tmp.name)),\
              patch.object(replay,"command",
                  side_effect=lambda *argv,**kw: commands.append(argv) or ""):
             result=replay.reconcile()
