@@ -315,6 +315,7 @@ def capture():
                 record = copy_file(source, partial / name, mode=metadata["mode"],
                                    owner=(metadata["uid"], metadata["gid"]),
                                    expected_identity=metadata["identity"])
+                record["name"] = name  # retain relative swtpm/ path in manifest
                 files.append(record)
                 print("CAPTURE_COPY_VERIFIED: " + name, flush=True)
             # Final guest state and source metadata gate after slow disk copy.
