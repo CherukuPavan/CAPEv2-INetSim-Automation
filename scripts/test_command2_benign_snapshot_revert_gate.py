@@ -93,6 +93,9 @@ class RevertTests(unittest.TestCase):
                 raise AssertionError("Unexpected virsh "+str(a))
             with patch.object(snap,"target_guard"),\
                  patch.object(gate.os,"geteuid",return_value=0),\
+                 patch.object(gate.os,"fstat",return_value=type(
+                     "RootLock",(),{"st_mode":0o100600,
+                                    "st_uid":0,"st_nlink":1})()),\
                  patch.object(gate.sys.stdin,"isatty",return_value=True),\
                  patch.object(gate,"LOCK",lock),\
                  patch("builtins.input",return_value="REVERT-BENIGN-WIN11_1"),\
