@@ -42,6 +42,8 @@ on:
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_master_nic_guard.py"
       - "scripts/test_command2_ssl55_master_nic_guard.py"
+      - "scripts/command2_ssl55_guard_service_installer.py"
+      - "scripts/test_command2_ssl55_guard_service_installer.py"
       - "scripts/command2_ssl55_guard_systemd_unit_plan.py"
       - "scripts/test_command2_ssl55_guard_systemd_unit_plan.py"
       - "scripts/command2_ssl55_guard_scoped_replay.py"
@@ -119,6 +121,8 @@ on:
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_master_nic_guard.py"
       - "scripts/test_command2_ssl55_master_nic_guard.py"
+      - "scripts/command2_ssl55_guard_service_installer.py"
+      - "scripts/test_command2_ssl55_guard_service_installer.py"
       - "scripts/command2_ssl55_guard_systemd_unit_plan.py"
       - "scripts/test_command2_ssl55_guard_systemd_unit_plan.py"
       - "scripts/command2_ssl55_guard_scoped_replay.py"
@@ -289,6 +293,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_guard_systemd_unit_plan.py' -v
+      - name: Python 3.10 create-only CAPE nft guard systemd installer exact-plan mock tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_guard_service_installer.py' -v
       - name: Python 3.10 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -429,6 +437,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_guard_systemd_unit_plan.py' -v
+      - name: Python 3.12 create-only CAPE nft guard systemd installer exact-plan mock tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_guard_service_installer.py' -v
       - name: Python 3.12 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
