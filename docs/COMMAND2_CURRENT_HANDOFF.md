@@ -1,6 +1,35 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 ~21:14 UTC — BLOCKED Windows CAPE_FIX ISO preflight due assistant parser BUG, not proven inactive network
+
+User ran SHA pinned Windows fix optical ISO launcher from previous turn
+(head 837a3c33093c78d63916bf7016e0a6e183f90e8e).
+Read-only stage responded:
+BLOCKED: Isolated network unexpectedly inactive.
+No new ISO, no virsh change-media, no guest modification was done.
+Root cause in scripts/command2_ssl55_oneclick_fix_iso_host.py:
+- old virsh net-info check searched exact "active:     yes"
+  or x.strip() == "active: yes", both reject ordinary padded
+  Active:           yes even when bridge is ACTIVE.
+- next preflight tried command("systemctl","is-enabled",
+  "nftables.service") where disabled returns nonzero exit code
+  (correct status but helper would have treated it as fatal).
+Fixed both: strict parse_key_values(separator=":") normalizes keys
+and whitespace, checks active=yes/autostart=no/persistent=yes/
+bridge=cape-lab0; systemctl show (exit 0) instead of is-enabled
+to confirm base nftables loaded+disabled+inactive, guard service
+loaded+enabled+active+success. Add unit tests including mocked
+complete preflight with padded columns and disabled base unit.
+GitHub Actions run 38175722660 PASSED both Python and Windows.
+Actual host network state NOT changed; do not call virsh net-start,
+reboot or disable any checks. Rerun updated SHA-pinned optical
+host script plan and optional oneclick CD media replacement.
+Then doubleclick CAPE_FIX SETUP.CMD in Windows to guarded replace
+old .122.125 IP with .240.101 if old route is expected.
+No new VM/snapshot/malware, preserve master/trial.
+
+
 ## 2026-10-11 ~21:03 UTC — WIN11-1 diagnostic screenshot identifies exact stale NAT address
 
 Windows Notepad output from CAPE_DIAG CD:
