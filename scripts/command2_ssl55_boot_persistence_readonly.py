@@ -121,7 +121,7 @@ def perform():
                for name in ("win11","win11_1","win11_trial_1")}
     network=preceding["analysis_network"]
     no_auto=network.get("autostart")=="no" and \
-            not autostart["win11_1"] and not autostart["win11_trial_1"]
+            not any(autostart.values())
     nftguard=preceding["existing_lab_firewall"].get("expected_guard_shape",False)
     # No static metadata alone can guarantee reapplication on a reboot
     # or after Docker/libvirt/nftables service restarts.
