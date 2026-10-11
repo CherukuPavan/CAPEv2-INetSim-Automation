@@ -1,6 +1,40 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 14:53+00 user-uploaded SSL55 win11_1 readiness, NEW live-state finding
+
+User uploaded CAPE_Command2_Win11_1_Readiness_20261011_145324_kJ5Azpm5.txt.
+Current existing win11_1 UUID 732b2256-ee99-41fa-881d-fbf5c476d960
+SHUT OFF, zero saved NICs, independent QCOW2/UEFI paths, TPM2 emulator.
+cape-analysis-isolated persistent inactive autostart=no, no NAT/forward/
+DHCP/IPv6 network elements, cape-lab0 192.168.240.1. No route/address
+collision for 192.168.240.0/24. Legacy nft inet cape_analysis_guard
+present with forward/input hooks; newer candidate
+cape_analysis_cmd2_guard NOT installed. No clone snapshots.
+Images fs only 95.59 GiB available; no new VM disks/copies on SSL55.
+Windows static IP, port8000, IPv4/IPv6 negative egress, reboot
+persistence, full cold restore and running snapshot NOT verified.
+
+New repo scripts/command2_ssl55_existing_guard_readonly.py and
+scripts/test_command2_ssl55_existing_guard_readonly.py make a
+CONSERVATIVE additional no-write observation: exact expected three
+nft cape_analysis_guard base chain hooks/priority and accept/drop
+order, bridge+address+TCP8000 tokens, systemd nftables/guard service
+enablement, and proposed deterministic locally administered MAC for
+win11_1 after all libvirt/host link collision checks. Still reports
+ALL packet/reboot/L2/agent acceptance FALSE, and no approval to attach.
+GitHub Actions run 38149589815 SUCCESS offline+Windows parser.
+Docs: docs/COMMAND2_SSL55_WIN11_1_PILOT_NEXT.md.
+
+User is expected to run a single SHA-pinned, read-only SSL55
+guard+persistence+MAC audit TXT and upload for actual live rule
+review BEFORE any shared-host network/guest state modification.
+No host modifications made through assistant. Original win11 NIC
+already restored and must remain untouched. Command2 not done,
+Command3 not yet started. INetSim service integration can wait;
+safe isolation/agent/snapshot cannot wait for live win11_1 pilot.
+
+
 ## 2026-10-11 later Command2 guest autoconfiguration milestone
 
 User expects not just static IP PLANS but actual per-Windows-clone
