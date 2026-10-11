@@ -17,6 +17,17 @@ class ReportSyncTests(unittest.TestCase):
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_setup_requires_controlling_tty_even_with_heredoc_stdin(self):
+        # Installer can be launched through a reviewed heredoc wrapper.
+        # stdin is then NOT a TTY. Opt-in must read /dev/tty explicitly.
+        script = SETUP.read_text(encoding="utf-8")
+        self.assertIn("ACK </dev/tty", script)
+        self.assertIn("-r /dev/tty && -w /dev/tty", script)
+        self.assertIn("ENABLE-CAPE-AUTO-REPORTS", script)
+        self.assertNotIn("[[ -t 0 ]]", script)
+        self.assertIn("id -u", script)
+        self.assertNotIn("sudo ", script)
+
     def test_user_only_no_vm_or_unapproved_copy(self):
         text = UPLOADER.read_text(encoding="utf-8")
         self.assertIn("CAPE_SSL55_AutoReports", text)
