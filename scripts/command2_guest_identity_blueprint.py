@@ -9,6 +9,7 @@ apply/stage mode is provided here.
 """
 from __future__ import annotations
 
+import ipaddress
 import re
 import secrets
 import uuid
@@ -78,6 +79,12 @@ def blueprint(preflight, *, existing_uuids=(), existing_macs=(),
          "Unexpected deploy/write authorization in planning record")
     records = preflight.get("planned_vms")
     count = preflight.get("requested_vm_count")
+    try:
+        subnet = ipaddress.IPv4Network(preflight.get("analysis_subnet"), strict=True)
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise BlueprintBlocked("Preflight analysis subnet missing or malformed") from exc
+    need(subnet.is_private and subnet.num_addresses >= count + 102,
+         "Preflight subnet is inappropriate for guest identity planning")
     need(type(count) is int and 1 <= count <= 16 and
          isinstance(records, list) and len(records) == count,
          "Expected precisely the requested bounded count")
@@ -111,6 +118,10 @@ def blueprint(preflight, *, existing_uuids=(), existing_macs=(),
         need(isinstance(disk, str) and isinstance(nvram, str) and
              disk.startswith("/") and nvram.startswith("/") and disk != nvram,
              "Invalid clone disk or UEFI path")
+        expected_ip = str(ipaddress.IPv4Address(int(subnet.network_address) + 100 + index))
+        need(ip == expected_ip and ipaddress.IPv4Address(ip) in subnet and
+             ipaddress.IPv4Address(ip) != subnet.broadcast_address,
+             "Unexpected guest IP or wrong analysis subnet")
         need(name not in names and disk not in paths and nvram not in paths
              and ip not in ips, "Duplicated guest name/path/IP")
         names.add(name)
