@@ -1,6 +1,61 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 continued Command 2 engineering — stage + Windows config
+
+User requested to complete Command 2, without any additional
+VM/NIC/backups on reference SSL-55. Developed only in GitHub development:
+
+- scripts/command2_portable_zero_nic_stager.py: new guarded,
+  privileged, separate-host-only zero-NIC staging engine. Exact root
+  reservation manifest, Command 1 source template UUID/QCOW2/UEFI,
+  plaintext volume probe and supplied source SHA256, target-host
+  real KVM/storage/network preflight, duplicate VM/UUID/MAC paths,
+  no other guest sharing master firmware/template, 40 GiB reserve,
+  exclusive durable per-VM intent BEFORE conversion, and private
+  completion note after virsh define/readback. Each clone is an
+  independent shut-off QCOW2 plus independent UEFI with new swtpm
+  emulator definition. NO NIC, guest boot or Windows changes.
+- scripts/test_command2_portable_zero_nic_stager.py: 13 mocked
+  negative/positive-path test methods, including synthetic tiny copy.
+- scripts/command2_portable_zero_nic_entrypoint.py integrates count,
+  independent source/master check, current host UUID/MAC inventory,
+  actual master RAM demand, identity blueprint, exclusive reservation,
+  per-VM private Windows JSON config, and separately confirmed staging.
+  It is an unapproved development-stage frontend, NOT complete Command2.
+- scripts/test_command2_portable_zero_nic_entrypoint.py: seven mocked
+  frontend tests: SSL-55 denial, plan-only, interactive/root gates,
+  source inventory, staged config manifests, master RAM sizing.
+- scripts/command2_windows_guest_config.py: pure strict hostname/IP
+  JSON config generator, based on reserved guest identity and subnet.
+- scripts/command2_guest_personalize.ps1: guest-local PowerShell
+  Plan/Identity/Network/Verify phases. Identity requires ZERO NIC;
+  network phase requires independently proven host isolation, one
+  exact reserved MAC, no default route; this is NOT yet automatically
+  installed, delivered, or invoked in Windows.
+- scripts/test_command2_windows_guest_config.py: four offline checks.
+- CI workflow updated with Python 3.10/3.12 synthetic tests and
+  Windows GitHub Actions AST syntax parse of the guest script.
+- docs/COMMAND2_PORTABLE_ZERO_NIC_STAGER.md and
+  docs/COMMAND2_WINDOWS_GUEST_PERSONALIZATION.md explain limits.
+
+TEST STATUS: New mocked tests and PowerShell parser have been committed
+but their CI conclusions and physical host acceptance remain
+**NOT VERIFIED** in this session. Do not claim they passed merely
+because source code is in development. The older user-uploaded
+37/37 offline preflight tests are confirmed, but do not cover the
+new integrated write-capable staging code.
+
+UNFINISHED: fully portable Command 1 prerequisite installer/master
+bootstrap; actual Windows config-drive bootstrap/install and verified
+guest rename/reboot; independent CAPE and INetSim network guard
+persisted without global firewall changes; real IPv4/IPv6 negative
+egress; safely attached NIC; verified static IP in Windows; guest
+TPM/UEFI cold snapshot and RESTORE; parallel CAPE analyses; independent
+fresh-host two-command end-to-end acceptance. No actual VMs were
+created/modified in this session. NEVER create more VMs on SSL-55.
+
+
 ## ACTIVE USER DIRECTIVE: finish substantial work before replying
 
 The user explicitly objects to intermediate assistant returns after each
