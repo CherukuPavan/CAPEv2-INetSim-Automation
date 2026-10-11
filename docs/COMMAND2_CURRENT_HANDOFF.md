@@ -1,16 +1,13 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
-## 2026-10-11 — LIVE GRAPH AUDIT PREPARED; SNAPSHOT STILL BLOCKED
+## 2026-10-11 — SAFEST NEXT DIAGNOSTIC: ACTIVE QEMU OPEN FILES (NO QMP)
 
-- User supplied snapshot compatibility report: libvirt 11.1.0, QEMU 9.2.2, swtpm 0.7.3, libtpms 0.9.3; NO real snapshot tested.
-- Current win11_1 has RAW OVMF pflash VARS + swtpm2 and live libvirt XML mentioning ORIGINAL MASTER files. Prior qemu-img -U info showed top QCOW2 only. This discrepancy is **not** proof of an independent image.
-- Added `scripts/command2_ssl55_runtime_block_audit.py`: exact SSL55 running win11_1 only; checks protected master and trial SHUT OFF; reads live and inactive XML; issues ONLY QMP `query-block` and `query-named-block-nodes`; reads advisory qemu-img -U --backing-chain JSON; inventories cloned TPM, OVMF metadata, storage available. No changes to VMs or network; refuses snapshots.
-- Added synthetic regression tests and CI path registration. GitHub Actions passing status must be checked after these commits; synthetic CI never proves real block graph or running snapshot viability.
-- IMPORTANT QMP queries are allowlisted informational commands. A QMP query is not an automatic libvirt snapshot compatibility test. Live graph evidence first, then design restorable disk/memory/OVMF/TPM workflow. Preserve original master chain. NO snapshot-revert, rebase, flattening, guest commands or malware yet.
-- Next action: run this single read-only audit on SSL55 and upload the generated TXT. Compare QMP paths with XML and qemu-img metadata; then design valid snapshot/revert and separately prove negative IPv4/IPv6/L2 isolation.
-
-
-**CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+- libvirt 11.1.0, QEMU 9.2.2, swtpm 0.7.3, libtpms 0.9.3 as reported, NO snapshot/revert performed.
+- win11_1 uses RAW OVMF pflash VARS, swtpm 2.0, and live XML references old master image paths, but prior qemu-img info -U --backing-chain displayed only clone top. This remains UNRESOLVED.
+- Originally a QMP query script was staged, but corrected BEFORE any user host execution: libvirt may mark a VM tainted when qemu-monitor-command is used. To avoid even that diagnostic side effect on shared SSL55, the CURRENT development audit uses NO QMP. It checks exact VM identities, reads libvirt XML, resolves exact QEMU PID using UUID+VM name, inventories /proc/PID/fd inode mappings to original master paths, and compares advisory qemu-img -U metadata plus clone TPM/OVMF file metadata.
+- Script: scripts/command2_ssl55_runtime_block_audit.py and synthetic tests test_command2_ssl55_runtime_block_audit.py; CI paths already registered. Do not use older code from commits containing QMP queries.
+- QEMU open file handles determine whether master files are held open, but DO NOT independently prove QEMU block-graph edge order; that would require separately authorized monitor inspection on an approved host or alternative evidence.
+- NO snapshot, clone, flatten, rebase, revert, guest code or malware. Preserve original master/trial; do not change host firewall. Next: exact read-only QEMU FD report from SSL55, then select restorable disk/memory/TPM/OVMF plan and run separate benign negative IPv4/IPv6/L2 tests.
 
 ## 2026-10-11 21:29 UTC — ACTUAL SNAPSHOT READINESS REPORT; CRITICAL TPM/UEFI/BACKING RISKS
 
