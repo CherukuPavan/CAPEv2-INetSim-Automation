@@ -15,6 +15,8 @@ on:
       - "scripts/command2_windows_guest_config.py"
       - "scripts/test_command2_windows_guest_config.py"
       - "scripts/command2_guest_personalize.ps1"
+      - "scripts/command2_guest_one_nic_firstboot.ps1"
+      - "scripts/test_command2_guest_one_nic_firstboot.py"
       - "scripts/command2_guest_startup_autoconfig.ps1"
       - "scripts/test_command2_guest_startup_autoconfig.py"
       - "scripts/command2_portable_zero_nic_entrypoint.py"
@@ -100,6 +102,8 @@ on:
       - "scripts/command2_windows_guest_config.py"
       - "scripts/test_command2_windows_guest_config.py"
       - "scripts/command2_guest_personalize.ps1"
+      - "scripts/command2_guest_one_nic_firstboot.ps1"
+      - "scripts/test_command2_guest_one_nic_firstboot.py"
       - "scripts/command2_guest_startup_autoconfig.ps1"
       - "scripts/test_command2_guest_startup_autoconfig.py"
       - "scripts/command2_portable_zero_nic_entrypoint.py"
@@ -329,6 +333,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_windows_guest_config.py' -v
+      - name: Python 3.10 Windows one-NIC firstboot guest static-IP/identity offline tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_guest_one_nic_firstboot.py' -v
       - name: Python 3.10 Windows startup guest auto-IP safety source checks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -485,6 +493,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_windows_guest_config.py' -v
+      - name: Python 3.12 Windows one-NIC firstboot guest static-IP/identity offline tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_guest_one_nic_firstboot.py' -v
       - name: Python 3.12 Windows startup guest auto-IP safety source checks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
