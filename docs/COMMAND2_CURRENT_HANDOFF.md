@@ -1,6 +1,53 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 verified major Command2 development + GitHub CI GREEN
+
+User explicitly asks ALL Command2 features before starting Command3:
+existing win11_1 isolated network, automatic static IPv4/hostnames,
+running CAPE snapshot and fully restorable independent guest state.
+SSL55 original win11 NIC was previously restored successfully;
+win11_1 remains ZERO NIC intentionally until host isolation is proved.
+No new VMs, NICs, snapshot copies or host changes on SSL55.
+
+New development modules committed (full details in
+docs/COMMAND2_NETWORK_RUNNING_SNAPSHOT_INTEGRATION.md):
+- command2_guarded_isolated_nic.py: authorized OTHER-host,
+  exact one-NIC shutoff libvirt CONFIG attachment with root-only
+  acceptance record, live nft/libvirt readback and host protection.
+  Does NOT create/start network, define firewall or boot guest.
+- command2_cape_agent_probe.py: strictly bounded read-only
+  CAPE Agent HTTP GET guest_ip:8000 with expected JSON/admin proof.
+- command2_running_cape_snapshot_gate.py: operator-guarded
+  running CAPE snapshot creation; enforces one INTERNAL memory
+  and disk snapshot after live agent and network acceptance.
+- command2_benign_snapshot_revert_gate.py: guarded destructive
+  separate-host BENIGN running-snapshot revert; verifies agent
+  after revert; does not assert unproven TPM/UEFI integrity.
+- command2_portable_cold_bundle.py: guarded full shutoff clone
+  disk+UEFI+swtpm capture/sha256 and deliberate restore. Stores
+  old clone artifacts and durable intent so crash requires review.
+  Python3.10 bug Path.chown fixed to os.chown.
+- command2_cape_kvm_config_plan.py: emits CAPE KVM machine labels,
+  guest IPv4, win11 tags, snapshot names for counts 1 to 16.
+- 262 offline unit tests passed in GitHub Python3.10 aggregate run;
+  Python 3.12 steps and Windows PowerShell AST syntax check passed.
+  Official run 38146877542:
+  https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38146877542
+  HEAD tested a1c2fe7b306e2a0d281d56bd62f1e790cbabac1d.
+
+Critical release distinction: ALL success is OFFLINE MOCK/STATIC,
+no newly provisioned guest, NIC, firewall, boot, internal vTPM
+snapshot or actual cold-restore/revert physically verified.
+Host isolation receipts are operator assertions, not cryptographic
+evidence without independent probes. Command1 trusted Windows
+guest first-boot/config transport remains unimplemented/integrated;
+host networking/reboot persistence and user Windows guest static IP
+cannot be accepted without an OTHER approved KVM host and its
+validated Windows master. Do NOT say Command2 complete or go to
+Command3 on the basis of green CI.
+
+
 ## Development after verified original win11 NIC restore
 
 Following operator upload of successful restore report at 13:38 UTC,
