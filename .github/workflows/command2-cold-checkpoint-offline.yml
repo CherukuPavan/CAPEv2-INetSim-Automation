@@ -6,6 +6,10 @@ on:
     paths:
       - "scripts/command2_cold_checkpoint.py"
       - "scripts/test_command2_cold_checkpoint*.py"
+      - "scripts/command2_stage_independent_clones.py"
+      - "scripts/test_command2_stage_independent_clones.py"
+      - "scripts/command2_portable_fresh_count_plan.py"
+      - "scripts/test_command2_portable_fresh_count_plan.py"
       - "scripts/command2_continuation_plan.py"
       - "scripts/test_command2_continuation_plan.py"
       - "scripts/test_command2_shared_artifacts.py"
@@ -17,6 +21,10 @@ on:
     paths:
       - "scripts/command2_cold_checkpoint.py"
       - "scripts/test_command2_cold_checkpoint*.py"
+      - "scripts/command2_stage_independent_clones.py"
+      - "scripts/test_command2_stage_independent_clones.py"
+      - "scripts/command2_portable_fresh_count_plan.py"
+      - "scripts/test_command2_portable_fresh_count_plan.py"
       - "scripts/command2_continuation_plan.py"
       - "scripts/test_command2_continuation_plan.py"
       - "scripts/test_command2_shared_artifacts.py"
@@ -45,6 +53,14 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_continuation_plan.py' -v
+      - name: Python 3.10 reference-host staging guard tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_stage_independent_clones.py' -v
+      - name: Python 3.10 fresh-machine count model tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_portable_fresh_count_plan.py' -v
       - name: Python 3.10 peer collision guard tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -61,6 +77,14 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_continuation_plan.py' -v
+      - name: Python 3.12 reference-host staging guard tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_stage_independent_clones.py' -v
+      - name: Python 3.12 fresh-machine count model tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_portable_fresh_count_plan.py' -v
       - name: Python 3.12 peer collision guard tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
