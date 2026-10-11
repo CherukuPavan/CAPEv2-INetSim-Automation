@@ -251,6 +251,28 @@ def collect(disk_dir, nvram_dir, template):
     }
 
 
+CANDIDATE_ISOLATED_SUBNETS = (
+    "192.168.240.0/24", "192.168.241.0/24", "192.168.242.0/24",
+    "172.28.240.0/24", "10.254.240.0/24"
+)
+
+
+def suggest_nonoverlapping_subnet(routes, addresses, networks):
+    """Suggestion only; never mutate network or implicitly change IP plan."""
+    if not all(isinstance(z, list) for z in (routes, addresses, networks)):
+        return None
+    try:
+        claimed = [ipaddress.IPv4Network(z, strict=False)
+                   for z in (routes + addresses + networks)]
+    except (ValueError, TypeError):
+        return None
+    for candidate in CANDIDATE_ISOLATED_SUBNETS:
+        block = ipaddress.IPv4Network(candidate)
+        if block.is_private and not any(block.overlaps(existing) for existing in claimed):
+            return candidate
+    return None
+
+
 def evaluate(profile, count, disk_dir, nvram_dir, cidr):
     """Fail-closed readiness on supplied/synthetic inventory; no mutations."""
     errors = []
@@ -340,6 +362,9 @@ def evaluate(profile, count, disk_dir, nvram_dir, cidr):
         "host_memory_reserve_mib": HOST_RAM_RESERVE_MIB,
         "errors": sorted(set(errors)),
         "detected_outbound_interface": profile.get("outbound_interface"),
+        "suggested_nonoverlapping_subnet_only": suggest_nonoverlapping_subnet(
+            routes, addrs, networks),
+        "suggested_subnet_not_automatically_applied": True,
         "preflight_pass": not errors,
         "ssl55_new_vm_prohibited": bool(profile.get("reference_ssl55")),
         "ipv4_overlap_checked": all(isinstance(z, list) for z in
