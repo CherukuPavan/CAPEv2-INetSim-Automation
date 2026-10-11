@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import secrets
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -297,9 +298,24 @@ def provision(entry,saved,base_stamp,vars_stamp,existing_macs):
         if temp_path is not None and temp_path.exists():
             print("INCOMPLETE_EXPORT_RETAINED: "+temp_path.name,file=sys.stderr)
 
+def prohibit_reference_host_staging():
+    """Do not create ANY additional VMs on the SSL-55 reference machine.
+
+    This SSL-55-specific staging adapter is retained for historical tests.
+    Production deployment on different hosts requires the portable Command 2
+    entrypoint, not bypassing this guard.
+    """
+    hostname=socket.gethostname().split(".",1)[0].casefold()
+    check(hostname not in ("cse-ssl-55","ssl-55"),
+          "SSL-55 is REFERENCE-ONLY: additional VM staging prohibited")
+
+
 def deploy(count,mode):
     os.umask(0o077)
     check(mode in ("plan","stage"),"Invalid staging mode")
+    if mode=="stage":
+        # Enforce before opening even the staging lock file.
+        prohibit_reference_host_staging()
     check(not GUARD_LOCK.is_symlink(),"Unsafe shared staging lock")
     lock=os.open(GUARD_LOCK,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     journal={"result":"IN_PROGRESS","mode":mode,
