@@ -23,20 +23,6 @@ def synthetic_present(flag=True):
             "guard_present":flag,"expected_guard_shape":flag}}
 
 
-def safety_context(report=None,unit="disabled",autostart=False):
-    from contextlib import ExitStack
-    stack=ExitStack()
-    stack.enter_context(patch.object(replay.socket,"gethostname",
-                                     return_value="CSE-SSL-55"))
-    stack.enter_context(patch.object(replay.observed,"SENTINEL",
-                                     Path("/tmp/does-not-exist-for-unit-tests")))
-    stack.enter_context(patch.object(replay.observed.SENTINEL,"is_dir",
-                                     return_value=True)) if False else None
-    # The real persistence marker is never inspected in mocks: use
-    # a caller-owned disposable directory as fake protected marker.
-    return stack
-
-
 class GuardReplayTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory()
