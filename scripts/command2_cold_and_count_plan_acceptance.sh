@@ -7,7 +7,7 @@ umask 077
 HERE="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 for file in command2_cold_checkpoint.py command2_continuation_plan.py \
   test_command2_cold_checkpoint.py test_command2_cold_checkpoint_capture.py \
-  test_command2_continuation_plan.py; do
+  test_command2_continuation_plan.py test_command2_shared_artifacts.py; do
   [[ -f "$HERE/$file" && ! -L "$HERE/$file" ]] || {
     echo "BLOCKED: Missing or linked test/module: $file" >&2; exit 2;
   }
@@ -28,6 +28,8 @@ set +e
     -s "$HERE" -p 'test_command2_cold_checkpoint*.py' -v
   PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B -m unittest discover \
     -s "$HERE" -p 'test_command2_continuation_plan.py' -v
+  PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B -m unittest discover \
+    -s "$HERE" -p 'test_command2_shared_artifacts.py' -v
   echo 'STEP 2: Existing clone cold checkpoint PLAN - NO CAPTURE'
   sudo -n /usr/bin/python3 -B "$HERE/command2_cold_checkpoint.py" --mode plan
   echo "STEP 3: Total count $COUNT continuation PLAN - NO STAGING"
