@@ -42,6 +42,8 @@ on:
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_master_nic_guard.py"
       - "scripts/test_command2_ssl55_master_nic_guard.py"
+      - "scripts/command2_ssl55_win11_1_benign_nic.py"
+      - "scripts/test_command2_ssl55_win11_1_benign_nic.py"
       - "scripts/command2_ssl55_bridge_only_activation.py"
       - "scripts/test_command2_ssl55_bridge_only_activation.py"
       - "scripts/command2_ssl55_guard_service_installer.py"
@@ -123,6 +125,8 @@ on:
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_master_nic_guard.py"
       - "scripts/test_command2_ssl55_master_nic_guard.py"
+      - "scripts/command2_ssl55_win11_1_benign_nic.py"
+      - "scripts/test_command2_ssl55_win11_1_benign_nic.py"
       - "scripts/command2_ssl55_bridge_only_activation.py"
       - "scripts/test_command2_ssl55_bridge_only_activation.py"
       - "scripts/command2_ssl55_guard_service_installer.py"
@@ -305,6 +309,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_bridge_only_activation.py' -v
+      - name: Python 3.10 SSL55 protected existing win11_1 config-only NIC attach mock tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_win11_1_benign_nic.py' -v
       - name: Python 3.10 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -453,6 +461,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_bridge_only_activation.py' -v
+      - name: Python 3.12 SSL55 protected existing win11_1 config-only NIC attach mock tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_win11_1_benign_nic.py' -v
       - name: Python 3.12 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
