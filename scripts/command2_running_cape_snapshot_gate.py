@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -69,7 +70,7 @@ def planned_name(name):
     return "cape_ready_" + name
 
 
-def saved_xml_checks(name, expected_uuid, expected_mac, expected_ip):
+def saved_xml_checks(name, expected_uuid, expected_mac, expected_ip, subnet):
     """Read actual running domain and validate exact single isolated NIC."""
     require(virsh("domstate", name) == "running",
             "CAPE snapshot requires RUNNING Windows guest")
@@ -112,8 +113,20 @@ def saved_xml_checks(name, expected_uuid, expected_mac, expected_ip):
     network_status = virsh("net-info", "cape-analysis-isolated")
     require(re.search(r"^Active:\s+yes\s*$", network_status, re.M|re.I) is not None,
             "Isolated libvirt network is not active")
-    require(re.fullmatch(r"192\.168\.240\.(?:10[1-9]|11[0-6])", expected_ip) is not None,
-            "Unexpected target IP range; fresh-host custom CIDR not yet accepted")
+    try:
+        network = ipaddress.IPv4Network(subnet, strict=True)
+        assigned = ipaddress.IPv4Address(expected_ip)
+        ordinal = int(VM_RE.fullmatch(name).group(1))
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise SnapshotBlocked("Invalid exact guest subnet/IP") from exc
+    rfc1918 = (ipaddress.IPv4Network("10.0.0.0/8"),
+               ipaddress.IPv4Network("172.16.0.0/12"),
+               ipaddress.IPv4Network("192.168.0.0/16"))
+    require(network.prefixlen == 24 and
+            any(network.subnet_of(net) for net in rfc1918) and
+            assigned == ipaddress.IPv4Address(
+                int(network.network_address) + 100 + ordinal),
+            "Guest IP does not match reserved private /24 and VM index")
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -162,14 +175,14 @@ def check_snapshot_absence(name, snapshot):
     require(snapshot not in listing.splitlines(), "CAPE snapshot already exists")
 
 
-def plan(name, target_host, expected_uuid, expected_mac, guest_ip, receipt=None):
+def plan(name, target_host, expected_uuid, expected_mac, guest_ip, receipt=None, subnet="192.168.240.0/24"):
     target_guard(target_host)
     snapshot = planned_name(name)
     require(re.fullmatch(r"[0-9a-f-]{36}", expected_uuid or "") is not None and
             re.fullmatch(r"02:(?:[0-9a-f]{2}:){4}[0-9a-f]{2}",
                          expected_mac or "") is not None,
             "Expected reserved VM UUID and MAC required")
-    xml_sha = saved_xml_checks(name, expected_uuid, expected_mac, guest_ip)
+    xml_sha = saved_xml_checks(name, expected_uuid, expected_mac, guest_ip, subnet)
     check_snapshot_absence(name, snapshot)
     receipt_sha = None
     if receipt is not None:
@@ -189,11 +202,11 @@ def plan(name, target_host, expected_uuid, expected_mac, guest_ip, receipt=None)
     }
 
 
-def capture(name, target_host, expected_uuid, expected_mac, guest_ip, receipt):
+def capture(name, target_host, expected_uuid, expected_mac, guest_ip, receipt, subnet="192.168.240.0/24"):
     target_guard(target_host)
     require(os.geteuid() == 0, "Root required for guarded capture")
     require(sys.stdin.isatty(), "Direct interactive terminal required")
-    pre = plan(name,target_host,expected_uuid,expected_mac,guest_ip,receipt)
+    pre = plan(name,target_host,expected_uuid,expected_mac,guest_ip,receipt,subnet)
     require(pre["receipt_sha256"] is not None,
             "Prior separate-host acceptance evidence required")
     phrase = "CAPTURE-RUNNING-" + name.upper()
@@ -207,7 +220,7 @@ def capture(name, target_host, expected_uuid, expected_mac, guest_ip, receipt):
                 stat.S_IMODE(st.st_mode)==0o600 and st.st_nlink==1,
                 "Unsafe snapshot lock metadata")
         fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
-        again = plan(name,target_host,expected_uuid,expected_mac,guest_ip,receipt)
+        again = plan(name,target_host,expected_uuid,expected_mac,guest_ip,receipt,subnet)
         require(again["domain_live_xml_sha256"] == pre["domain_live_xml_sha256"]
                 and again["receipt_sha256"] == pre["receipt_sha256"],
                 "Snapshot inputs changed since operator confirmation")
@@ -246,13 +259,14 @@ def main():
     parser.add_argument("--expected-uuid", required=True)
     parser.add_argument("--expected-mac", required=True)
     parser.add_argument("--guest-ip", required=True)
+    parser.add_argument("--subnet", default="192.168.240.0/24")
     parser.add_argument("--receipt", type=Path)
     args = parser.parse_args()
     try:
         if args.mode == "capture":
             require(args.receipt is not None, "Acceptance receipt is mandatory")
             report = capture(args.vm,args.approved_host,args.expected_uuid,
-                             args.expected_mac,args.guest_ip,args.receipt)
+                             args.expected_mac,args.guest_ip,args.receipt,args.subnet)
         else:
             report = plan(args.vm,args.approved_host,args.expected_uuid,
                           args.expected_mac,args.guest_ip,args.receipt)
