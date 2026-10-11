@@ -83,6 +83,17 @@ def saved_xml_checks(name, expected_uuid, expected_mac, expected_ip, subnet):
     require(root.tag == "domain" and root.get("type") == "kvm" and
             root.findtext("name") == name and root.findtext("uuid") == expected_uuid,
             "Live KVM domain identity differs")
+    # A generic internal disk+memory snapshot is not safe for a live
+    # Windows guest whose OVMF pflash varstore remains RAW. Restore
+    # compatibility must be validated separately, never inferred from
+    # a snapshot-create-as --print-xml success.
+    loader = root.find("./os/loader")
+    nvram = root.find("./os/nvram")
+    require(not (
+        loader is not None and loader.get("type") == "pflash" and
+        nvram is not None and nvram.get("format", "raw") == "raw"
+    ), "RAW_PFLASH_NVRAM_INTERNAL_SNAPSHOT_NOT_APPROVED: use validated "
+       "memory/disk/UEFI/TPM restore design; no generic --atomic capture")
     devices = root.find("devices")
     require(devices is not None, "VM has no reviewed devices")
     nics = devices.findall("interface")
