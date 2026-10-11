@@ -1,6 +1,55 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 20:27 UTC: SSL55 win11_1 BENIGN boot confirmed; Windows static-IP path next
+
+Uploaded CAPE_Command2_Win11_1_Boot_20261011_202713.txt:
+win11_1 UUID 732b2256-ee99-41fa-881d-fbf5c476d960
+RUNNING after guarded virsh start, reserved MAC
+02:0a:30:6a:3f:50 on cape-analysis-isolated,
+bridge cape-lab0. win11 master and win11_trial_1
+remain SHUT OFF, no snapshot. Windows target
+WIN11-1 and IPv4 192.168.240.101/24 (no gateway)
+still NOT applied/read back. Guest actual IPv4/IPv6
+external egress, agent HTTP 8000, running snapshot
+and revert NOT tested. No malware/sample execution.
+
+Critical existing-guest pilot detail: the previous
+command2_guest_personalize.ps1 -Mode Identity
+requires ZERO NIC; pilot now has ONE NIC. Do not
+reuse its zero-NIC phase or silently detach MAC.
+Added generic portable 1..16 Windows PowerShell:
+scripts/command2_guest_one_nic_firstboot.ps1.
+Modes Plan/Apply/Verify; guards actual SMBIOS
+UUID, reserved locally-admin MAC, one physical
+NIC, sequential 192.168.240.(100+N)/24, rejects
+any guest IPv4/IPv6 default route and any
+unexpected existing guest IPv4; explicit admin
+-ApproveBenignSetup required before apply.
+Apply sets static IPv4 WITHOUT gateway/DNS,
+requests WIN11-N rename if needed, and refuses
+to claim analysis readiness. It NEVER disables
+security software or Windows firewall or reboots
+guest implicitly. Actual Windows state unknown;
+PowerShell validity checked in GitHub Windows AST
+job and synthetic source tests, NOT live Windows.
+GitHub Actions #38172575972 SUCCESS offline+Windows
+parser. Need determine FAST transport: check whether
+Windows QEMU guest agent supports guest-exec; if yes
+deliver pinned PowerShell automatically with a
+host guard and read-only Plan first; otherwise use
+offline read-only optical config media/Windows console.
+Do not assume Windows guest agent installed.
+
+USER ASKED speed and stay on LAST GOAL:
+finish SSL55 Command2 pilot, automate count-selected
+1..16 guest clone hostname/IP, isolation and CAPE
+running snapshots, then develop Command3, then
+physical full 3-command acceptance on new host.
+INetSim optional deferred. No new host VM or
+large QCOW2 copies on SSL55.
+
+
 ## 2026-10-11 20:20 UTC: user uploaded successful NIC report; benign Windows boot next
 
 Source: CAPE_Command2_Win11_1_NIC_20261011_202005.txt.
