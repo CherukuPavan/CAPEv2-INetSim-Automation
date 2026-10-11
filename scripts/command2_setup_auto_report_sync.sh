@@ -14,6 +14,7 @@ rclone listremotes 2>/dev/null | grep -Fxq 'cape_reports:' || {
 }
 SOURCE="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)/command2_upload_approved_reports.sh"
 [[ -f "$SOURCE" && ! -L "$SOURCE" ]] || { echo 'BLOCKED: sibling uploader missing'; exit 2; }
+bash -n "$SOURCE" || { echo 'BLOCKED: uploader syntax check failed'; exit 2; }
 read -r -p 'Type ENABLE-CAPE-AUTO-REPORTS to activate approved TXT-only uploads: ' ACK
 [[ "$ACK" == 'ENABLE-CAPE-AUTO-REPORTS' ]] || {
   echo 'No changes made'; exit 2;
@@ -55,6 +56,7 @@ Description=Upload only approved CAPE offline TXT reports (no sudo)
 
 [Service]
 Type=oneshot
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/snap/bin
 ExecStart=/bin/bash %h/.local/libexec/cape/command2_upload_approved_reports.sh
 Nice=10
 NoNewPrivileges=yes
