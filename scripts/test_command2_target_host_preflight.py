@@ -87,6 +87,17 @@ class PurePreflight(unittest.TestCase):
         self.assertFalse(x["preflight_pass"])
         self.assertIn("MISSING_ROUTES_INVENTORY", x["errors"])
 
+    def test_requested_count_scales_above_sixteen_only_with_host_budget(self):
+        huge = evaluate(32, disk_free_gib=4096, available_ram_mib=300000)
+        self.assertTrue(huge["preflight_pass"])
+        self.assertEqual(len(huge["planned_vms"]), 32)
+        self.assertFalse(huge["deploy_authorized"])
+        self.assertEqual(huge["planned_vms"][-1]["planned_ipv4"],
+                         "192.168.240.132")
+        with self.assertRaisesRegex(p.count_plan.PortablePlanBlocked,
+                                    "safety bounds"):
+            evaluate(p.count_plan.MAX_COUNT + 1)
+
     def test_insufficient_resources_not_authorized(self):
         x = evaluate(disk_free_gib=96.11, available_ram_mib=12000)
         self.assertIn("INSUFFICIENT_CONSERVATIVE_DISK_CAPACITY", x["errors"])
