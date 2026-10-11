@@ -56,6 +56,34 @@ Prior to ANY file or VM action the engine requires:
    verifies shut-off, exact UUID/genid, independent paths, TPM emulator
    and no NIC. Missing/partial artifacts require manual forensic review.
 
+## Integrated developer-stage Command 2 frontend (not a finished installer)
+
+The new scripts/command2_portable_zero_nic_entrypoint.py connects:
+read-only target-host preflight -> complete live+inactive UUID/MAC
+inventory -> actual cloned-memory budget -> per-VM unique identity
+blueprint -> private root-only reservation -> distinct JSON Windows
+configuration notes -> guarded zero-NIC QCOW2/UEFI/TPM definitions.
+
+It asks for TOTAL guest count (1-16), can produce a READ-ONLY plan
+without writes, and has an interactive STAGE mode restricted to
+the explicitly approved separate host and root. The active staging
+engine ALSO requires a typed approval and reruns live preflight under
+its own lock. No additional guest is ever created on SSL-55.
+
+Each configuration note is saved as
+command2-guest-config-win11_N.json in the private journal directory,
+mode 0600, with a SHA256 recorded in stage output. It contains the
+reserved Windows hostname/IP/MAC and expected VM SMBIOS UUID but
+**is not delivered, installed, or executed inside the Windows guest**.
+An exclusive create prevents overwriting a prior note; failures retain
+all artifacts for manual reconciliation, not automatic cleanup.
+
+After staging, every guest is STILL shut off and has ZERO NICs;
+Windows hostnames, static IPv4 and CAPEv2 mapping remain unapplied.
+See docs/COMMAND2_WINDOWS_GUEST_PERSONALIZATION.md for the guest-local
+script under development. That script requires a Command 1 guest
+bootstrap installation and a verified secure configuration transport.
+
 ## Not operationally approved
 
 The complete two-command workflow is **NOT ready**. This is a
