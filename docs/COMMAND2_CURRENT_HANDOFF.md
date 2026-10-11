@@ -1,6 +1,65 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 ~21:03 UTC — WIN11-1 diagnostic screenshot identifies exact stale NAT address
+
+Windows Notepad output from CAPE_DIAG CD:
+- Hostname WIN11-1 already CORRECT; do NOT rename.
+- SMBIOS UUID 732B2256-EE99-41FA-881D-FBF5C476D960 correct.
+- One Intel 82574L e1000e NIC InterfaceIndex=12 MAC 02-0A-30-6A-3F-50, Up.
+- Current IPv4 192.168.122.125/24 (Manual, DHCP Disabled), inherited
+  from original NAT/default VM; target guest IP 192.168.240.101/24.
+- IPv6 guest interface link-local fe80 only; IPv6 default route no matching.
+- Old diagnostic attempted nonexistent CIM route object 'PolicyStore' property;
+  that error PREVENTED exact IPv4 default route readback, so gateway
+  NextHop is NOT known from report. Do not assume it was .122.1.
+- Original diagnostic ISO host report CAPE_Command2_DiagnosticISO_20261011_210225.txt
+  confirmed new diag ISO mounted live+saved sdb; host/Windows IP unchanged.
+
+User finds typing/copying text in offline Windows very difficult.
+Added develop-only guarded Windows one-click converter:
+- scripts/command2_ssl55_win11_1_oneclick_guest_fix.ps1 accepts
+  Plan/Apply/Verify; checks exact WIN11-1 hostname, SMBIOS UUID,
+  one UP e1000e MAC, old 192.168.122.125/24 with DHCP Disabled
+  or already-desired 192.168.240.101/24, no extra NIC or other
+  non-APIPA IPv4. Reads/default route NextHop/Index directly
+  WITHOUT PolicyStore object property; refuses ANY IPv6 default
+  or non-link-local global guest IPv6. Permits either ZERO IPv4
+  default routes or exact old 192.168.122.1 on reserved adapter;
+  blocks unknown default routes BEFORE mutation. Requires admin
+  and user YES; removes ONLY exact old default route if found,
+  removes ONLY old .122.125, sets .240.101/24 with NO gateway/DNS,
+  revalidates absence of default IPv4/IPv6 routes. Reports to
+  Windows Public Documents and opens Notepad. Never changes
+  guest Windows Defender/firewall or runs malware.
+- scripts/command2_ssl55_win11_1_oneclick_SETUP.cmd automatically
+  checks exact script SHA256 and requests Windows UAC administrator
+  approval via PowerShell Start-Process, no copied Windows commands.
+- scripts/command2_ssl55_oneclick_fix_iso_host.py verifies
+  SSL55 protected master/trial, exact running win11_1, live/saved
+  isolated e1000e MAC/sdb CD, active CAPE nft guard, no NAT/DHCP
+  libvirt bridge, root sentinel and Git blob-pinned source scripts;
+  after interactive phrase creates small CAPE_FIX ISO via
+  genisoimage (without recursive inclusion) and changes ONLY
+  existing VM sdb from diag ISO to new ISO, --live --config.
+  Preserves old diag ISO; no VM boot, other host networking change
+  or file transfer dependency. On error do not rerun blindly.
+- 6+7 offline tests, plus actual Windows PowerShell AST passed
+  GitHub Actions run 38175451590; NOT live guest acceptance.
+
+NEXT user command: immutable commit pinned downloader for 3 scripts,
+  sudo Python host ISO staging plan + apply one TXT report; Windows
+  Explorer -> CAPE_FIX -> double click SETUP.CMD -> accept UAC
+  then type short YES ONLY if guarded exact old route matches.
+  Upload resulting Notepad report/screenshot. If blocked report
+  unknown route NextHop and no Windows modification.
+
+Final goal unchanged: complete win11_1 static IP and safe packet
+containment, CAPE agent, RUNNING snapshot benign revert, then
+count-driven 1..16 multi VM automation (Command 2), Command 3,
+final 3-command end-to-end other-host validation. INetSim after
+core commands; no extra VMs or qcow2 copies on shared SSL55.
+
 ## 2026-10-11 20:56+ UTC — ISO mounted but existing WIN11-1 guest has UNKNOWN DEFAULT ROUTE; no Windows IP set
 
 User uploaded CAPE_Command2_WindowsISO_20261011_204246.txt:
