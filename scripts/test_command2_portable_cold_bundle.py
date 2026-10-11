@@ -4,6 +4,8 @@ Uses ONLY disposable sub-1KiB tempfile fixtures; no hypervisor or
 master VM is accessed. All subprocess/libvirt interactions are mocked.
 """
 from pathlib import Path
+import os
+import stat
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -59,7 +61,15 @@ class ColdBundleTests(unittest.TestCase):
             disk,vars,tpm=fixture(root)
             checkpoint=root/"checkpoint"
             def state(*_):return synthetic_guest(disk,vars,tpm)
+            real_fstat=os.fstat
+            def root_only_fstat(fd):
+                # Preserve all actual file metadata and change ONLY
+                # ownership in this synthetic unprivileged CI fixture.
+                items=list(real_fstat(fd))
+                items[stat.ST_UID]=0
+                return os.stat_result(items)
             with patch.object(b,"host_guard"),\
+                 patch.object(b.os,"fstat",side_effect=root_only_fstat),\
                  patch.object(b,"safe_folder",side_effect=lambda p:Path(p)),\
                  patch.object(b,"free_bytes",return_value=200*b.GIB),\
                  patch.object(b,"state",side_effect=state),\
