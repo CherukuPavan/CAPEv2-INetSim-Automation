@@ -17,7 +17,14 @@ do
     echo "BLOCKED: Missing/linked test input $file" >&2; exit 2;
   }
 done
-REPORT="$(mktemp "$HOME/CAPE_Command2_OfflinePreflightTests_$(date +%Y%m%d_%H%M%S)_XXXXXXXX.txt")"
+REPORT_BASE="$HOME"
+APPROVED="$HOME/CAPE_Approved_Reports"
+if [[ -d "$APPROVED" && ! -L "$APPROVED" ]] &&
+   [[ "$(stat -c '%u' "$APPROVED")" == "$(id -u)" ]] &&
+   [[ "$(stat -c '%a' "$APPROVED")" == "700" ]]; then
+  REPORT_BASE="$APPROVED"
+fi
+REPORT="$(mktemp "$REPORT_BASE/CAPE_Command2_OfflinePreflightTests_$(date +%Y%m%d_%H%M%S)_XXXXXXXX.txt")"
 echo "Private test report: $REPORT"
 set +e
 (
