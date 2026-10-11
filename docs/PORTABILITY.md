@@ -3,6 +3,26 @@
 **Status:** Architecture and acceptance requirements, not a claim of finished automation or verified compatibility.  
 **Reference:** SSL-55 is the **canonical source of manual procedure**; its preinstalled software is **not** the baseline assumed on a fresh host.
 
+## Physical testing restriction (2026-10-11)
+
+**Do not stage or boot additional Windows analysis VMs on the shared
+SSL-55 reference host.** Maintain existing `win11`, `win11_trial_1`
+and `win11_1` unchanged except for separately authorized validation
+of the existing clone. The remaining ~96 GiB space is insufficient
+for multi-VM experiments and unnecessary cold checkpoint copies.
+All multi-VM scale tests on SSL-55 must be simulated/offline or
+metadata-only. A portable Command 2 must be deployed and accepted
+on a separate supported host with adequate storage, RAM, CPU,
+isolation approvals and its own verified Windows master.
+
+The developer-stage standalone planner
+`scripts/command2_portable_fresh_count_plan.py` accepts explicit
+host-specific paths, CIDR and resource assumptions for 1–16 TOTAL
+Windows clone names, and never creates a VM. It is not a substitute
+for live host discovery, clone creation, guest IP/hostname application,
+host firewall persistence, IPv4/IPv6 egress testing, CAPE reachability,
+TPM/NVRAM snapshot restore, or final fresh-host acceptance.
+
 ## Support contract (must be established and tested)
 
 Target a documented, explicit compatibility matrix of **supported fresh Ubuntu releases, architectures, hardware and virtualization stacks**. Exact supported Ubuntu versions, kernel combinations, CAPEv2/INetSim releases, VM hypervisor versions and minimum resources remain **to be confirmed** from manual evidence plus compatibility testing. Do **not** promise success on every arbitrary computer, unsupported Linux distribution, conflicting virtualization stack or machine without CPU virtualization.
