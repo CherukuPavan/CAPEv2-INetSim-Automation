@@ -84,6 +84,21 @@ class NetworkAuditTests(unittest.TestCase):
             self.assertTrue(read["backup_available"])
             self.assertEqual(read["saved_interfaces"][0]["source_network"],"default")
 
+    def test_heredoc_runner_does_not_require_tty_stdin(self):
+        # A shell launched as bash <<'BASH' has redirected stdin even
+        # when an operator is at a physical interactive terminal.
+        import subprocess
+        from pathlib import Path
+        wrapper = Path(__file__).with_name(
+            "command2_ssl55_network_readonly_acceptance.sh")
+        source = wrapper.read_text(encoding="utf-8")
+        self.assertNotIn('[[ -t 0 ]]', source)
+        self.assertIn('sudo -v', source)
+        self.assertIn('sudo -n /usr/bin/python3 -B "$SCRIPT"', source)
+        outcome = subprocess.run(["bash", "-n", str(wrapper)],
+                                 capture_output=True, text=True, check=False)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+
     def test_no_write_commands_present(self):
         from pathlib import Path
         source=Path(audit.__file__).read_text(encoding="utf-8")
