@@ -8,6 +8,7 @@ capture. Not a release certificate or isolation/eagress proof.
 """
 from __future__ import annotations
 import argparse
+import ipaddress
 import json
 from pathlib import Path
 import socket
@@ -78,6 +79,60 @@ def xml_parts(raw,view):
                                  tpm.get("version")=="2.0"),
         "snapshots_not_inferred_from_xml":True,
     }
+
+def check_ipv4_subnet_overlap(cidr="192.168.240.0/24"):
+    """Summarize kernel routes/addresses that overlap candidate CAPE CIDR."""
+    intended=ipaddress.IPv4Network(cidr,strict=True)
+    commands=(("ip","-j","-4","route","show","table","all"),
+              ("ip","-j","-4","addr","show"))
+    parsed=[]
+    for args in commands:
+        result,payload=command(*args)
+        if result!=0:
+            return {"inventory_available":False,
+                    "nonbridge_overlaps":None,
+                    "no_nonbridge_collision_proven":False}
+        try:
+            entries=json.loads(payload)
+        except (json.JSONDecodeError,ValueError) as exc:
+            raise ReadinessBlocked("Malformed host IPv4 inventory") from exc
+        need(type(entries) is list,"Unexpected host IP JSON shape")
+        parsed.append(entries)
+    matches=set()
+    for entry in parsed[0]:
+        if type(entry) is not dict:
+            continue
+        dev=entry.get("dev","unknown")
+        dst=entry.get("dst","default")
+        if dst in ("default",None):
+            continue
+        try:
+            network=ipaddress.IPv4Network(dst,strict=False)
+        except (ValueError,TypeError):
+            continue
+        if network.overlaps(intended) and dev!=BRIDGE:
+            matches.add(("route",str(dev),str(network)))
+    for device in parsed[1]:
+        if type(device) is not dict:
+            continue
+        name=device.get("ifname","unknown")
+        for address in device.get("addr_info",[]):
+            if type(address) is not dict or address.get("family")!="inet":
+                continue
+            try:
+                net=ipaddress.IPv4Network(
+                    str(address["local"])+"/"+str(address["prefixlen"]),
+                    strict=False)
+            except (ValueError,TypeError,KeyError):
+                continue
+            if net.overlaps(intended) and name!=BRIDGE:
+                matches.add(("interface",str(name),str(net)))
+    conflicts=[{"source":src,"device":dev,"subnet":net}
+               for src,dev,net in sorted(matches)]
+    return {"inventory_available":True,
+            "nonbridge_overlaps":conflicts,
+            "no_nonbridge_collision_proven":len(conflicts)==0}
+
 
 def check():
     actual=socket.gethostname().split(".",1)[0].lower()
@@ -152,6 +207,7 @@ def check():
         "memory_disk_snapshot_validated":False,
         "snapshot_revert_tested":False
     }
+    subnet_conflicts=check_ipv4_subnet_overlap()
     code,space=command("df","-Pk","/var/lib/libvirt/images")
     disk_free_kib=None
     if code==0 and len(space.splitlines())>=2:
@@ -163,6 +219,7 @@ def check():
         "host":actual,"vm":VM,"uuid":UUID,"power_state":state,
         "domain_views":views,
         "analysis_network":network,
+        "analysis_ipv4_subnet_overlap":subnet_conflicts,
         "nft_guard_presence_not_proof_of_effectiveness":nft_tables,
         "snapshots":snapshot_result,
         "images_fs_free_gib":round(disk_free_kib/1048576,2)
