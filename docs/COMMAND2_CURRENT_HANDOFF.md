@@ -1,6 +1,37 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## OPERATOR SSL-55 NIC RESTORE PLAN verified 2026-10-11 13:35 UTC
+
+User uploaded CAPE_MasterNIC_RepairPlan_20261011_133515_FfV4f1Cf.txt.
+Read-only plan PASS: result SSL55_ORIGINAL_MASTER_NIC_REPAIR_PLAN_ONLY;
+original protected win11 UUID 289d89be-68ec-4c62-90e1-ea930849266f
+remains SHUT OFF, current snapshot finalshutoffversion and snapshot
+inventory Afterfull/basicinstallwinsnapshot/finalshutoffversion;
+original saved e1000e/default NIC MAC 52:54:00:62:a0:00 is missing.
+plan_sha256 dd474f43350c10932fdd3d9abceef1c3f9fe2a74ee79e06edcdfb262f4005f83
+Master disk/snapshot unchanged, zero host operations in PLAN.
+
+Next explicitly scoped optional action: operator-run apply using pinned
+scripts/command2_ssl55_master_nic_guard.py blob SHA
+23d9cb48ab400928bc7a8d2e0fc12e81cff5d42b and the exact
+plan SHA. Apply checks state again and requires the literal phrase
+RESTORE-ONLY-SHUTOFF-WIN11-SAVED-NIC. Because operator pastes a
+bash heredoc, use </dev/tty on Python apply subprocess to satisfy
+the script's intentional interactive confirmation requirement.
+Capturing the output through tee to one private TXT is recommended.
+NEVER apply without phrase and reviewed hash. If any result BLOCKED
+or postcondition fails, no blind retry; upload result.
+
+Apply (if invoked) targets ONLY the original master's saved libvirt
+NIC --config. It does not activate default network, power any VM on,
+attach win11_1 NIC, change nftables, copy disks, make backups, or
+restore parallel guest isolation. On success, master original saved
+NIC still NAT-capable if booted later; do not use master for malware.
+Real-host network isolated-clone acceptance remains separate and
+Command 2 / Command 3 release gates are unchanged.
+
+
 ## VERIFIED new uploaded SSL-55 network TXT — 2026-10-11 13:21 UTC
 
 Operator uploaded CAPE_SSL55_NetworkReadOnly_20261011_132144_s2Qf9Jhu.txt:
