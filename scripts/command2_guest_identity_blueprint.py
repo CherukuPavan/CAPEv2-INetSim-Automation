@@ -79,15 +79,15 @@ def blueprint(preflight, *, existing_uuids=(), existing_macs=(),
          "Unexpected deploy/write authorization in planning record")
     records = preflight.get("planned_vms")
     count = preflight.get("requested_vm_count")
+    need(type(count) is int and 1 <= count <= 16 and
+         isinstance(records, list) and len(records) == count,
+         "Expected precisely the requested bounded count")
     try:
         subnet = ipaddress.IPv4Network(preflight.get("analysis_subnet"), strict=True)
     except (ValueError, TypeError, AttributeError) as exc:
         raise BlueprintBlocked("Preflight analysis subnet missing or malformed") from exc
     need(subnet.is_private and subnet.num_addresses >= count + 102,
          "Preflight subnet is inappropriate for guest identity planning")
-    need(type(count) is int and 1 <= count <= 16 and
-         isinstance(records, list) and len(records) == count,
-         "Expected precisely the requested bounded count")
     need(isinstance(existing_uuids, (tuple, list, set)) and
          isinstance(existing_macs, (tuple, list, set)),
          "Complete host UUID/MAC inventory must be supplied")
