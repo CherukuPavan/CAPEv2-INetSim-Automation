@@ -49,7 +49,7 @@ class ColdBundleTests(unittest.TestCase):
 
     def test_renamed_ssl55_marker_also_blocks(self):
         with patch.object(b.socket,"gethostname",return_value=HOST),\
-             patch.object(b.SENTINEL,"exists",return_value=True):
+             patch.object(b,"SENTINEL",Path(__file__).parent):
             with self.assertRaisesRegex(b.ColdBlocked,"SSL55_REFERENCE_ONLY"):
                 b.host_guard(HOST)
 
