@@ -1,6 +1,12 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+
+Release gate: docs/COMMAND2_PRODUCTION_ACCEPTANCE_GATES.md records
+missing real deployment and recovery acceptance. Command 3 is locked
+until Command 2 is proven on a different approved, adequately provisioned
+machine. SSL-55 network diagnosis remains strictly read-only.
+
 ## 2026-10-11 user requests complete Command2 plus SSL55 NIC fix
 
 New operator request: finish ALL Command2 before starting Command3.
