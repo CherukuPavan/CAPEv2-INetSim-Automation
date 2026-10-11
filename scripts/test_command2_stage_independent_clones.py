@@ -80,6 +80,22 @@ class Tests(unittest.TestCase):
         self.assertEqual(result["result"],"MULTI_CLONE_ZERO_NIC_PLAN_ONLY")
         prod.assert_not_called()
 
+    def test_ssl55_never_stages_additional_vm_even_before_lock(self):
+        # The canonical reference host is never a multi-VM deployment target.
+        with patch.object(m.socket,"gethostname",return_value="CSE-SSL-55"), \
+             patch.object(m.os,"open",side_effect=AssertionError("Must not create staging lock")), \
+             patch.object(m,"preflight",side_effect=AssertionError("Must not reach VM allocation")), \
+             patch.object(m,"provision",side_effect=AssertionError("Must not stage VM")):
+            report=m.deploy(5,"stage")
+        self.assertEqual(report["result"],"BLOCKED_OR_PARTIAL_REVIEW_REQUIRED")
+        self.assertIn("REFERENCE-ONLY",report["reason"])
+        self.assertEqual(report["created"],[])
+
+    def test_ssl55_subdomain_is_also_blocked(self):
+        with patch.object(m.socket,"gethostname",return_value="CSE-SSL-55.example.edu"):
+            with self.assertRaisesRegex(m.MultiStageError,"REFERENCE-ONLY"):
+                m.prohibit_reference_host_staging()
+
     def test_failure_retains_previously_created_clones(self):
         item=m.planned(2)
         def fake(entry,*args):
