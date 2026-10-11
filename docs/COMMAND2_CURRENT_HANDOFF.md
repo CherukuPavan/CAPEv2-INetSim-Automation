@@ -1,6 +1,52 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 20:20 UTC: user uploaded successful NIC report; benign Windows boot next
+
+Source: CAPE_Command2_Win11_1_NIC_20261011_202005.txt.
+Host report shows exact result SSL55_WIN11_1_BENIGN_ONLY_NIC_SAVED_SHUTOFF:
+one e1000e NIC MAC 02:0a:30:6a:3f:50 attached to saved
+win11_1 uuid 732b2256-ee99-41fa-881d-fbf5c476d960,
+cape-analysis-isolated network, clone still SHUT OFF;
+master and trial remain untouched. Windows static IP,
+external IPv4/IPv6 isolation, CAPE agent HTTP and running
+snapshot are NOT yet verified. DO NOT repeat NIC attach.
+
+User explicitly asked SPEED UP and concentrate on final goal:
+finish SSL55 reference Command2, make truly count-driven
+N independent Windows guest static IP/hostname/agent/
+running snapshot automatically, develop Command3, then
+accept ALL three commands together on a later separate host.
+INetSim services deferred, network safety NOT deferred.
+
+New scripts/command2_ssl55_win11_1_benign_boot.py + 7 offline
+tests (scripts/test_command2_ssl55_win11_1_benign_boot.py).
+Safely inspect protected current-boot CAPE guard and service,
+isolated active manually started bridge, exact ONE saved
+win11_1 NIC with original UUID/disk/UEFI/TPM, original master/
+trial saved identities and shutoff, no other running VMs,
+autostart disabled, no snapshots. Only explicit typed
+BOOT-ISOLATED-WIN11_1-BENIGN-ONLY can issue virsh start win11_1.
+Postchecks ensure same one-NIC clone running with no
+other running VMs. Does not install Windows IP, invoke CAPE
+agent or run samples; no snapshots or further host changes.
+CI run 38172118517 PASSED offline+Windows syntax.
+
+NEXT: user runs SHA pinned guarded benign guest BOOT script
+once on SSL55 and uploads one TXT. If PASS proceed directly
+to single Windows guest hostname/static IP and CAPE agent
+benign checks. Important: existing
+scripts/command2_guest_personalize.ps1 Identity phase
+requires ZERO NIC and will NOT work on win11_1 AFTER the
+NIC was attached. Need choose a safe ONE-NIC Windows
+configuration path for this existing pilot, not blindly invoke
+Identity. For future count-driven clones install startup
+bootstrap in golden template BEFORE clone NIC creation or
+provide approved offline config delivery. Snapshot gate
+still requires actual benign network tests, TPM/UEFI and
+CAPE-agent live validation.
+
+
 ## 2026-10-11 ~20:13 UTC: bridge success, BENIGN-only single existing win11_1 NIC stage prepared
 
 User uploaded CAPE_Command2_Bridge_20261011_201302.txt.
