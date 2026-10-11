@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Read-only SSL-55 Command 2 live QEMU block graph and TPM/UEFI metadata audit.
+"""Read-only SSL-55 Command 2: inspect active QEMU file handles and XML.
 
-Only allowlisted QMP *queries*. No guest code, snapshot, libvirt definition
-change, disk repair/rebase/copy, firewall adjustment or TPM-secret reads.
+NO QMP / qemu-monitor-command: even harmless queries can taint libvirt
+domain metadata. NO snapshots, guest actions, disk writes, or state changes.
+Inspect /proc file descriptors + advisory qemu-img -U info ONLY.
 """
 import json
 import os
@@ -22,6 +23,7 @@ VARS = "/var/lib/libvirt/qemu/nvram/win11_1.command2_VARS.fd"
 SOURCES = ("/var/lib/libvirt/images/win11.Afterfull",
            "/var/lib/libvirt/images/win11.basicinstallwinsnapshot",
            "/var/lib/libvirt/images/win11.qcow2")
+WATCHED = (DISK, VARS) + SOURCES
 
 class Blocked(Exception):
     pass
@@ -34,10 +36,10 @@ def read(*argv):
     try:
         p = subprocess.run(argv, capture_output=True, timeout=50, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise Blocked("Command missing or timed out: " + argv[0]) from exc
+        raise Blocked("Read-only utility unavailable/timed out: " + argv[0]) from exc
     need(p.returncode == 0, "Read-only command failed: " + argv[0] +
          " (exit " + str(p.returncode) + ")")
-    need(len(p.stdout) <= 1000000, "Oversize command response")
+    need(len(p.stdout) <= 1000000, "Oversized command output")
     return p.stdout.decode("utf-8", "replace").strip()
 
 def virsh(*args):
@@ -81,37 +83,62 @@ def domain_summary(raw):
             "nvram_format": nvram.get("format", "unspecified"),
             "tpm": "emulator-2.0", "disk": DISK}
 
-def qmp_query(name):
-    need(name in ("query-block", "query-named-block-nodes"),
-         "Refused non-query QMP operation")
-    result = json.loads(virsh("qemu-monitor-command", VM, "--pretty",
-                              json.dumps({"execute": name})))
-    need(type(result) is dict and type(result.get("return")) is list,
-         "QMP response failed: " + name)
-    return result["return"]
+def qemu_pid():
+    """Find a single exact guest process without printing its full command line."""
+    hits = []
+    for p in Path("/proc").iterdir():
+        if not p.name.isdigit():
+            continue
+        try:
+            name = (p / "comm").read_text().strip()
+            if not (name.startswith("qemu-system") or name.startswith("qemu-kvm")):
+                continue
+            parts = (p / "cmdline").read_bytes().split(b"\0")
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            continue
+        args = [s.decode("utf-8", "replace").lower() for s in parts if s]
+        if UID in args and any(x == VM or x.startswith("guest=" + VM + ",")
+                              or x == "guest=" + VM for x in args):
+            hits.append(int(p.name))
+    need(len(hits) == 1, "Could not uniquely identify exact QEMU PID")
+    return hits[0]
 
-def referenced_paths(value):
-    paths = set()
-    def walk(obj, key=None):
-        if type(obj) is dict:
-            for k, v in obj.items():
-                walk(v, k)
-        elif type(obj) is list:
-            for v in obj:
-                walk(v, key)
-        elif type(obj) is str and key in (
-                "filename", "backing-filename", "full-backing-filename",
-                "backing_file", "file"):
-            paths.add(obj)
-    walk(value)
-    return sorted(paths)
-
-def meta(path):
-    file = Path(path)
-    need(file.is_file() and not file.is_symlink(), "Missing/linked: " + path)
-    st = file.stat()
-    need(stat.S_ISREG(st.st_mode), "Nonregular file: " + path)
-    return {"bytes": st.st_size, "allocated_bytes": st.st_blocks * 512}
+def open_disk_fds(pid):
+    """An open inode is evidence of a QEMU-held file, not proof of chain order."""
+    # Snapshot watched path inodes; allow missing sources, never follow links
+    # supplied from other host directories into mutation operations.
+    wanted = {}
+    for path in WATCHED:
+        try:
+            s = os.stat(path)
+            wanted[path] = (s.st_dev, s.st_ino)
+        except (FileNotFoundError, PermissionError, OSError):
+            wanted[path] = None
+    refs = {path: [] for path in WATCHED}
+    unusual_images = []
+    root = Path("/proc") / str(pid) / "fd"
+    need(root.is_dir(), "Exact QEMU fd table disappeared")
+    for fd in sorted(root.iterdir(), key=lambda p: p.name):
+        try:
+            link = os.readlink(fd)
+            s = fd.stat()   # follows the open descriptor, works if name changed
+        except (FileNotFoundError, ProcessLookupError):
+            continue      # concurrent harmless descriptor closure
+        except PermissionError as exc:
+            raise Blocked("Cannot inspect QEMU file handles") from exc
+        if not stat.S_ISREG(s.st_mode):
+            continue
+        inode = (s.st_dev, s.st_ino)
+        matches = [path for path, ident in wanted.items() if ident == inode and ident is not None]
+        if not matches and link.startswith("/var/lib/libvirt/images/"):
+            unusual_images.append(link)
+        for path in matches:
+            refs[path].append({"fd": fd.name,
+                               "link_matches_path": link == path,
+                               "open_file_reported_path": link})
+    return {"matching_open_file_descriptors": refs,
+            "other_libvirt_image_paths": sorted(set(unusual_images)),
+            "warning": "FD/inode presence confirms open files, NOT backing edge order"}
 
 def tpm_metadata():
     folder = Path("/var/lib/libvirt/swtpm") / UID / "tpm2"
@@ -127,8 +154,15 @@ def tpm_metadata():
          "TPM permanent state not found")
     return {"metadata_only": files, "secret_contents_read": False}
 
+def meta(path):
+    file = Path(path)
+    need(file.is_file() and not file.is_symlink(), "Missing/linked: " + path)
+    st = file.stat()
+    need(stat.S_ISREG(st.st_mode), "Nonregular file: " + path)
+    return {"bytes": st.st_size, "allocated_bytes": st.st_blocks * 512}
+
 def perform():
-    need(os.geteuid() == 0, "sudo required for QMP query access")
+    need(os.geteuid() == 0, "sudo needed to inspect exact running QEMU file handles")
     need(socket.gethostname().split(".")[0].lower() in
          ("cse-ssl-55", "ssl-55"), "Only CSE-SSL-55 allowed")
     need(virsh("domuuid", VM).lower() == UID and
@@ -142,36 +176,35 @@ def perform():
     inactive = domain_summary(virsh("dumpxml", "--inactive", VM))
     need(not virsh("snapshot-list", VM, "--name").strip(),
          "Unexpected pre-existing snapshots")
-    # QMP queries are the source of truth for LIVE disk graph observations.
-    block = qmp_query("query-block")
-    nodes = qmp_query("query-named-block-nodes")
-    # -U deliberately bypasses active-image lock: ADVISORY metadata only.
-    # No qemu-img check, convert, rebase, or write against a live image.
+    pid = qemu_pid()
+    fds = open_disk_fds(pid)
+    need(bool(fds["matching_open_file_descriptors"][DISK]),
+         "QEMU disk inode not found open; cannot draw dependency conclusions")
+    # -U bypasses lock for metadata only; QEMU could update concurrently.
     img = json.loads(read("qemu-img", "info", "-U", "--output=json",
                           "--backing-chain", DISK))
     need(type(img) is list and bool(img) and img[0].get("format") == "qcow2",
          "Unexpected qemu-img info")
-    qmp_paths = referenced_paths(block) + referenced_paths(nodes)
-    img_paths = referenced_paths(img)
     fs = os.statvfs(str(Path(DISK).parent))
-    return {"result": "SSL55_COMMAND2_LIVE_GRAPH_READONLY",
+    return {"result": "SSL55_COMMAND2_ACTIVE_FILE_HANDLE_READONLY",
             "vm": VM, "uuid": UID, "master_and_trial_shut_off": True,
             "live_xml": live, "inactive_xml": inactive,
-            "QMP_query_block": block, "QMP_query_named_block_nodes": nodes,
-            "qemu_img_info_U_advisory_only": img,
-            "master_paths_in_XML": [p for p in SOURCES if p in live["backing_paths_in_xml"]],
-            "master_paths_in_QMP": [p for p in SOURCES if p in qmp_paths],
-            "master_paths_in_qemu_img": [p for p in SOURCES if p in img_paths],
-            "QMP_all_paths": sorted(set(qmp_paths)),
+            "qemu_pid": pid, "qemu_open_files": fds,
+            "master_paths_held_open_by_QEMU": [
+                path for path in SOURCES
+                if fds["matching_open_file_descriptors"][path]],
+            "qemu_img_info_U_ADVISORY_RUNNING_IMAGE": img,
             "disk_metadata": meta(DISK), "nvram_metadata": meta(VARS),
             "TPM": tpm_metadata(),
             "free_gib": round(fs.f_bavail * fs.f_frsize / 1024 ** 3, 2),
+            "live_QMP_block_graph_read": False,
+            "qemu_monitor_used": False,
             "snapshot_created": False, "restore_proven": False,
             "guest_egress_negative_proven": False,
             "TPM_UEFI_restore_proven": False,
             "approved_to_snapshot": False,
-            "warning": "Do not infer backing independence from -U while QEMU is running",
-            "no_mutations_requested": True}
+            "warning": "Open QEMU handles show active file usage but not graph edges; no snapshot/revert permission",
+            "no_host_guest_or_network_mutations_requested": True}
 
 def main():
     try:
