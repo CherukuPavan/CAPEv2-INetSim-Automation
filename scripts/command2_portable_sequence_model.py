@@ -14,6 +14,8 @@ from ipaddress import IPv4Address
 import re
 from uuid import UUID
 
+from command2_portable_fresh_count_plan import MAX_COUNT
+
 class SequenceBlocked(ValueError):
     pass
 
@@ -88,7 +90,7 @@ def create_model(candidate_blueprint, *, reference_host=False):
           "Expected unapplied candidate blueprint")
     rows = candidate_blueprint.get("candidates")
     count = candidate_blueprint.get("requested_total")
-    check(type(count) is int and 1 <= count <= 16 and
+    check(type(count) is int and 1 <= count <= MAX_COUNT and
           type(rows) is list and len(rows) == count,
           "Invalid requested model size")
     identities = set()
