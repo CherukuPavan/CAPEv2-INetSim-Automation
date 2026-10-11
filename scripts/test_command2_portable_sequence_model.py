@@ -84,6 +84,14 @@ class SequenceModelTests(unittest.TestCase):
         self.assertFalse(result["real_checkpoint_restored"])
         self.assertFalse(result["operator_action_authorized"])
 
+    def test_thirty_two_guest_state_machine_is_simulated_only(self):
+        model = flow.create_model(fixture(32))
+        self.assertEqual(model["guest_count"], 32)
+        self.assertEqual(len(model["guests"]), 32)
+        self.assertEqual(model["guests"]["win11_32"]["stage"], "PLANNED")
+        self.assertFalse(model["real_host_modified"])
+        self.assertFalse(model["deploy_authorized"])
+
     def test_host_restriction_and_staged_inputs(self):
         with self.assertRaisesRegex(flow.SequenceBlocked, "SSL-55"):
             flow.create_model(fixture(1), reference_host=True)
@@ -131,7 +139,7 @@ class SequenceModelTests(unittest.TestCase):
                              gate("IDENTITY_RESERVED"))
 
     def test_invalid_count_names_and_duplicates(self):
-        for total in (0, 17, True):
+        for total in (0, flow.MAX_COUNT + 1, True):
             broken = fixture(1)
             broken["requested_total"] = total
             with self.assertRaises(flow.SequenceBlocked):
