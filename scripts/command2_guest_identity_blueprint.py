@@ -14,6 +14,8 @@ import re
 import secrets
 import uuid
 
+from command2_portable_fresh_count_plan import MAX_COUNT
+
 class BlueprintBlocked(ValueError):
     """Fail-closed planning error."""
 
@@ -79,7 +81,7 @@ def blueprint(preflight, *, existing_uuids=(), existing_macs=(),
          "Unexpected deploy/write authorization in planning record")
     records = preflight.get("planned_vms")
     count = preflight.get("requested_vm_count")
-    need(type(count) is int and 1 <= count <= 16 and
+    need(type(count) is int and 1 <= count <= MAX_COUNT and
          isinstance(records, list) and len(records) == count,
          "Expected precisely the requested bounded count")
     try:
