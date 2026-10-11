@@ -16,6 +16,8 @@ on:
       - "scripts/test_command2_windows_guest_config.py"
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_guest_one_nic_firstboot.ps1"
+      - "scripts/command2_ssl55_oneclick_fix_iso_host.py"
+      - "scripts/test_command2_ssl55_oneclick_fix_iso_host.py"
       - "scripts/command2_ssl55_win11_1_oneclick_guest_fix.ps1"
       - "scripts/command2_ssl55_win11_1_oneclick_SETUP.cmd"
       - "scripts/test_command2_ssl55_win11_1_oneclick_guest_fix.py"
@@ -109,6 +111,8 @@ on:
       - "scripts/test_command2_windows_guest_config.py"
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_guest_one_nic_firstboot.ps1"
+      - "scripts/command2_ssl55_oneclick_fix_iso_host.py"
+      - "scripts/test_command2_ssl55_oneclick_fix_iso_host.py"
       - "scripts/command2_ssl55_win11_1_oneclick_guest_fix.ps1"
       - "scripts/command2_ssl55_win11_1_oneclick_SETUP.cmd"
       - "scripts/test_command2_ssl55_win11_1_oneclick_guest_fix.py"
@@ -357,6 +361,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_win11_1_oneclick_guest_fix.py' -v
+      - name: Python 3.10 exact SSL55 sdb oneclick ISO replace and protected guest preflight tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_oneclick_fix_iso_host.py' -v
       - name: Python 3.10 Windows startup guest auto-IP safety source checks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -525,6 +533,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_win11_1_oneclick_guest_fix.py' -v
+      - name: Python 3.12 exact SSL55 sdb oneclick ISO replace and protected guest preflight tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_oneclick_fix_iso_host.py' -v
       - name: Python 3.12 Windows startup guest auto-IP safety source checks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
