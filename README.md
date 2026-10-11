@@ -1,5 +1,14 @@
 # CAPEv2 + INetSim Automation
 
+> **SSL-55 is reference-only.** Do not create any additional VMs or
+> storage-heavy clone copies on SSL-55. Preserve existing `win11`,
+> `win11_trial_1`, and verified `win11_1`. All count-driven multi-VM
+> deployment belongs on a separate approved, supported machine with
+> sufficient capacity. [Current Command 2 handoff](docs/COMMAND2_CURRENT_HANDOFF.md).
+> No complete portable deployer is yet approved; the new
+> [fresh-host count planning model](scripts/command2_portable_fresh_count_plan.py)
+> creates no VMs.
+
 Private **development** work toward a portable **four-command** malware-analysis lab:
 1. **Host + first Windows master:** discover/bootstrap the host, configure CAPEv2 prerequisites and one Windows `win11` guest through its ready-to-clone snapshot.
 2. **Clone N:** ask the count, produce `win11_1`…`win11_N` with unique guest IPs and identities, verify ping/CAPE agent and per-clone snapshots.
