@@ -524,7 +524,8 @@ jobs:
         run: |
           $scripts = @(
             'scripts/command2_guest_personalize.ps1',
-            'scripts/command2_guest_startup_autoconfig.ps1'
+            'scripts/command2_guest_startup_autoconfig.ps1',
+            'scripts/command2_guest_one_nic_firstboot.ps1'
           )
           foreach ($scriptName in $scripts) {
             $tokens = $null
