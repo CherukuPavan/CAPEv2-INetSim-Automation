@@ -138,10 +138,12 @@ class IdentityBlueprintTests(unittest.TestCase):
         with self.assertRaisesRegex(b.BlueprintBlocked, "entropy provider"):
             b.allocate_unique_mac(set(), lambda n: None)
 
-    def test_sixteen_candidates_model_only(self):
-        values = b.blueprint(verified(16))["candidates"]
-        self.assertEqual(len(values), 16)
-        self.assertEqual(values[-1]["windows_hostname_target"], "WIN11-16")
+    def test_scaled_thirty_two_candidates_model_only(self):
+        values = b.blueprint(verified(32))["candidates"]
+        self.assertEqual(len(values), 32)
+        self.assertEqual(values[-1]["windows_hostname_target"], "WIN11-32")
+        self.assertEqual(len({x["libvirt_uuid_candidate"] for x in values}), 32)
+        self.assertEqual(len({x["mac_candidate"] for x in values}), 32)
 
     def test_no_vm_management_modules_are_imported(self):
         import inspect
