@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
+import command2_cape_agent_probe as agentprobe
 
 SENTINEL = Path("/var/backups/cape-win11-preservation/win11-state-92POdfNc")
 LOCK = Path("/run/lock/cape-command2-running-snapshot.lock")
@@ -221,6 +222,12 @@ def capture(name, target_host, expected_uuid, expected_mac, guest_ip, receipt, s
                 "Unsafe snapshot lock metadata")
         fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
         again = plan(name,target_host,expected_uuid,expected_mac,guest_ip,receipt,subnet)
+        # A signed/recorded acceptance receipt alone is not live proof.
+        # Check that the *running* guest actually serves the CAPE agent
+        # with administrator privileges before taking memory snapshot.
+        live_agent = agentprobe.probe_agent(guest_ip)
+        require(live_agent["result"] == "COMMAND2_CAPE_AGENT_READONLY_VERIFIED",
+                "Guest agent did not pass live HTTP readiness check")
         require(again["domain_live_xml_sha256"] == pre["domain_live_xml_sha256"]
                 and again["receipt_sha256"] == pre["receipt_sha256"],
                 "Snapshot inputs changed since operator confirmation")
@@ -244,6 +251,7 @@ def capture(name, target_host, expected_uuid, expected_mac, guest_ip, receipt, s
             "vm":name,"snapshot":pre["snapshot_name"],
             "memory_and_disk_metadata_present":True,
             "guest_still_running":True,"capture_receipt_sha256":pre["receipt_sha256"],
+            "guest_agent_http_verified_before_capture":True,
             "snapshot_revert_tested":False,"tpm_uefi_revert_tested":False,
             "cape_cycle_tested":False,"production_ready":False,
         }
