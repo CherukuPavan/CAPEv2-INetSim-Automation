@@ -17,6 +17,8 @@ on:
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_portable_zero_nic_entrypoint.py"
       - "scripts/test_command2_portable_zero_nic_entrypoint.py"
+      - "scripts/command2_cape_egress_guard_plan.py"
+      - "scripts/test_command2_cape_egress_guard_plan.py"
       - "scripts/command2_isolated_network_xml_plan.py"
       - "scripts/test_command2_isolated_network_xml_plan.py"
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
@@ -62,6 +64,8 @@ on:
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_portable_zero_nic_entrypoint.py"
       - "scripts/test_command2_portable_zero_nic_entrypoint.py"
+      - "scripts/command2_cape_egress_guard_plan.py"
+      - "scripts/test_command2_cape_egress_guard_plan.py"
       - "scripts/command2_isolated_network_xml_plan.py"
       - "scripts/test_command2_isolated_network_xml_plan.py"
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
@@ -161,6 +165,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_isolated_network_xml_plan.py' -v
+      - name: Python 3.10 CAPE bridge-scoped no-apply nft guard plan tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_cape_egress_guard_plan.py' -v
       - name: Python 3.10 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -237,6 +245,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_isolated_network_xml_plan.py' -v
+      - name: Python 3.12 CAPE bridge-scoped no-apply nft guard plan tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_cape_egress_guard_plan.py' -v
       - name: Python 3.12 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
