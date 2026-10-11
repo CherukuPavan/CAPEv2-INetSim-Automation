@@ -38,7 +38,8 @@ class Capture(unittest.TestCase):
                  patch.object(c,'guards',side_effect=fake_guards),\
                  patch.object(c,'virsh',side_effect=virsh),\
                  patch.object(c,'assert_stopped_processes'),\
-                 patch.object(c,'assert_no_shared_artifacts'):
+                 patch.object(c,'assert_no_shared_artifacts'),\
+                 patch.object(c.socket,'gethostname',return_value='synthetic-test-host'):
                 if fail:
                     with patch.object(c,'copy_file',side_effect=c.Blocked('simulated copy failure')):
                         with self.assertRaisesRegex(c.Blocked,'simulated'):
