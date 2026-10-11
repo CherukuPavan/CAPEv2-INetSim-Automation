@@ -20,6 +20,8 @@ on:
       - "scripts/test_command2_guest_identity_blueprint.py"
       - "scripts/command2_target_host_preflight.py"
       - "scripts/test_command2_target_host_preflight.py"
+      - "scripts/command2_portable_identity_allocator.py"
+      - "scripts/test_command2_portable_identity_allocator.py"
       - "scripts/command2_target_host_preflight_offline_acceptance.sh"
       - "scripts/command2_setup_auto_report_sync.sh"
       - "scripts/command2_upload_approved_reports.sh"
@@ -49,6 +51,8 @@ on:
       - "scripts/test_command2_guest_identity_blueprint.py"
       - "scripts/command2_target_host_preflight.py"
       - "scripts/test_command2_target_host_preflight.py"
+      - "scripts/command2_portable_identity_allocator.py"
+      - "scripts/test_command2_portable_identity_allocator.py"
       - "scripts/command2_target_host_preflight_offline_acceptance.sh"
       - "scripts/command2_setup_auto_report_sync.sh"
       - "scripts/command2_upload_approved_reports.sh"
@@ -96,6 +100,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_target_host_preflight.py' -v
+      - name: Python 3.10 portable identity allocator tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_portable_identity_allocator.py' -v
       - name: Python 3.10 candidate guest identity blueprint tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -144,6 +152,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_target_host_preflight.py' -v
+      - name: Python 3.12 portable identity allocator tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_portable_identity_allocator.py' -v
       - name: Python 3.12 candidate guest identity blueprint tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
