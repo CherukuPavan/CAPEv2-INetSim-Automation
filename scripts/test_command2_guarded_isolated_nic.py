@@ -51,8 +51,7 @@ def faux_virsh(*a):
 class AttachTests(unittest.TestCase):
     def test_plan_exact_vm_no_network_changes(self):
         with patch.object(n.socket,"gethostname",return_value=HOST),\
-             patch.object(n.SENTINEL,"exists",return_value=False),\
-             patch.object(n.SENTINEL,"is_symlink",return_value=False),\
+             patch.object(n,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
              patch.object(n,"virsh",side_effect=faux_virsh) as calls,\
              patch.object(n,"cmd",return_value=NFT),\
              patch.object(n,"read_acceptance_receipt",return_value=True):
@@ -65,7 +64,8 @@ class AttachTests(unittest.TestCase):
     def test_reference_and_renamed_reference_block_before_virsh(self):
         for name,present in (("cse-ssl-55",False),(HOST,True)):
             with patch.object(n.socket,"gethostname",return_value=name),\
-                 patch.object(n.SENTINEL,"exists",return_value=present),\
+                 patch.object(n,"SENTINEL", Path(__file__).parent if present else
+                      Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
                  patch.object(n,"virsh",side_effect=AssertionError("No host access")):
                 with self.assertRaisesRegex(n.NicBlocked,"SSL55_REFERENCE_ONLY"):
                     n.plan(VM,name,UUID,MAC,SUBNET)
@@ -110,8 +110,7 @@ class AttachTests(unittest.TestCase):
 
     def test_attach_no_receipt_refused(self):
         with patch.object(n.socket,"gethostname",return_value=HOST),\
-             patch.object(n.SENTINEL,"exists",return_value=False),\
-             patch.object(n.SENTINEL,"is_symlink",return_value=False),\
+             patch.object(n,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
              patch.object(n.os,"geteuid",return_value=0),\
              patch.object(n.sys.stdin,"isatty",return_value=True),\
              patch.object(n,"plan",return_value={"acceptance_receipt_checked":False}),\
@@ -137,8 +136,7 @@ class AttachTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             lock=Path(temp)/"nic.lock"
             with patch.object(n.socket,"gethostname",return_value=HOST),\
-                 patch.object(n.SENTINEL,"exists",return_value=False),\
-                 patch.object(n.SENTINEL,"is_symlink",return_value=False),\
+                 patch.object(n,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
                  patch.object(n.os,"geteuid",return_value=0),\
                  patch.object(n.sys.stdin,"isatty",return_value=True),\
                  patch.object(n,"LOCK",lock),\
