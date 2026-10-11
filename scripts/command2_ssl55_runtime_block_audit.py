@@ -83,10 +83,10 @@ def domain_summary(raw):
             "nvram_format": nvram.get("format", "unspecified"),
             "tpm": "emulator-2.0", "disk": DISK}
 
-def qemu_pid():
+def qemu_pid(proc_root=Path("/proc")):
     """Find a single exact guest process without printing its full command line."""
     hits = []
-    for p in Path("/proc").iterdir():
+    for p in proc_root.iterdir():
         if not p.name.isdigit():
             continue
         try:
@@ -103,7 +103,7 @@ def qemu_pid():
     need(len(hits) == 1, "Could not uniquely identify exact QEMU PID")
     return hits[0]
 
-def open_disk_fds(pid):
+def open_disk_fds(pid, proc_root=Path("/proc")):
     """An open inode is evidence of a QEMU-held file, not proof of chain order."""
     # Snapshot watched path inodes; allow missing sources, never follow links
     # supplied from other host directories into mutation operations.
@@ -116,7 +116,7 @@ def open_disk_fds(pid):
             wanted[path] = None
     refs = {path: [] for path in WATCHED}
     unusual_images = []
-    root = Path("/proc") / str(pid) / "fd"
+    root = proc_root / str(pid) / "fd"
     need(root.is_dir(), "Exact QEMU fd table disappeared")
     for fd in sorted(root.iterdir(), key=lambda p: p.name):
         try:
