@@ -48,6 +48,35 @@ Preflight never changes routing/firewall/VMs. The candidate Ubuntu
 matrix, VM memory plan and max-16 count are not production-certified.
 deploy_authorized is ALWAYS false. No target machine tested yet.
 
+## AUTO-REPORT DELIVERY — 2026-10-11 (operator requested no manual uploads)
+
+Verified connector access to private Google Drive folder
+CAPE_SSL55_Reports (Drive ID 1sWwYzqTgc2jLC8eC3_UOJ3DFEBBfNcAa).
+An hourly conditional ChatGPT report watch has been scheduled.
+Actual scheduled Drive read/notification is not yet proven.
+
+New dev-only report pipeline:
+- scripts/command2_upload_approved_reports.sh
+- scripts/command2_setup_auto_report_sync.sh
+- scripts/test_command2_upload_approved_reports.py
+- docs/COMMAND2_AUTOMATED_REPORT_DELIVERY.md
+The one-time installer is a user-level systemd timer, NOT an SSH
+agent or root service. It requires a separate operator-approved
+rclone Google Drive OAuth remote named cape_reports with drive.file
+scope, creating a separate rclone-owned folder CAPE_SSL55_AutoReports.
+Uses only a small user-approved reports directory and an exact
+offline-test TXT basename allowlist, excludes symlinks/likely secrets,
+max 256KiB; no host VM checks or changes, no unrestricted home sync.
+Earlier safe offline test reports can be backfilled by the installer.
+The offline preflight acceptance runner now writes into approved
+folder if configured securely, otherwise retains old HOME behavior.
+
+CRITICAL: User has not yet configured Ubuntu rclone or run installer.
+The reporter-to-Drive link is NOT active until one-time OAuth and
+local timer setup succeed. No production upload or alert verified.
+Google Drive's ChatGPT connection is distinct from SSL55's local
+Ubuntu file access. No passwords, tokens or keys may be pasted.
+
 ## Workflow preference and verified offline testing — 2026-10-11
 
 Operator wants to minimize back-and-forth terminal commands/uploads
