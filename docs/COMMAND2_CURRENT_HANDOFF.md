@@ -1,6 +1,49 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## Active development continuation — 2026-10-11
+
+The operator requested independent continuation and a return only for
+important completion/blocker notices, not routine pasted-command checks.
+Authorized GitHub-only implementation and synthetic offline testing
+continue on `development`; **DO NOT operate any new VM on SSL-55**.
+
+New safety/specification module:
+`scripts/command2_portable_sequence_model.py` models exact, ordered
+no-NIC clone lifecycle and requires separate evidence gates for
+durable UUID/MAC reservations, independent QCOW2, UEFI/swtpm,
+zero-NIC guest boot, unique hostname, independent IPv4/IPv6 negative
+egress plus reboot-persistent isolation, dedicated NIC, static IP,
+CAPE reachability, full cold disk+NVRAM+TPM restore and approved benign
+analysis. All transitions remain IN-MEMORY SIMULATION ONLY;
+real host evidence is explicitly NOT authenticated; no deployment.
+`scripts/test_command2_portable_sequence_model.py` adds 13 mocked
+state-machine tests and guards against skipping/forging proof states.
+Development CI now includes Python 3.10/3.12 tests; no passing
+CI result yet confirmed. See docs/COMMAND2_PORTABLE_SEQUENCE_GATES.md.
+
+Portable **planning** count is no longer arbitrarily capped at 16:
+pure model safety cap raised to 4096 with network CIDR, RAM, disk
+and CPU constraints expected to impose practical tighter limits.
+Separate SSL-55-specific staged-clone script remains hard-blocked
+and its legacy 16-target size is NOT expanded or run. Added 32-guest
+synthetic examples/tests to fresh-host planner, target preflight,
+identity blueprint and sequence model. NONE are real VMs.
+Read-only host preflight inspects collision artifact paths only
+for the requested N, not all 4096 possible indices.
+
+**Current blockers to COMPLETION:** no approved separate target
+machine is connected or physical host verification recorded.
+Cross-machine Command 1 source baseline, actual clone creation
+and durable identity reservation, Windows guest hostname/IP
+personalization, fail-closed network guard IPv4/IPv6 runtime
+isolation, TPM/NVRAM/disk cold restore, CAPE concurrent acceptance
+are unfinished. 37/37 historical offline tests from a different
+earlier commit passed via auto-uploaded report; NEW stage/scaling
+tests are not yet confirmed passing in real CI/local execution.
+No SSL-55 terminal action is requested now.
+
+
 
 ## NEW offline acceptance for portable preflight
 
