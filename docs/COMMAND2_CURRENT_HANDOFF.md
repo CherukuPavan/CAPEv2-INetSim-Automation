@@ -1,6 +1,37 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+
+## 2026-10-11 20:05 UTC: live SSL55 reboot test PASS; bridge-only stage next
+
+User uploaded CAPE_Command2_RebootVerification_20261011_200314.txt.
+Pre/post boot IDs differed (actual reboot). Dedicated CAPE nft guard
+unit now enabled and ACTIVE/SUCCESS after restart; journal shows it
+RESTORED legacy inet cape_analysis_guard at 20:04:57. Base nftables
+service remains disabled/inactive; protected three Windows VMs
+remain shut off, zero-NIC clone/trial unchanged, CAPE network remains
+inactive, autostart disabled. Initial guard boot replay is PROVED;
+external IPv4/IPv6 and L2 packet containment is NOT proved.
+No second reboot necessary now. No bridge/NIC/VM started yet.
+
+Committed scripts/command2_ssl55_bridge_only_activation.py and
+9 offline mock tests; only existing libvirt cape-analysis-isolated
+net-start can occur on explicit guarded interactive mode, without
+NIC/VM start. Strict preflight requires current boot guard service
+ACTIVE/SUCCESS, exact protection/VM state, inactive no-NAT/DHCP/DNS
+isolated bridge with port isolated=yes, no CIDR collisions. The
+post-start checks verify intended bridge IPv4, no global/site IPv6,
+unchanged nft table inventory and zero NIC/no running VMs.
+Unexpected post-start state is PARTIAL, no automatic destructive
+rollback, no permission to attach NIC or analyze samples.
+CI workflow 38171061727 passed BOTH offline and Windows syntax jobs.
+Docs: docs/COMMAND2_SSL55_REBOOT_PASS_BRIDGE_NEXT.md.
+
+NEXT ACTION: one SHA-pinned bridge-only plan/optional interactive
+activation command on SSL55; report back before NIC attachment.
+The protected master must remain shut off and untouched.
+
+
 ## 2026-10-11 ~19:41+ — OPERATOR AUTHORIZED SSL55 DEDICATED GUARD UNIT INSTALL+ENABLE
 
 User explicitly replied 'yes carry on' to approval for ONLY a
