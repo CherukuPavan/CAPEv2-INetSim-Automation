@@ -92,6 +92,13 @@ class ColdTests(unittest.TestCase):
                                 expected_identity=meta['identity'])
             self.assertTrue(out.exists())
 
+    def test_reference_host_cannot_capture_under_any_resource_conditions(self):
+        with patch.object(c.socket,'gethostname',return_value='CSE-SSL-55.school.local'), \
+             patch.object(c,'guards',side_effect=AssertionError('Must not reach host')), \
+             patch.object(c,'copy_file',side_effect=AssertionError('Must not copy')):
+            with self.assertRaisesRegex(c.Blocked,'SSL55_REFERENCE_ONLY'):
+                c.capture()
+
     def test_running_capture_refused(self):
         with patch.object(c, 'guards', side_effect=c.Blocked('shut off')):
             with self.assertRaises(c.Blocked):
