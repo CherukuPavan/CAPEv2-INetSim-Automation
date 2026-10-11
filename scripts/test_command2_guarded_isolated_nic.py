@@ -138,6 +138,9 @@ class AttachTests(unittest.TestCase):
             with patch.object(n.socket,"gethostname",return_value=HOST),\
                  patch.object(n,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
                  patch.object(n.os,"geteuid",return_value=0),\
+                 patch.object(n.os,"fstat",return_value=type(
+                     "RootLock",(),{"st_mode":0o100600,
+                                    "st_uid":0,"st_nlink":1})()),\
                  patch.object(n.sys.stdin,"isatty",return_value=True),\
                  patch.object(n,"LOCK",lock),\
                  patch.object(n,"plan",return_value={"acceptance_receipt_checked":True}),\
