@@ -1,5 +1,16 @@
 # CAPEv2 + INetSim Automation
 
+> **Command 2 development milestone (2026-10-11): 262 aggregate offline tests PASS.**
+> [GitHub Actions evidence](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38146877542).
+> [Detailed network/Windows/CAPE running-snapshot and full-cold-restore workflow](docs/COMMAND2_NETWORK_RUNNING_SNAPSHOT_INTEGRATION.md).
+> Code for guarded isolated NIC attachment, CAPE agent probing, running
+> snapshot capture/revert, cold QCOW2+UEFI+swtpm checkpoint/restore, and
+> 1–16 guest KVM config generation exists on `development`.
+> **DO NOT deploy yet:** the trusted Windows first-boot transport and
+> real separate-host firewall, guest boot, snapshot/revert and parallel
+> CAPE/INetSim acceptance are not complete. SSL-55's win11_1 is still
+> deliberately ZERO NIC. Command 3 stays locked.
+
 > **No Command 3 until Command 2 has passed every real-machine gate.**
 > [Command 2 production acceptance](docs/COMMAND2_PRODUCTION_ACCEPTANCE_GATES.md),
 > [SSL-55 protected master network audit](docs/COMMAND2_SSL55_NETWORK_RECOVERY_READONLY.md),
