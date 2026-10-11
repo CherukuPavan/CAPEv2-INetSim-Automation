@@ -40,6 +40,8 @@ on:
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_master_nic_guard.py"
       - "scripts/test_command2_ssl55_master_nic_guard.py"
+      - "scripts/command2_ssl55_boot_persistence_readonly.py"
+      - "scripts/test_command2_ssl55_boot_persistence_readonly.py"
       - "scripts/command2_ssl55_existing_guard_readonly.py"
       - "scripts/test_command2_ssl55_existing_guard_readonly.py"
       - "scripts/command2_ssl55_win11_1_readiness.py"
@@ -107,6 +109,8 @@ on:
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_master_nic_guard.py"
       - "scripts/test_command2_ssl55_master_nic_guard.py"
+      - "scripts/command2_ssl55_boot_persistence_readonly.py"
+      - "scripts/test_command2_ssl55_boot_persistence_readonly.py"
       - "scripts/command2_ssl55_existing_guard_readonly.py"
       - "scripts/test_command2_ssl55_existing_guard_readonly.py"
       - "scripts/command2_ssl55_win11_1_readiness.py"
@@ -249,6 +253,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_existing_guard_readonly.py' -v
+      - name: Python 3.10 SSL55 boot lifecycle exact unit statuses and autostart tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_boot_persistence_readonly.py' -v
       - name: Python 3.10 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -369,6 +377,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_existing_guard_readonly.py' -v
+      - name: Python 3.12 SSL55 boot lifecycle exact unit statuses and autostart tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_boot_persistence_readonly.py' -v
       - name: Python 3.12 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
