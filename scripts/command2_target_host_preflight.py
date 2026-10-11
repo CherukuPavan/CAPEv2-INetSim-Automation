@@ -99,6 +99,19 @@ def parsed_addresses(value):
     return sorted(nets)
 
 
+
+def parse_outbound_interface(route_lookup):
+    """Parse kernel-only route lookup without surfacing src/gateway secrets."""
+    if not isinstance(route_lookup, list) or len(route_lookup) != 1:
+        return None
+    route = route_lookup[0]
+    if not isinstance(route, dict):
+        return None
+    dev = route.get("dev")
+    if not isinstance(dev, str) or not re.fullmatch(r"[a-zA-Z0-9_.:-]{1,32}", dev):
+        return None
+    return dev if dev != "lo" else None
+
 def libvirt_nets():
     names = run_readonly("virsh", "-c", "qemu:///system", "net-list",
                          "--all", "--name")
@@ -230,6 +243,8 @@ def collect(disk_dir, nvram_dir, template):
             "ip", "-j", "-4", "route", "show", "table", "all")) if tools["ip"] else None,
         "kernel_ipv4_addresses": parsed_addresses(json_command(
             "ip", "-j", "-4", "addr", "show")) if tools["ip"] else None,
+        "outbound_interface": parse_outbound_interface(json_command(
+            "ip", "-j", "-4", "route", "get", "1.1.1.1")) if tools["ip"] else None,
         "libvirt_ipv4_networks": libvirt_nets() if tools["virsh"] else None,
         "template": template_metadata(template) if tools["qemu-img"] else
                     {"visible": False, "qcow2_flat": False},
@@ -264,6 +279,9 @@ def evaluate(profile, count, disk_dir, nvram_dir, cidr):
     require((profile.get("template") or {}).get("qcow2_flat") is True,
             "TEMPLATE_METADATA_NOT_VERIFIED_FLAT_64G")
     require(profile.get("nvram_dir_exists") is True, "NVRAM_DIR_NOT_AVAILABLE")
+    require(isinstance(profile.get("outbound_interface"), str) and
+            bool(profile.get("outbound_interface")),
+            "DEFAULT_OUTBOUND_INTERFACE_UNAVAILABLE")
 
     existing = profile.get("existing_domain_names")
     if not isinstance(existing, list):
@@ -321,6 +339,7 @@ def evaluate(profile, count, disk_dir, nvram_dir, cidr):
         "guest_memory_assumed_mib": RECOMMENDED_RAM_PER_GUEST_MIB,
         "host_memory_reserve_mib": HOST_RAM_RESERVE_MIB,
         "errors": sorted(set(errors)),
+        "detected_outbound_interface": profile.get("outbound_interface"),
         "preflight_pass": not errors,
         "ssl55_new_vm_prohibited": bool(profile.get("reference_ssl55")),
         "ipv4_overlap_checked": all(isinstance(z, list) for z in
