@@ -197,6 +197,25 @@ def assert_no_collision(entries):
                  "Reserved MAC conflicts with existing VM")
 
 
+def assert_cold_source_unshared(template, master_nvram):
+    """Refuse cloning a template/UEFI source referenced by another guest."""
+    expected = {os.path.realpath(str(template)), os.path.realpath(str(master_nvram))}
+    other_names = set(virsh("list", "--all", "--name").splitlines()) - {"win11", ""}
+    for other in sorted(other_names):
+        views = [virsh("dumpxml", "--inactive", other)]
+        if virsh("domstate", other).strip() == "running":
+            views.append(virsh("dumpxml", other))
+        for xml_text in views:
+            root = ET.fromstring(xml_text)
+            for disk in root.findall("./devices/disk/source"):
+                path = disk.get("file")
+                if path and os.path.realpath(path) in expected:
+                    raise StageBlocked("Clone source storage is assigned to another libvirt guest")
+            firmware = root.findtext("./os/nvram")
+            if firmware and os.path.realpath(firmware) in expected:
+                raise StageBlocked("Source UEFI variables are shared with another guest")
+
+
 def validate_inputs(entries, master_uuid, source_template, master_nvram,
                     master_xml, template_sha256, audit_source):
     need(virsh("domuuid", "win11").lower() == master_uuid.lower() and
@@ -206,6 +225,7 @@ def validate_inputs(entries, master_uuid, source_template, master_nvram,
     orig_vars = Path(master_nvram)
     diskstamp = exact_file(source)
     vars_stamp = exact_file(orig_vars)
+    assert_cold_source_unshared(source, orig_vars)
     need(diskstamp[2] > 0 and vars_stamp[2] in
          (540672, 131072, 262144, 1048576),
          "Unexpected OS template / firmware size")
@@ -322,6 +342,7 @@ def make_one(row, *, master_xml, master_disk, master_nvram,
              template, source_stamp, vars_stamp, logdir):
     need(virsh("domstate", "win11").strip() == "shut off",
          "Original Windows master started before clone")
+    assert_cold_source_unshared(template,master_nvram)
     need(exact_file(template) == source_stamp and
          exact_file(master_nvram) == vars_stamp,
          "Original template or NVRAM changed before clone")
@@ -465,6 +486,7 @@ def execute(*, mode, approved_host, journal_dir, template, template_sha256,
         fcntl.flock(lockfd,fcntl.LOCK_EX|fcntl.LOCK_NB)
         host_guard(approved_host,for_stage=True)
         target_host_preflight(entries,template,subnet)
+        assert_cold_source_unshared(source,master_nvram)
         need(virsh("dumpxml","--inactive","win11")==master_xml,
              "Master XML changed during staging authorization")
         need(not any((logdir/(INTENT_PREFIX+row["libvirt_name"]+".json")).exists()
