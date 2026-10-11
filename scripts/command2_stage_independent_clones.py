@@ -308,6 +308,8 @@ def prohibit_reference_host_staging():
     hostname=socket.gethostname().split(".",1)[0].casefold()
     check(hostname not in ("cse-ssl-55","ssl-55"),
           "SSL-55 is REFERENCE-ONLY: additional VM staging prohibited")
+    check(not verified.BACKUP.exists() and not verified.BACKUP.is_symlink(),
+          "SSL-55 is REFERENCE-ONLY: preserved master backup sentinel present")
 
 
 def deploy(count,mode):
