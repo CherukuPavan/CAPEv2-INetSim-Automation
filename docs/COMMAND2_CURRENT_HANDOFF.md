@@ -1,6 +1,43 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+
+## 2026-10-11 ~21:25 UTC: LIVE SSL55 WIN11-1 CAPE AGENT 0.23 PASS
+
+User uploaded CAPE_Command2_Win11_1_AgentNetwork_20261011_212518.txt:
+exact live win11_1, master/trial shutoff, master NIC preserved,
+active CAPE nft guard after boot, libvirt no NAT/DHCP and
+isolated network, exact host route to guest
+192.168.240.101 via cape-lab0 using src 192.168.240.1.
+One genuine read-only HTTP GET returned JSON with
+CAPE Agent! version 0.23, is_user_admin=true. VERIFIED.
+No need to reinstall agent, change guest IPv4, restart VM,
+or repeat host libvirt/firewall configuration.
+
+UNVERIFIED: actual negative guest IPv4/IPv6 egress,
+live two-guest L2 isolation, full cold QCOW2+UEFI+swtpm
+recovery, running full-system snapshot/revert. Do NOT
+execute malware before those acceptance gates.
+
+Relevant upstream CAPE agent /execute POST is available in
+agent/agent.py but changes agent state to RUNNING, even for
+benign commands, potentially altering analysis-ready baseline.
+Avoid blindly invoking /execute for diagnostic probes; stick
+to vetted benign guest diagnostic optical media or separately
+approved status-preserving test. Host-side pure read-only
+snapshot compatibility inventory should be done next;
+VM uses OVMF/pflash + swtpm2, so virtual TPM/UEFI state
+must be accounted for and snapshot compatibility verified.
+Current separate-host running snapshot gate refuses SSL55;
+do not bypass directly. No disk copy/snapshot until host
+resource audit and specific permitted plan are reviewed.
+
+NEXT: collect ONE read-only host file with libvirt snapshot
+--print-xml, VM disk/UEFI/swtpm, free disk, bridge link ports,
+IPv4/IPv6 forwarding and nft guards, then decide safe actual
+negative guest traffic probes and snapshot method.
+
+
 ## 2026-10-11 21:19 UTC — WIN11-1 STATIC IPv4 CONFIG SUCCESS; next read-only agent/network audit
 
 User screenshot of Windows CAPE_FIX FIX.PS1 apply Notepad:
