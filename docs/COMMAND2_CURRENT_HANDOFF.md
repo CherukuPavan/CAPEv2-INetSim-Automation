@@ -1,5 +1,15 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-11 — LIVE GRAPH AUDIT PREPARED; SNAPSHOT STILL BLOCKED
+
+- User supplied snapshot compatibility report: libvirt 11.1.0, QEMU 9.2.2, swtpm 0.7.3, libtpms 0.9.3; NO real snapshot tested.
+- Current win11_1 has RAW OVMF pflash VARS + swtpm2 and live libvirt XML mentioning ORIGINAL MASTER files. Prior qemu-img -U info showed top QCOW2 only. This discrepancy is **not** proof of an independent image.
+- Added `scripts/command2_ssl55_runtime_block_audit.py`: exact SSL55 running win11_1 only; checks protected master and trial SHUT OFF; reads live and inactive XML; issues ONLY QMP `query-block` and `query-named-block-nodes`; reads advisory qemu-img -U --backing-chain JSON; inventories cloned TPM, OVMF metadata, storage available. No changes to VMs or network; refuses snapshots.
+- Added synthetic regression tests and CI path registration. GitHub Actions passing status must be checked after these commits; synthetic CI never proves real block graph or running snapshot viability.
+- IMPORTANT QMP queries are allowlisted informational commands. A QMP query is not an automatic libvirt snapshot compatibility test. Live graph evidence first, then design restorable disk/memory/OVMF/TPM workflow. Preserve original master chain. NO snapshot-revert, rebase, flattening, guest commands or malware yet.
+- Next action: run this single read-only audit on SSL55 and upload the generated TXT. Compare QMP paths with XML and qemu-img metadata; then design valid snapshot/revert and separately prove negative IPv4/IPv6/L2 isolation.
+
+
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
 
 ## 2026-10-11 21:29 UTC — ACTUAL SNAPSHOT READINESS REPORT; CRITICAL TPM/UEFI/BACKING RISKS
