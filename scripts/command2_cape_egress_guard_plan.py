@@ -37,9 +37,13 @@ def render_cape_egress_guard(analysis_subnet="192.168.240.0/24",
         net = IPv4Network(analysis_subnet, strict=True)
     except (ValueError, TypeError) as exc:
         raise GuardPlanBlocked("Malformed canonical analysis subnet") from exc
-    require(net.is_private and net.prefixlen == 24 and
+    rfc1918 = (IPv4Network("10.0.0.0/8"),
+               IPv4Network("172.16.0.0/12"),
+               IPv4Network("192.168.0.0/16"))
+    require(net.prefixlen == 24 and
+            any(net.subnet_of(block) for block in rfc1918) and
             str(net) != "192.168.122.0/24",
-            "Only private nondefault /24 analysis subnets are candidates")
+            "Only RFC1918 nondefault /24 analysis subnets are candidates")
     host_ip = IPv4Address(int(net.network_address) + 1)
     # Policy chain accept applies only to OTHER traffic; our explicit
     # cape-lab0 drop rules never alter unrelated Docker/campus bridges.
