@@ -35,7 +35,7 @@ SOURCES={
     "command2_ssl55_win11_1_oneclick_guest_fix.ps1":
     "a1827b96f4f1c5d2a42a9153ba6cfa00131b49a7",
     "command2_ssl55_win11_1_oneclick_SETUP.cmd":
-    "844bb9926bf9c8c2052e9267accec3ed2e40542a",
+    "a58fd42ee0e137ff3359e1ffb4fa13e5c1b90bf0",
 }
 PHRASE="INSTALL-ONECLICK-WIN11-1-ISO"
 
