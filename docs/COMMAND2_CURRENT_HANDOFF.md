@@ -1,6 +1,63 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 15:16 — SSL55 CAPE nft guard report received; staged benign NIC fix
+
+Operator uploaded CAPE_Command2_GuardNetwork_20261011_151629_yRxE0i87.txt:
+- Existing CAPE nft `inet cape_analysis_guard` PRESENT, three
+  expected chain hooks/priorities, verdict lists
+  cape_forward drop/drop, cape_input accept/drop,
+  cape_output accept/drop, bridge and TCP8000 expected tokens.
+- The analysis cape-analysis-isolated / cape-lab0 is persistent
+  but ACTIVE=no, AUTOSTART=no, no forward/NAT/DHCP.
+- win11 UUID 289d89be-68ec-4c62-90e1-ea930849266f
+  shut off and has 1 inactive NIC (restoration verified).
+- win11_1 UUID 732b2256-ee99-41fa-881d-fbf5c476d960
+  shut off, 0 NICs, NO running CAPE snapshot.
+- win11_trial_1 UUID e75f6fef-347d-462f-9738-4de3df6bfa74
+  shut off, 0 NICs.
+- Candidate win11_1 MAC 02:0a:30:6a:3f:50 COLLISION-FREE in
+  current host/libvirt inventory. Windows target WIN11-1, IPv4
+  192.168.240.101. MAC still NOT RESERVED nor attached.
+- SYSTEMD status for nftables.service and cape-analysis-guard.service
+  was 'unknown' in the audit due to `systemctl is-enabled` and
+  `is-active` nonzero exit statuses, NOT proof of missing services.
+- IPv4/IPv6 actual egress, L2 and reboot guard persistence NEVER
+  tested. safe_to_attach_analysis_nic=false.
+
+**Critical architectural fix:** previous scripts/command2_guarded_isolated_nic.py
+required guest-level negative egress and CAPE agent readback BEFORE
+the guest possessed a NIC: CIRCULAR ACCEPTANCE BLOCK. Added
+scripts/command2_quarantined_benign_nic.py and 10 synthetic tests.
+It is for separate approved hosts ONLY; guards SSL55. After
+verified host-only non-NAT bridge + installed scoped nft policy +
+root-only operator receipt, it can attach one config-only e1000e
+NIC to shut-off guest for BENIGN egress testing, never granting
+CAPE, snapshot or malware approval. Checks exact existing MACs and
+kernel IPv4 routes/address collision. Legacy higher-trust attach
+mode remains, but no longer the initial benign testing path.
+See docs/COMMAND2_BENIGN_QUARANTINE_NIC_STAGE.md.
+
+Added scripts/command2_ssl55_boot_persistence_readonly.py and
+8 synthetic tests. This read-only script imports existing guard
+audit and obtains `systemctl show` LoadState/UnitFileState/ActiveState
+with clear missing vs disabled vs enabled distinctions; inspects
+root-owned /etc/nftables.conf metadata for guard and flush mention;
+checks libvirt autostart for all 3 protected VMs. NEVER activates
+bridge/NIC, writes rules, or grants boot persistence.
+
+GitHub Actions run 38151326848 on `development`: SUCCESS offline
+and Windows PowerShell syntax jobs after strict route/address
+collision check, and run 38150998250 also green. CI is SYNTHETIC
+only. Next user step: single sha-pinned read-only SSL55 boot service
+state TXT before any live network/guest change.
+
+Do not use shared host as proof of full separate-host Command2
+readiness. No additional VMs/disks allowed on SSL55. Do NOT start
+Command3 until agreed development gates, but user ultimately wants
+three-command physical acceptance together on other machine.
+
+
 ## 2026-10-11 14:53+00 user-uploaded SSL55 win11_1 readiness, NEW live-state finding
 
 User uploaded CAPE_Command2_Win11_1_Readiness_20261011_145324_kJ5Azpm5.txt.
