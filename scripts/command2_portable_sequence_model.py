@@ -10,8 +10,9 @@ egress containment plus persistent guards. It cannot run on SSL-55.
 from __future__ import annotations
 
 from copy import deepcopy
-from ipaddress import IPv4Address, IPv4Network
+from ipaddress import IPv4Address
 import re
+from uuid import UUID
 
 class SequenceBlocked(ValueError):
     pass
@@ -105,14 +106,23 @@ def create_model(candidate_blueprint, *, reference_host=False):
               "Unexpected model guest state or name")
         for field in ("libvirt_uuid_candidate", "smbios_generation_id_candidate"):
             ident = item.get(field)
-            check(type(ident) is str and ident not in identities,
-                  "Missing/duplicate guest UUID or generation ID")
+            try:
+                ident = str(UUID(ident)) if type(ident) is str else None
+            except (TypeError, ValueError, AttributeError):
+                ident = None
+            check(ident is not None and ident not in identities,
+                  "Missing/invalid/duplicate guest UUID or generation ID")
             identities.add(ident)
         mac = item.get("mac_candidate")
         ip = item.get("guest_static_ipv4_target")
-        check(type(mac) is str and mac not in macs and
-              type(ip) is str and ip not in ips,
-              "Missing/duplicate guest MAC or IP")
+        check(type(mac) is str and bool(re.fullmatch(r"02:(?:[0-9a-f]{2}:){4}[0-9a-f]{2}", mac))
+              and mac not in macs, "Missing/invalid/duplicate guest MAC")
+        try:
+            parsed_ip = IPv4Address(ip) if type(ip) is str else None
+        except (ValueError, TypeError):
+            parsed_ip = None
+        check(parsed_ip is not None and str(parsed_ip) not in ips,
+              "Missing/invalid/duplicate guest IPv4")
         macs.add(mac)
         ips.add(ip)
         guests[name] = {"stage": "PLANNED", "validated_gates": [],
