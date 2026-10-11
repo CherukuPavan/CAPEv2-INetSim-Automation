@@ -139,10 +139,30 @@ class RunningSnapshotTests(unittest.TestCase):
                      patch.object(s.sys.stdin,"isatty",return_value=True),\
                      patch("builtins.input",return_value="CAPTURE-RUNNING-WIN11_1"),\
                      patch.object(s,"plan",return_value=pre),\
+                     patch.object(s.agentprobe,"probe_agent",return_value={
+                         "result":"COMMAND2_CAPE_AGENT_READONLY_VERIFIED"}),\
                      patch.object(s,"LOCK",lock),\
                      patch.object(s,"virsh",side_effect=faux_virsh):
                     with self.assertRaisesRegex(s.SnapshotBlocked,"both running memory and guest disk"):
                         s.capture(NAME,HOST,UUID,MAC,IP,"/verified")
+
+    def test_live_snapshot_requires_real_cape_agent_response(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lock=Path(tmp)/"snapshot.lock"
+            pre={"domain_live_xml_sha256":"a"*64,"receipt_sha256":"b"*64,
+                 "snapshot_name":"cape_ready_win11_1"}
+            with patch.object(s.socket,"gethostname",return_value=HOST),\
+                 patch.object(s.SENTINEL,"exists",return_value=False),\
+                 patch.object(s.SENTINEL,"is_symlink",return_value=False),\
+                 patch.object(s.os,"geteuid",return_value=0),\
+                 patch.object(s.sys.stdin,"isatty",return_value=True),\
+                 patch("builtins.input",return_value="CAPTURE-RUNNING-WIN11_1"),\
+                 patch.object(s,"plan",return_value=pre),\
+                 patch.object(s,"LOCK",lock),\
+                 patch.object(s.agentprobe,"probe_agent",
+                     side_effect=s.agentprobe.AgentBlocked("Agent missing")):
+                with self.assertRaisesRegex(s.agentprobe.AgentBlocked,"Agent missing"):
+                    s.capture(NAME,HOST,UUID,MAC,IP,"/verified")
 
     def test_no_automatic_revert_or_network_mutation_commands(self):
         source=Path(s.__file__).read_text(encoding="utf-8")
