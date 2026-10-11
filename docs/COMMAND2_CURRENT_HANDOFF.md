@@ -2,6 +2,37 @@
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
 
+## NEW development stage — target-host READ-ONLY preflight (2026-10-11)
+
+User requested continued development under hard restriction: no new VMs
+and no storage-heavy cold copies on SSL-55. GitHub development only.
+
+- scripts/command2_target_host_preflight.py: read-only real target-host
+  inventory/evaluation of candidate Ubuntu 22.04/24.04 and KVM,
+  usable resources, virsh/qemu-img/ip, Command 1 master state,
+  independent QCOW2 template metadata, collisions, kernel IPv4
+  routes/address overlaps, inactive/active libvirt network conflicts,
+  and dynamic uplink from a kernel-only ip route get (no traffic).
+- scripts/test_command2_target_host_preflight.py: mocked negative-path
+  tests including overlap, missing inventory, inadequate resources,
+  reference-host refusal, dynamic Ethernet/Wi-Fi interface discovery,
+  advisory subnet alternatives, and no mutation commands.
+- docs/COMMAND2_TARGET_HOST_PREFLIGHT.md: detailed support and scope.
+- Development Python 3.10 and 3.12 CI updated; actual job conclusion
+  still needs verification; mocks are not physical acceptance.
+
+Existing scripts/command2_cold_checkpoint.py now refuses CAPTURE
+on SSL-55 before inspecting guest or allocating any storage, even if
+someone provides a confirmation phrase. Plan/verify are unchanged.
+Capture test fixture uses a synthetic NON-SSL55 hostname; the refusal
+is tested explicitly. Do not bypass the guard by renaming the host.
+
+Default isolated CIDR remains 192.168.240.0/24; candidate fallback
+is an advisory recommendation ONLY, never an implicit IP change.
+Preflight never changes routing/firewall/VMs. The candidate Ubuntu
+matrix, VM memory plan and max-16 count are not production-certified.
+deploy_authorized is ALWAYS false. No target machine tested yet.
+
 ## OPERATOR DIRECTIVE — SSL-55 IS REFERENCE-ONLY (2026-10-11)
 
 **HARD RESTRICTION:** DO NOT create, stage, define, boot or allocate
