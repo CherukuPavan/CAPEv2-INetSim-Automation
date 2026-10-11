@@ -26,6 +26,7 @@ import command2_windows_guest_config as guestconfig
 import command2_isolated_network_xml_plan as netdesign
 import command2_cape_egress_guard_plan as nftplan
 import command2_cape_kvm_config_plan as capeplan
+import command2_sequential_guest_ip as sequential_ip
 
 
 class Command2Blocked(RuntimeError):
@@ -114,6 +115,17 @@ def proposal(*,count,approved_host,disk_dir,nvram_dir,template,subnet):
     uuids,macs=read_inventory()
     candidate=identity.blueprint(report,existing_uuids=uuids,
                                  existing_macs=macs)
+    # Cross-check the independent count model with strict previous
+    # verified Windows ANALYSIS guest + 1 semantics. This frontend is
+    # FRESH host only; an existing guest requires a separate proven
+    # Windows guest readback, never inferred from the master NAT NIC.
+    sequential=sequential_ip.allocate(count,subnet)
+    need=len(candidate["candidates"]) == len(sequential["new_guests"])
+    require(need,"Candidate count differs from sequential IP allocation")
+    for planned,assigned in zip(candidate["candidates"],sequential["new_guests"]):
+        require(planned["libvirt_name"]==assigned["libvirt_name"] and
+                planned["guest_static_ipv4_target"]==assigned["planned_ipv4"],
+                "Reserved Windows IP conflicts with independently checked +1 allocation")
     # Validate all per-guest Windows config schemas while still read-only.
     for row in candidate["candidates"]:
         guestconfig.make_guest_config(row,subnet)
@@ -131,6 +143,7 @@ def proposal(*,count,approved_host,disk_dir,nvram_dir,template,subnet):
                       "isolated_network_design_only":network_plan,
                       "candidate_l3_nft_guard_only":egress_plan,
                       "cape_kvm_machinery_plan_only":cape_conf,
+                      "guest_ip_sequential_plus_one_plan":sequential,
                       "cape_running_snapshots_verified":False,
                       "network_isolation_verified":False,
                       "nic_attachment_authorized":False,
