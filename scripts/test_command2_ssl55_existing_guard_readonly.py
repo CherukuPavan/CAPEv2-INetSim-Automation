@@ -42,6 +42,8 @@ NFT_TEXT=('table inet cape_analysis_guard { '
 
 
 def virsh_fake(*a):
+    if a==("list","--all","--name"):
+        return "win11\nwin11_1\nwin11_trial_1"
     if a[0]=="domuuid":
         return {"win11":s.MASTER_UUID,"win11_1":s.CLONE_UUID,
                 "win11_trial_1":s.TRIAL_UUID}[a[1]]
@@ -60,6 +62,8 @@ def virsh_fake(*a):
 
 
 def command_fake(*a):
+    if a==("ip","-j","link","show"):
+        return '[{"ifname":"eno1","address":"00:13:33:aa:bb:cc"}]'
     if a==("nft","-j","list","table","inet",s.TABLE): return nft_json()
     if a==("nft","list","table","inet",s.TABLE): return NFT_TEXT
     if a[:2]==("systemctl","is-enabled"):return "disabled"
@@ -101,6 +105,12 @@ class SSL55GuardReadOnlyTests(unittest.TestCase):
         self.assertEqual(out["result"],
                          "SSL55_EXISTING_COMMAND2_NFT_PERSISTENCE_AUDIT_ONLY")
         self.assertTrue(out["existing_lab_firewall"]["expected_guard_shape"])
+        self.assertTrue(out["win11_1_candidate_nic_not_applied"]
+                        ["mac_inventory_complete"])
+        self.assertFalse(out["win11_1_candidate_nic_not_applied"]
+                         ["host_or_libvirt_mac_collision"])
+        self.assertFalse(out["win11_1_candidate_nic_not_applied"]
+                         ["approval_to_attach"])
         self.assertEqual(out["analysis_network"]["active"],"no")
         self.assertEqual(out["protected_domains"]["win11_1"]["nic_counts"]
                          ["inactive"],0)
@@ -131,6 +141,28 @@ class SSL55GuardReadOnlyTests(unittest.TestCase):
                 out=s.audit()
         self.assertFalse(out["existing_lab_firewall"]["guard_present"])
         self.assertFalse(out["safe_to_attach_analysis_nic"])
+
+    def test_candidate_mac_conflict_with_host_blocks_safe_attachment(self):
+        import hashlib
+        digest=hashlib.sha256(
+            ("CAPE_COMMAND2_SSL55_WIN11_1|" + s.CLONE_UUID).encode()
+        ).digest()[:5]
+        collision="02:"+":".join(f"{x:02x}" for x in digest)
+        def host(*a):
+            if a==("ip","-j","link","show"):
+                return json.dumps([{"ifname":"eno1","address":collision}])
+            raise AssertionError("Unexpected command "+str(a))
+        with patch.object(s,"virsh",side_effect=virsh_fake),\
+             patch.object(s,"command",side_effect=host):
+            plan=s.proposed_analysis_mac()
+        self.assertTrue(plan["host_or_libvirt_mac_collision"])
+        self.assertFalse(plan["approval_to_attach"])
+
+    def test_unavailable_mac_inventory_fails_closed(self):
+        with patch.object(s,"virsh",side_effect=virsh_fake),\
+             patch.object(s,"command",return_value=None):
+            with self.assertRaisesRegex(s.AuditBlocked,"MAC inventory"):
+                s.proposed_analysis_mac()
 
     def test_source_does_not_expose_write_capable_commands(self):
         text=Path(s.__file__).read_text()
