@@ -19,6 +19,7 @@ def profile(**changes):
         "architecture": "x86_64",
         "logical_cpus": 16,
         "vmx_svm_cpu_flag": True,
+        "outbound_interface": "eno1",
         "kvm_character_device": True,
         "kvm_access_current_user": True,
         "tools_found": {"virsh": True, "qemu-img": True, "ip": True},
@@ -99,6 +100,18 @@ class PurePreflight(unittest.TestCase):
     def test_existing_target_vm_collides_and_refuses(self):
         with self.assertRaisesRegex(p.count_plan.PortablePlanBlocked, "VM collision"):
             evaluate(existing_domain_names=["win11", "win11_2"])
+
+    def test_outbound_interface_discovered_dynamically(self):
+        self.assertEqual(p.parse_outbound_interface(
+            [{"dev":"enp0s31f6","dst":"1.1.1.1",
+              "gateway":"10.0.0.1","prefsrc":"10.0.0.55"}]), "enp0s31f6")
+        self.assertEqual(p.parse_outbound_interface([{"dev":"wlp2s0"}]), "wlp2s0")
+        self.assertIsNone(p.parse_outbound_interface([{"dev":"lo"}]))
+        self.assertIsNone(p.parse_outbound_interface([{"dev":"../bad"}]))
+        self.assertIsNone(p.parse_outbound_interface([]))
+        result = evaluate(outbound_interface=None)
+        self.assertFalse(result["preflight_pass"])
+        self.assertIn("DEFAULT_OUTBOUND_INTERFACE_UNAVAILABLE",result["errors"])
 
     def test_kernel_route_and_ipv4_addr_json_normalization(self):
         routes = [{"dst":"default"}, {"dst":"10.23.104.0/22"},
