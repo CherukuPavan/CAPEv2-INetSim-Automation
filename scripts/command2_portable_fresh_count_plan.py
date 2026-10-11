@@ -59,10 +59,11 @@ def plan_fresh(total, *, disk_dir, nvram_dir, analysis_subnet,
          "Do not plan guests on common libvirt default NAT subnet")
     need(net.num_addresses >= total + 102,
          "Analysis subnet too small for the assigned host-address offset")
-    need(not any(str(name) in ("win11", "win11_trial_1")
-                 for name in existing_domains),
-         "Fresh-machine plan must not reconfigure an existing master/trial domain")
+    # Command 1 provides a protected source master 'win11' on a fresh host.
+    # Its presence is expected; never include it among the guest targets.
     domains = set(existing_domains)
+    need("win11_trial_1" not in domains,
+         "Unexpected trial VM on new target: inspect before provisioning")
     occupied = {str(path) for path in occupied_artifacts}
     entries = []
     for i in range(1, total+1):
