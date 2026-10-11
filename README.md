@@ -1,5 +1,11 @@
 # CAPEv2 + INetSim Automation
 
+> **No Command 3 until Command 2 has passed every real-machine gate.**
+> [Command 2 production acceptance](docs/COMMAND2_PRODUCTION_ACCEPTANCE_GATES.md),
+> [SSL-55 protected master network audit](docs/COMMAND2_SSL55_NETWORK_RECOVERY_READONLY.md),
+> [isolated network XML plan](scripts/command2_isolated_network_xml_plan.py).
+> None of these are permission to attach a NIC on SSL-55.
+
 > **Command 2 (2026-10-11): developer-stage zero-NIC staging engine exists,
 > but the complete two-command deployment is NOT ready.**
 > [Integrated count entrypoint](scripts/command2_portable_zero_nic_entrypoint.py)
