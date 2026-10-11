@@ -142,7 +142,7 @@ class RunningSnapshotTests(unittest.TestCase):
                          "result":"COMMAND2_CAPE_AGENT_READONLY_VERIFIED"}),\
                      patch.object(s,"LOCK",lock),\
                      patch.object(s,"virsh",side_effect=faux_virsh):
-                    with self.assertRaisesRegex(s.SnapshotBlocked,"both running memory and guest disk"):
+                    with self.assertRaisesRegex(s.SnapshotBlocked,"INTERNAL disk and INTERNAL memory"):
                         s.capture(NAME,HOST,UUID,MAC,IP,"/verified")
 
     def test_live_snapshot_requires_real_cape_agent_response(self):
