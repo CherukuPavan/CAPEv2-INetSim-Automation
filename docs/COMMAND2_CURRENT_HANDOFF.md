@@ -5,6 +5,39 @@ This is a state handoff, not a complete deployment approval. User builds
 incrementally on shared Ubuntu host SSL-55; user pastes carefully guarded
 terminal commands and uploads one report instead of repeated console output.
 
+## 2026-10-11 developer continuation: guarded cold capture + count reconciliation
+
+**NEW DEV-ONLY IMPLEMENTATION; ZERO NEW SSL-55 HOST OPERATIONS.**
+- scripts/command2_cold_checkpoint.py implements read-only plan,
+  separately confirmed cold capture with exact clone-only disk/UEFI/swtpm
+  checksums + private manifest, and read-only verify. It refuses capture
+  on running clone or active clone emulator/swtpm; preserves incomplete
+  artifacts for manual review and never touches original master.
+  There is NO restore/apply implementation and NO host-accepted checkpoint.
+- scripts/command2_continuation_plan.py plans TOTAL requested clone
+  count, safely preserving existing win11_1; plans only missing
+  win11_2..win11_5 when total=5; refuses collisions and never stages VMs.
+- scripts/command2_cold_and_count_plan_acceptance.sh performs a single
+  read-only TXT plan on the host AFTER offline unit tests.
+- Three new unit test modules: 19 local synthetic tests passed, including
+  full fake capture/verify, partial failure and malicious path cases.
+  New GitHub Actions workflow targets Python 3.10 and 3.12;
+  CI conclusion is not yet independently confirmed.
+- **Extra shared-host storage safety gate**: capture now needs at least
+  104 GiB free (64 GiB max copy +30 GiB reserve +10 GiB margin).
+  Last reported 96.11 GiB would BLOCK capture. Four additional clones
+  need an estimated 286 GiB at the current 64 GiB-per-clone policy.
+- Implementation and future restore limitations documented in
+  docs/COMMAND2_COLD_CAPTURE_IMPLEMENTATION.md.
+
+**Immediate next operator gate:** SHA-pinned read-only consolidated
+cold checkpoint + total count plan, then upload its ONE TXT report.
+Do not shut down VM, start capture, add NICs, enable analysis network,
+make master/TPM changes or run malware until review and storage resolution.
+Command 2 is NOT complete: snapshot restore, unique guest networking,
+guard persistence, isolation tests, dual-VM acceptance and portability
+are still outstanding.
+
 ## Verified on SSL-55 (actual operator TXT reports)
 - Protected original Windows master `win11` (UUID
   `289d89be-68ec-4c62-90e1-ea930849266f`) **SHUT OFF**;
