@@ -1,6 +1,40 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 20:56+ UTC — ISO mounted but existing WIN11-1 guest has UNKNOWN DEFAULT ROUTE; no Windows IP set
+
+User uploaded CAPE_Command2_WindowsISO_20261011_204246.txt:
+host correctly created ISO /var/lib/libvirt/images/cape-clones-staging/win11_1.command2_firstboot.iso and inserted into
+running win11_1 sdb via virsh change-media --live --config. VM disk unchanged.
+Screen capture in Windows elevated PowerShell showed first user-typed one-liner
+Get-CimInstance Win32_LogicalDisk -Filter DriveType=5 => Invalid query,
+then corrected PowerShell script running read-only Plan blocked:
+COMMAND2_ONE_NIC_BLOCKED: Unexpected IPv4/IPv6 default route
+(do not configure under uncertain routing). No Windows IP/hostname changes
+were applied. User cannot conveniently copy/paste commands into offline VM
+and asks to avoid future manual Windows PowerShell typing.
+
+Resolution in development: scripts/command2_windows_one_nic_diagnostic.ps1
+and scripts/command2_windows_one_nic_CHECK.cmd provide a double-click
+READ-ONLY Windows CD-ROM diagnostic (route next-hop/interface, NICs, IPv4/IPv6
+addresses, current hostname and SMBIOS UUID) that writes a Windows Public
+Documents TXT and opens Notepad, ready for screenshot. NO IP/firewall/route
+changes; never bypass the default-route guard before identifying it.
+GitHub Actions run 38174511351 PASS dual Python + real Windows AST checks.
+Next user action: on SSL55 replace EXISTING sdb firstboot ISO with a new
+immutable GitHub pinned small DIAG-only ISO via virsh change-media
+--update --live --config (no --force, preserve original ISO), then
+Windows GUI File Explorer -> CAPE_DIAG CD -> double-click CHECK.cmd;
+user uploads Notepad screenshot to review default routes. The next
+approved guest configuration can similarly be launched by double-click
+a .cmd from ISO, no Windows terminal copy/paste or internet.
+
+Remaining goal unchanged: finish real SSL55 win11_1 benign static IP
+192.168.240.101, WIN11-1 hostname, prove guest/host IPv4/IPv6 no egress,
+CAPE Agent port8000, running disk+memory snapshot + benign revert;
+then automate Command2 for N independent clones and work Command3,
+full 3-command tests on separate host. INetSim service deferred.
+
 ## 2026-10-11 20:27 UTC: SSL55 win11_1 BENIGN boot confirmed; Windows static-IP path next
 
 Uploaded CAPE_Command2_Win11_1_Boot_20261011_202713.txt:
