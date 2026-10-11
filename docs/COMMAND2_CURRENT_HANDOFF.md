@@ -48,6 +48,32 @@ Preflight never changes routing/firewall/VMs. The candidate Ubuntu
 matrix, VM memory plan and max-16 count are not production-certified.
 deploy_authorized is ALWAYS false. No target machine tested yet.
 
+## Workflow preference and verified offline testing — 2026-10-11
+
+Operator wants to minimize back-and-forth terminal commands/uploads
+by allowing a limited approved report-folder or connected-source
+workflow. **Do not interpret this as authorization to access SSL-55
+by remote shell, request credentials, enable SSH, or perform writes.**
+Current Chat session can directly maintain GitHub development; it
+cannot independently open SSL-55 terminal or home-directory files.
+For future diagnostics, use a single reviewed read-only collector
+writing redacted TXT reports to an operator-controlled folder.
+User may upload the single report, or deliberately connect a
+report-only sanctioned cloud folder if institutional policy permits.
+Never upload full TPM state, BitLocker materials, OwnerAuth, keys,
+unredacted campus network configuration or malware samples.
+SSL-55 remains NO EXTRA VMs and NO COLD BACKUPS; risky actions
+require explicit operator review and must target other approved host.
+
+ACTUAL operator report:
+CAPE_Command2_OfflinePreflightTests_20261011_103641_ZnSj1eKa.txt.
+Verified offline acceptance groups: portable count model 7/7,
+target-host preflight 17/17, checkpoint mocked guards 13/13;
+37/37 tests passed; final
+RESULT: COMMAND2_OFFLINE_PREFLIGHT_TESTS_PASS.
+Tests are synthetic and do NOT prove host deploy, egress isolation
+or VM snapshot restore. This is the latest REAL operator report.
+
 ## OPERATOR DIRECTIVE — SSL-55 IS REFERENCE-ONLY (2026-10-11)
 
 **HARD RESTRICTION:** DO NOT create, stage, define, boot or allocate
