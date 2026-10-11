@@ -135,7 +135,8 @@ class InstallerTests(unittest.TestCase):
         def only_systemd(*cmd,**kw):
             writes.append(cmd)
             if cmd[:2] not in (("systemctl","daemon-reload"),
-                               ("systemctl","enable")):
+                               ("systemctl","enable"),
+                               ("systemd-analyze","verify")):
                 raise AssertionError("Unexpected mutation: "+str(cmd))
             return ""
         with patch.object(m,"INSTALL_DIR",root/"bin"),\
@@ -148,6 +149,7 @@ class InstallerTests(unittest.TestCase):
              patch.object(m.os,"fstat",return_value=lckmeta),\
              patch.object(m,"plan",return_value=base),\
              patch.object(m,"inspect_sources",return_value=source),\
+             patch.object(m,"ensure_helper_parent",return_value=None),\
              patch.object(m,"verify_after",return_value={"load_state":"loaded"}),\
              patch.object(m,"command",side_effect=only_systemd),\
              patch("builtins.input",return_value=m.AUTH_PHRASE):
@@ -155,7 +157,8 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(out["result"],
                          "SSL55_CAPE_ONLY_GUARD_UNIT_INSTALLED_ENABLED_NOT_STARTED")
         self.assertFalse(out["reboot_persistence_verified"])
-        self.assertEqual(writes,[("systemctl","daemon-reload"),
+        self.assertEqual(writes,[("systemd-analyze","verify",str(root/"guard.service")),
+                                 ("systemctl","daemon-reload"),
                                  ("systemctl","enable","cape-analysis-guard.service")])
         self.assertTrue((root/"bin"/"command2_ssl55_guard_scoped_replay.py").is_file())
         self.assertTrue((root/"etc"/"approved.json").is_file())
