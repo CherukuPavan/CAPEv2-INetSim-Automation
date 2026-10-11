@@ -62,8 +62,9 @@ class SSL55Win11GuestFixTests(unittest.TestCase):
             self.assertNotIn(forbidden,self.ps)
 
     def test_click_launcher_auto_elevates_and_checks_sha256_before_execution(self):
-        for wanted in ('fltmc >NUL', "Start-Process -FilePath 'cmd.exe'",
-                       "-Verb RunAs", "Get-FileHash -LiteralPath",
+        for wanted in ("Start-Process -FilePath 'powershell.exe'",
+                       "-Verb RunAs", "-Wait -PassThru",
+                       "Get-FileHash -LiteralPath",
                        "__PS_SHA256__","%~dp0","FIX.PS1",
                        "pause"):
             self.assertIn(wanted,self.cmd)
