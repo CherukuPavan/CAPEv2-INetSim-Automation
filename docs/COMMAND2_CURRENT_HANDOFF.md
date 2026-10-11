@@ -2,6 +2,21 @@
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
 
+## NEW offline acceptance for portable preflight
+
+- scripts/command2_target_host_preflight_offline_acceptance.sh runs
+  synthetic fresh-host planning, 17 new target preflight tests, and
+  cold-checkpoint safety regressions under unprivileged Python, writing
+  one private TXT report in the operator HOME. It does not call sudo,
+  enumerate the live libvirt host, allocate VM disks, or change networks.
+- This separate test-only runner MAY be used on SSL-55; it NEVER
+  runs the live host preflight or creates additional VMs there.
+- The first real test report is pending. Do not claim CI or test pass
+  until evidence is reviewed. Any failing test must be fixed in
+  development and rerun without modifying the Windows guests.
+- The portable live target preflight itself is for another approved
+  supported machine, not SSL-55. deploy_authorized remains false.
+
 ## NEW development stage — target-host READ-ONLY preflight (2026-10-11)
 
 User requested continued development under hard restriction: no new VMs
