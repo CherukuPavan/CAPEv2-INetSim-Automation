@@ -23,6 +23,7 @@ import command2_guest_identity_blueprint as identity
 import command2_identity_reservation_journal as reserve
 import command2_portable_zero_nic_stager as stager
 import command2_windows_guest_config as guestconfig
+import command2_isolated_network_xml_plan as netdesign
 
 
 class Command2Blocked(RuntimeError):
@@ -114,9 +115,13 @@ def proposal(*,count,approved_host,disk_dir,nvram_dir,template,subnet):
     # Validate all per-guest Windows config schemas while still read-only.
     for row in candidate["candidates"]:
         guestconfig.make_guest_config(row,subnet)
+    network_plan=netdesign.plan("cape-analysis-isolated","cape-lab0",
+                                subnet,[r["guest_static_ipv4_target"]
+                                        for r in candidate["candidates"]])
     return candidate,{"actual_master_memory_mib":guest_ram_mib,
                       "available_ram_mib":facts["available_ram_mib"],
                       "required_total_gib":report["storage_required_gib"],
+                      "isolated_network_design_only":network_plan,
                       "resource_preflight_pass":True}
 
 
