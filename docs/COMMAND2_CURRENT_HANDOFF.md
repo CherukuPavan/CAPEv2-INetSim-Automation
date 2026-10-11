@@ -1,6 +1,40 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 ~20:13 UTC: bridge success, BENIGN-only single existing win11_1 NIC stage prepared
+
+User uploaded CAPE_Command2_Bridge_20261011_201302.txt.
+`SSL55_ISOLATED_BRIDGE_ONLY_ACTIVE_WITH_NO_GUEST_NICS`
+reported success: cape-analysis-isolated ACTIVE, bridge cape-lab0
+192.168.240.1, current CAPE guard present, nft table inventory
+unchanged, protected win11/win11_1/trial SHUT OFF, win11_1 and
+trial still ZERO saved NICs. Guest IPv4/IPv6 negative egress, L2,
+agent HTTP, snapshots still NOT verified. Do not re-run net-start.
+
+Committed SSL55-specific scripts/command2_ssl55_win11_1_benign_nic.py
+and scripts/test_command2_ssl55_win11_1_benign_nic.py with 11 synthetic
+tests on development. Separate-host NIC attachment script unchanged.
+No actual host write has happened yet.
+
+The SSL55 script verifies protected exact win11_1 UUID, saved unique
+independent disk/UEFI/TPM, bridge active and isolated port yes,
+no libvirt NAT/IPv6/DHCP/DNS, empty bridge ports,
+no other running libvirt VM, correct current boot CAPE nft guard,
+base nftables disabled, prior win11 saved NIC intact, unique MAC
+02:0a:30:6a:3f:50, and no clone snapshots.
+Only explicit typed ATTACH-ONE-BENIGN-NIC-WIN11_1-SSL55 under root
+exclusive lock can call ONE virsh attach-interface --config on the
+SHUT OFF existing win11_1. No VM boot, static IP, firewall edits,
+snapshot or other clone created. On PARTIAL halt and inspect.
+GitHub Actions run 38171586986 PASSED Windows parser+Python offline.
+
+NEXT operator step: single SHA-pinned script fetch, read-only plan,
+operator-typed saved NIC config attach, one TXT report.
+Then separate Windows guest safely monitored benign network
+qualification, identity/IP, agent HTTP, running snapshot, benign
+revert. No malware execution until actual IPv4/IPv6 containment proven.
+
+
 
 ## 2026-10-11 20:05 UTC: live SSL55 reboot test PASS; bridge-only stage next
 
