@@ -10,6 +10,8 @@ for file in \
   command2_cold_checkpoint.py \
   test_command2_portable_fresh_count_plan.py \
   test_command2_target_host_preflight.py \
+  command2_guest_identity_blueprint.py \
+  test_command2_guest_identity_blueprint.py \
   test_command2_cold_checkpoint.py \
   test_command2_cold_checkpoint_capture.py
 do
@@ -37,6 +39,8 @@ set +e
     -s "$HERE" -p 'test_command2_target_host_preflight.py' -v
   PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B -m unittest discover \
     -s "$HERE" -p 'test_command2_cold_checkpoint*.py' -v
+  PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B -m unittest discover \
+    -s "$HERE" -p 'test_command2_guest_identity_blueprint.py' -v
   echo 'RESULT: COMMAND2_OFFLINE_PREFLIGHT_TESTS_PASS'
 ) > "$REPORT" 2>&1
 RESULT=$?
