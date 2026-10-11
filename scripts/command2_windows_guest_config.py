@@ -46,10 +46,12 @@ def make_guest_config(entry, subnet):
     need(type(mac) is str and bool(re.fullmatch(
         r"02:(?:[0-9a-f]{2}:){4}[0-9a-f]{2}",mac)),
         "Unapproved expected guest NIC MAC")
-    need(entry.get("disk_target","").endswith(
-         "/"+name+".command2.qcow2") and
-         entry.get("uefi_nvram_target","").endswith(
-         "/"+name+".command2_VARS.fd"),
+    disk = entry.get("disk_target")
+    nvram = entry.get("uefi_nvram_target")
+    need(type(disk) is str and type(nvram) is str and
+         disk.startswith("/") and nvram.startswith("/") and
+         disk.endswith("/"+name+".command2.qcow2") and
+         nvram.endswith("/"+name+".command2_VARS.fd") and disk != nvram,
          "Not a canonical reserved independent clone")
     return {"format":"COMMAND2_GUEST_PERSONALIZATION_V1",
             "guest_name":name,
