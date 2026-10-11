@@ -30,6 +30,10 @@ def fakelib(*args):
 
 
 def fakecmd(*args):
+    if args==("ip","-j","-4","route","show","table","all"):
+        return 0,'[{"dst":"10.23.96.0/20","dev":"enp0s31f6"}]'
+    if args==("ip","-j","-4","addr","show"):
+        return 0,'[{"ifname":"enp0s31f6","addr_info":[{"family":"inet","local":"10.23.105.55","prefixlen":20}]}]'
     if args[:1]==("nft",):
         return 1,""
     if args[:1]==("df",):
@@ -54,6 +58,8 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(data["analysis_network"]["active"],"no")
         self.assertEqual(data["planned_first_analysis_guest_static_ipv4"],
                          "192.168.240.101")
+        self.assertTrue(data["analysis_ipv4_subnet_overlap"]
+                        ["no_nonbridge_collision_proven"])
         for key in ("host_ipv4_egress_isolation_proved",
                     "host_ipv6_egress_isolation_proved",
                     "guest_windows_static_ipv4_verified",
@@ -62,6 +68,26 @@ class ReadinessTests(unittest.TestCase):
                     "master_modified","clone_modified",
                     "host_network_modified"):
             self.assertFalse(data[key])
+
+    def test_nonbridge_route_and_address_overlaps_are_detected(self):
+        def conflicted(*args):
+            if args[:3]==("ip","-j","-4"):
+                if "route" in args:
+                    return 0,'[{"dst":"192.168.240.0/24","dev":"docker0"}]'
+                return 0,'[{"ifname":"campus0","addr_info":[{"family":"inet","local":"192.168.240.55","prefixlen":24}]}]'
+            raise AssertionError("Only IPv4 inventory allowed")
+        with patch.object(q,"command",side_effect=conflicted):
+            report=q.check_ipv4_subnet_overlap()
+        self.assertFalse(report["no_nonbridge_collision_proven"])
+        self.assertEqual(len(report["nonbridge_overlaps"]),2)
+        self.assertEqual({x["device"] for x in report["nonbridge_overlaps"]},
+                         {"docker0","campus0"})
+
+    def test_missing_ipv4_host_inventory_never_implies_safe_subnet(self):
+        with patch.object(q,"command",return_value=(1,"")):
+            result=q.check_ipv4_subnet_overlap()
+        self.assertFalse(result["inventory_available"])
+        self.assertFalse(result["no_nonbridge_collision_proven"])
 
     def test_wrong_reference_host_rejected_before_libvirt(self):
         with patch.object(q.socket,"gethostname",return_value="other-server"),\
