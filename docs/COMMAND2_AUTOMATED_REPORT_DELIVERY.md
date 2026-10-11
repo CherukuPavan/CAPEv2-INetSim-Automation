@@ -51,6 +51,28 @@ fail if Drive authorization or scheduled connector access changes.
    grant in the Google account's third-party access settings if needed.
    This does not disconnect ChatGPT's separate Drive authorization.
 
+## Fixed installer invocation block (2026-10-11)
+
+Operator encountered `PASS: Setup scripts verified` followed by
+`BLOCKED: run interactively` after pasting an outer `bash <<'BASH'`
+wrapper. Root cause: shell heredocs are non-TTY stdin (`-t 0`
+false), even when a human has an interactive controlling terminal.
+Development installer now requires a real controlling terminal and
+reads the explicit confirmation from `/dev/tty` rather than stdin.
+Offline regression test asserts the distinction. This fixes the
+launcher gate only: SSL-55 installation has NOT been performed,
+and there is no automatic uploader/timer demonstrated running.
+
+User explicitly requested that the assistant operate the Ubuntu CMD
+without any further terminal copy/paste. In the current Chat
+toolset only GitHub and connected Google Drive are directly
+accessible; **no SSH/local Ubuntu terminal tool is connected**.
+Do not claim a Google Drive connection confers local CLI control.
+Do not suggest enabling passwordless sudo, exposing a host terminal
+to the internet, or installing a self-hosted CI runner on SSL-55.
+Only a separate explicitly authorized/supported computer-control
+session or a one-time operator setup can change the user's host.
+
 ## Strict limitations
 
 - Uploader only scans one user-owned mode-0700 local folder, without
