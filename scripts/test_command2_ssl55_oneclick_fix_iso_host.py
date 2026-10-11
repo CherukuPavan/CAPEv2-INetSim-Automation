@@ -61,6 +61,82 @@ class OneclickIsoHostTests(unittest.TestCase):
             with self.assertRaisesRegex(h.OpticalBlocked,"checksum"):
                 h.checked_source(root)
 
+    def test_libvirt_netinfo_spacing_and_systemd_disabled_unit_parse(self):
+        a=h.parse_key_values(
+            "Name:             cape-analysis-isolated\n"
+            "UUID:             abcdef01\n"
+            "Active:           yes\n"
+            "Persistent:       yes\n"
+            "Autostart:        no\n"
+            "Bridge:           cape-lab0")
+        self.assertEqual(a["active"],"yes")
+        self.assertEqual(a["autostart"],"no")
+        self.assertEqual(a["bridge"],"cape-lab0")
+        b=h.parse_key_values(
+            "LoadState=loaded\nUnitFileState=disabled\nActiveState=inactive",
+            separator="=")
+        self.assertEqual(b["unitfilestate"],"disabled")
+        with self.assertRaisesRegex(h.OpticalBlocked,"Duplicate"):
+            h.parse_key_values("Active: yes\nActive: no")
+
+    def test_host_preflight_does_not_block_on_normal_virsh_spaces_or_disabled_systemd(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td)
+            orig=folder/"diagnostic.iso"
+            orig.write_bytes(b"fixture")
+            marker=folder/"preserved"
+            marker.mkdir()
+            def v(*args):
+                if args==("domuuid",h.VM):return h.UUID
+                if args==("domstate",h.VM):return "running"
+                if args==("list","--name"):return h.VM
+                if args[0]=="domstate":return "shut off"
+                if args[0]=="dumpxml":return vmxml(args[-1])
+                if args==("net-dumpxml","cape-analysis-isolated"):
+                    return ('<network><name>cape-analysis-isolated</name>'
+                            '<bridge name="cape-lab0"/><port isolated="yes"/>'
+                            '<dns enable="no"/>'
+                            '<ip address="192.168.240.1" netmask="255.255.255.0"/>'
+                            '</network>')
+                if args==("net-info","cape-analysis-isolated"):
+                    return ("Name:       cape-analysis-isolated\n"
+                            "Active:          yes\n"
+                            "Autostart:     no\n"
+                            "Persistent:     yes\n"
+                            "Bridge:  cape-lab0")
+                raise AssertionError(args)
+            def command(*args,**kwargs):
+                if args[0]=="systemctl":
+                    if args[-1]=="cape-analysis-guard.service":
+                        return ("LoadState=loaded\nUnitFileState=enabled\n"
+                                "ActiveState=active\nResult=success\nExecMainStatus=0")
+                    if args[-1]=="nftables.service":
+                        return ("LoadState=loaded\nUnitFileState=disabled\n"
+                                "ActiveState=inactive")
+                if args==("nft","list","table","inet","cape_analysis_guard"):
+                    return "table inet cape_analysis_guard {}"
+                raise AssertionError(args)
+            # The synthetic stage source/host assertions cover exactly
+            # the real failure path; no process changes, network calls,
+            # ISO creation or VM mutation are exercised.
+            with patch.object(h.os,"geteuid",return_value=0),\
+                 patch.object(h.socket,"gethostname",
+                              return_value="CSE-SSL-55"),\
+                 patch.object(h,"ROOT",folder),\
+                 patch.object(h,"OLD",orig),\
+                 patch.object(h,"NEW",folder/"not-yet.iso"),\
+                 patch.object(h,"SENTINEL",marker),\
+                 patch.object(h,"checked_source",return_value={
+                     "guest_fix.ps1":b"synthetic"}),\
+                 patch.object(h,"virsh",side_effect=v),\
+                 patch.object(h,"command",side_effect=command),\
+                 patch.object(h.shutil,"which",return_value="/usr/bin/genisoimage"):
+                result=h.preflight(folder)
+        self.assertEqual(result["result"],
+                         "SSL55_WIN11_1_ONECLICK_ISO_PLAN_ONLY")
+        self.assertFalse(result["host_changes"])
+        self.assertFalse(result["windows_changed"])
+
     def test_operator_declined_before_iso_create_or_change_media(self):
         with patch.object(h.sys.stdin,"isatty",return_value=True),\
              patch.object(h,"preflight",return_value={"expected":"ok"}),\
