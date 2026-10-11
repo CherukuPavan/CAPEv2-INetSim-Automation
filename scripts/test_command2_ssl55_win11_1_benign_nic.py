@@ -100,6 +100,7 @@ class NicTests(unittest.TestCase):
                  "win11":{"power_state":"shut off","nic_counts":{"inactive":1}},
                  "win11_1":{"power_state":"shut off","nic_counts":{"inactive":0}},
                  "win11_trial_1":{"power_state":"shut off","nic_counts":{"inactive":0}}}),\
+             patch.object(x.boot,"domain_autostart",return_value=False),\
              patch.object(x,"virsh",return_value="another_guest"):
             with self.assertRaisesRegex(x.BenignBlocked,"Another libvirt"):
                 x.guard_and_guests()
