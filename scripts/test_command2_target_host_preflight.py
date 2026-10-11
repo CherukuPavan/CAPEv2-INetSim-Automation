@@ -68,6 +68,18 @@ class PurePreflight(unittest.TestCase):
         self.assertIn("ANALYSIS_SUBNET_OVERLAPS_ADDRESSES", x["errors"])
         self.assertIn("ANALYSIS_SUBNET_OVERLAPS_LIBVIRT_NETWORKS", x["errors"])
 
+    def test_private_subnet_suggestion_never_auto_changes_requested_ip(self):
+        result = evaluate(kernel_ipv4_routes=["192.168.240.0/24"])
+        self.assertFalse(result["preflight_pass"])
+        self.assertEqual(result["planned_vms"][0]["planned_ipv4"], "192.168.240.101")
+        self.assertEqual(result["suggested_nonoverlapping_subnet_only"],
+                         "192.168.241.0/24")
+        self.assertTrue(result["suggested_subnet_not_automatically_applied"])
+        self.assertFalse(result["deploy_authorized"])
+        self.assertIsNone(p.suggest_nonoverlapping_subnet(None, [], []))
+        self.assertIsNone(p.suggest_nonoverlapping_subnet(
+            list(p.CANDIDATE_ISOLATED_SUBNETS), [], []))
+
     def test_unavailable_route_inventory_fail_closed(self):
         x = evaluate(kernel_ipv4_routes=None, kernel_ipv4_addresses=None,
                      libvirt_ipv4_networks=None)
