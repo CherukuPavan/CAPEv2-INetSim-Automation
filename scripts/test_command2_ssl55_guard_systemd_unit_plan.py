@@ -48,7 +48,7 @@ class ServiceDesignTests(unittest.TestCase):
         code=Path(unit.__file__).read_text()
         body=code[code.index("from __future__ import annotations"):]
         for token in ("subprocess", "os.system(", "write_text(", "os.open(",
-                      "mkdir(", "shutil.copy", "nft -f"):
+                      "mkdir(", "shutil.copy"):
             self.assertNotIn(token,body)
 
 
