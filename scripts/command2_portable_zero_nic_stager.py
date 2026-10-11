@@ -33,6 +33,8 @@ import command2_target_host_preflight as hostaudit
 GIB = 1024 ** 3
 VIRTUAL_BYTES = 64 * GIB
 RESERVE_BYTES = 40 * GIB  # 30 GiB reserve plus 10 GiB shared-host margin
+SSL55_PRESERVATION_SENTINEL = Path(
+    "/var/backups/cape-win11-preservation/win11-state-92POdfNc")
 LOCK_NAME = ".command2-stager.lock"
 INTENT_PREFIX = "command2-stage-intent-"
 COMPLETE_PREFIX = "command2-stage-complete-"
@@ -67,6 +69,11 @@ def host_guard(approved_host, *, for_stage):
     real = socket.gethostname().split(".", 1)[0].lower()
     need(real not in ("cse-ssl-55", "ssl-55"),
          "SSL55_REFERENCE_ONLY: staging prohibited")
+    # Defense-in-depth if SSL-55 was renamed; never mutate any host that
+    # still carries its canonical protected Windows preservation backup.
+    need(not SSL55_PRESERVATION_SENTINEL.exists() and
+         not SSL55_PRESERVATION_SENTINEL.is_symlink(),
+         "SSL55_REFERENCE_ONLY: preservation sentinel present")
     need(isinstance(approved_host, str) and re.fullmatch(r"[a-z0-9_.-]{1,64}", approved_host),
          "Explicit safe target hostname required")
     need(real == approved_host, "Approval host differs from actual host")
