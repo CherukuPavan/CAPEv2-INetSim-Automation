@@ -10,6 +10,12 @@ UPLOADER = Path(__file__).with_name("command2_upload_approved_reports.sh")
 SETUP = Path(__file__).with_name("command2_setup_auto_report_sync.sh")
 
 
+def executable_shell_lines(source):
+    """Ignore whole-line comments when scanning for prohibited commands."""
+    return "\n".join(line for line in source.splitlines()
+                     if line.strip() and not line.lstrip().startswith("#"))
+
+
 class ReportSyncTests(unittest.TestCase):
     def test_shell_syntax(self):
         for s in (UPLOADER, SETUP):
@@ -26,7 +32,7 @@ class ReportSyncTests(unittest.TestCase):
         self.assertIn("ENABLE-CAPE-AUTO-REPORTS", script)
         self.assertNotIn("[[ -t 0 ]]", script)
         self.assertIn("id -u", script)
-        self.assertNotIn("sudo ", script)
+        self.assertNotIn("sudo ", executable_shell_lines(script))
 
     def test_user_only_no_vm_or_unapproved_copy(self):
         text = UPLOADER.read_text(encoding="utf-8")
@@ -34,10 +40,17 @@ class ReportSyncTests(unittest.TestCase):
         self.assertIn("CAPE_Command2_OfflinePreflightTests_", text)
         self.assertIn("--immutable", text)
         self.assertIn("OwnerAuth", text)
-        self.assertNotIn("sudo ", text)
+        executable = executable_shell_lines(text)
+        self.assertNotIn("sudo ", executable)
         for bad in ("virsh ", "qemu-img ", "nft ", "rclone sync",
                     "rclone delete", "rm -rf", "systemctl"):
-            self.assertNotIn(bad, text)
+            self.assertNotIn(bad, executable)
+
+    def test_prohibited_command_detection_does_not_ignore_real_shell_code(self):
+        source = "# No sudo or VM access.\nsudo /bin/true\n"
+        self.assertIn("sudo ", executable_shell_lines(source))
+        source = "# No sudo or VM access.\necho safe\n"
+        self.assertNotIn("sudo ", executable_shell_lines(source))
 
     def test_mock_upload_only_whitelist_and_skip_secrets_symlinks(self):
         with tempfile.TemporaryDirectory() as tmp:
