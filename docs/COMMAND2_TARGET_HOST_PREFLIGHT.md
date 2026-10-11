@@ -94,3 +94,11 @@ never intentionally printed. There is no need to execute this on SSL-55.
 
 **Never interpret this preflight as permission to stage VMs or run samples.
 SSL-55 will not be used for additional VM setup.**
+
+## Count scale-up design gate
+
+Portable planning is no longer restricted to the old arbitrary
+16-guest simulation size. Its software safety cap is 4096 entries,
+subject to much tighter CIDR, RAM and free-space requirements.
+The former SSL-55-specific staging tool remains forbidden for new VMs
+on SSL-55. 32-guest examples are simulated and not physically deployed.
