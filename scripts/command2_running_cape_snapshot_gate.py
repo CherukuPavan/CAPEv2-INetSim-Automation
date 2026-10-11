@@ -241,9 +241,10 @@ def capture(name, target_host, expected_uuid, expected_mac, guest_ip, receipt, s
         memory = root.find("memory")
         disks = root.findall("./disks/disk")
         require(memory is not None and
-                memory.get("snapshot") not in ("no","none") and
-                any(x.get("snapshot") not in ("no","none") for x in disks),
-                "Snapshot did not record both running memory and guest disk")
+                memory.get("snapshot") == "internal" and
+                len(disks) == 1 and
+                disks[0].get("snapshot") == "internal",
+                "CAPE running snapshot must have exactly one INTERNAL disk and INTERNAL memory; no disk-only fallback")
         require(virsh("domstate", name) == "running",
                 "Guest stopped unexpectedly during snapshot")
         return {
