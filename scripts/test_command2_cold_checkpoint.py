@@ -101,14 +101,25 @@ class ColdTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             parent=Path(tmp)/'checkpoints';parent.mkdir()
             target=parent/'cold-20261011T010000Z-abcdef123456'
-            target.mkdir();(target/'swtpm').mkdir()
+            target.mkdir(mode=0o700);(target/'swtpm').mkdir(mode=0o700)
             (target/'manifest.json').write_text(json.dumps({
                 'version':1,'vm':c.VM,'uuid':c.UUID,
                 'kind':'command2-cold-clone-checkpoint',
-                'artifacts':[{'name':'../master.qcow2'}]*4}))
+                'artifacts':[{'name':n} for n in (
+                    'disk.qcow2', 'uefi_VARS.fd', 'domain.xml',
+                    'swtpm/tpm2-00.permall', '../master.qcow2')]}))
             (target/'manifest.json').chmod(0o600)
-            with patch.object(c,'CHECKPOINTS',parent),patch.object(c.os,'geteuid',return_value=0):
-                with self.assertRaisesRegex(c.Blocked, 'Duplicate'):
+            # TemporaryDirectory belongs to the non-root CI/operator account.
+            # Bypass only root-ownership assertions in THIS malformed-manifest
+            # fixture, preserving all real production owner checks.
+            original_meta, original_secure = c.file_meta, c.secure_dir
+            with patch.object(c,'CHECKPOINTS',parent), \
+                 patch.object(c.os,'geteuid',return_value=0), \
+                 patch.object(c,'file_meta',side_effect=lambda path,root_owner=False:
+                     original_meta(path,root_owner=False)), \
+                 patch.object(c,'secure_dir',side_effect=lambda path:
+                     original_secure(path,root=False)):
+                with self.assertRaisesRegex(c.Blocked, 'Path traversal'):
                     c.verify(target)
 
     def test_source_change_while_copying_refused(self):
