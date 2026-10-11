@@ -37,6 +37,17 @@ done
 # rclone creates this folder using limited drive.file OAuth.
 # No complete Drive-wide access is needed for this app-created folder.
 rclone mkdir cape_reports:CAPE_SSL55_AutoReports
+# One-time limited backfill of existing approved offline test reports.
+# The uploader performs the actual secret-content inspection before transfer.
+for FILE in "$HOME"/CAPE_Command2_OfflinePreflightTests_*.txt; do
+  [[ -f "$FILE" && ! -L "$FILE" ]] || continue
+  NAME="${FILE##*/}"
+  [[ "$NAME" =~ ^CAPE_Command2_OfflinePreflightTests_[0-9]{8}_[0-9]{6}_[A-Za-z0-9]{8}\.txt$ ]] || continue
+  [[ "$(stat -c '%u' -- "$FILE")" == "$(id -u)" ]] || continue
+  [[ "$(wc -c < "$FILE")" -le 262144 ]] || continue
+  [[ -e "$FOLDER/$NAME" || -L "$FOLDER/$NAME" ]] && continue
+  install -m 0600 "$FILE" "$FOLDER/$NAME"
+done
 install -m 0700 "$SOURCE" "$DEST"
 cat > "$UNIT" <<'EOF'
 [Unit]
