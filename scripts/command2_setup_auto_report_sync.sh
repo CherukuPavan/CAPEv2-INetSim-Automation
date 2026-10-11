@@ -4,7 +4,13 @@
 # Creates ~/.local/libexec/cape script and systemd --user timer only.
 set -Eeuo pipefail
 umask 077
-[[ -t 0 ]] || { echo 'BLOCKED: run interactively' >&2; exit 2; }
+# A reviewed wrapper may feed the script through a heredoc. Its stdin is
+# then a pipe, even if the operator has an interactive terminal available.
+# Require a real controlling terminal for the explicit opt-in instead.
+[[ -t 1 && -r /dev/tty && -w /dev/tty ]] || {
+  echo 'BLOCKED: an interactive controlling terminal is required' >&2
+  exit 2
+}
 [[ "$(id -u)" -ne 0 ]] || { echo 'BLOCKED: do not run as root' >&2; exit 2; }
 command -v rclone >/dev/null || { echo 'BLOCKED: install rclone first'; exit 2; }
 command -v systemctl >/dev/null || { echo 'BLOCKED: systemctl missing'; exit 2; }
@@ -15,7 +21,10 @@ rclone listremotes 2>/dev/null | grep -Fxq 'cape_reports:' || {
 SOURCE="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)/command2_upload_approved_reports.sh"
 [[ -f "$SOURCE" && ! -L "$SOURCE" ]] || { echo 'BLOCKED: sibling uploader missing'; exit 2; }
 bash -n "$SOURCE" || { echo 'BLOCKED: uploader syntax check failed'; exit 2; }
-read -r -p 'Type ENABLE-CAPE-AUTO-REPORTS to activate approved TXT-only uploads: ' ACK
+IFS= read -r -p 'Type ENABLE-CAPE-AUTO-REPORTS to activate approved TXT-only uploads: ' ACK </dev/tty || {
+  echo 'BLOCKED: could not receive approval from the controlling terminal' >&2
+  exit 2
+}
 [[ "$ACK" == 'ENABLE-CAPE-AUTO-REPORTS' ]] || {
   echo 'No changes made'; exit 2;
 }
