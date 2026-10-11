@@ -51,6 +51,8 @@ class ColdTests(unittest.TestCase):
         self.assertTrue(report['no_host_changes'])
         self.assertFalse(report['snapshot_or_restore_created'])
         self.assertTrue(report['capture_requires_guest_shutdown'])
+        self.assertEqual(report['capture_capacity_gate_gib'],104)
+        self.assertFalse(report['capture_capacity_gate_pass'])
 
     def test_tpm_reject_symlink_and_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
