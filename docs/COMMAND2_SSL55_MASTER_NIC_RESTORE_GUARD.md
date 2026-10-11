@@ -1,4 +1,16 @@
 # SSL-55 original win11 saved NIC repair — guarded two-phase procedure
+## Completed — host-verified guarded restoration, 2026-10-11
+
+Operator report CAPE_MasterNIC_Restore_20261011_133805_Ifv1ismz.txt
+returned ORIGINAL_SHUTOFF_WIN11_SAVED_NIC_RESTORED.
+Reported master: one saved interface, default network, shut off,
+snapshot finalshutoffversion. Both running clones untouched;
+host firewall unchanged, no network started and no extra guests.
+Do not repeat apply. This procedure below is retained as an
+auditable record, NOT as a new operational instruction.
+win11_1 remains intentionally no-NIC until actual egress protection
+is verified on an approved separate deployment host.
+
 
 **2026-10-11 actual read-only audit: original win11 has 0 saved
 interfaces, while the protected original backup has exactly ONE
