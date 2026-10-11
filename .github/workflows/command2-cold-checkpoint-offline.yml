@@ -21,6 +21,8 @@ on:
       - "scripts/test_command2_portable_cold_bundle.py"
       - "scripts/command2_benign_snapshot_revert_gate.py"
       - "scripts/test_command2_benign_snapshot_revert_gate.py"
+      - "scripts/command2_sequential_guest_ip.py"
+      - "scripts/test_command2_sequential_guest_ip.py"
       - "scripts/command2_cape_agent_probe.py"
       - "scripts/test_command2_cape_agent_probe.py"
       - "scripts/command2_running_cape_snapshot_gate.py"
@@ -80,6 +82,8 @@ on:
       - "scripts/test_command2_portable_cold_bundle.py"
       - "scripts/command2_benign_snapshot_revert_gate.py"
       - "scripts/test_command2_benign_snapshot_revert_gate.py"
+      - "scripts/command2_sequential_guest_ip.py"
+      - "scripts/test_command2_sequential_guest_ip.py"
       - "scripts/command2_cape_agent_probe.py"
       - "scripts/test_command2_cape_agent_probe.py"
       - "scripts/command2_running_cape_snapshot_gate.py"
@@ -221,6 +225,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_cape_kvm_config_plan.py' -v
+      - name: Python 3.10 strict previous verified analysis VM IP plus 1 tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_sequential_guest_ip.py' -v
       - name: Python 3.10 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -325,6 +333,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_cape_kvm_config_plan.py' -v
+      - name: Python 3.12 strict previous verified analysis VM IP plus 1 tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_sequential_guest_ip.py' -v
       - name: Python 3.12 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
