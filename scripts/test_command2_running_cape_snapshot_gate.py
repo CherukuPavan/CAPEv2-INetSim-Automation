@@ -85,6 +85,17 @@ class RunningSnapshotTests(unittest.TestCase):
                 with self.assertRaises(s.SnapshotBlocked):
                     s.saved_xml_checks(NAME,UUID,MAC,IP,"192.168.240.0/24")
 
+    def test_raw_ovmf_pflash_windows11_refused_before_any_snapshot(self):
+        raw = domain().replace(
+            '<os><nvram>/nvram/win11_1.command2_VARS.fd</nvram></os>',
+            '<os><loader type="pflash" format="raw">/usr/share/OVMF/OVMF_CODE_4M.ms.fd</loader>'
+            '<nvram format="raw">/nvram/win11_1.command2_VARS.fd</nvram></os>')
+        with patch.object(s,"virsh",side_effect=lambda *args:
+             raw if args==("dumpxml",NAME) else virsh_fake(*args)):
+            with self.assertRaisesRegex(s.SnapshotBlocked,
+                                        "RAW_PFLASH_NVRAM_INTERNAL_SNAPSHOT_NOT_APPROVED"):
+                s.saved_xml_checks(NAME,UUID,MAC,IP,"192.168.240.0/24")
+
     def test_guest_must_be_running(self):
         with patch.object(s,"virsh",return_value="shut off"):
             with self.assertRaisesRegex(s.SnapshotBlocked,"RUNNING"):
