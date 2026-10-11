@@ -73,6 +73,20 @@ A printed "preflight_pass: true" means only THESE discovery checks passed;
 machine-readable blockers. Sensitive network addresses and swtpm data are
 never intentionally printed. There is no need to execute this on SSL-55.
 
+## Candidate identities for a requested VM count
+
+See scripts/command2_portable_identity_allocator.py. It takes the
+offline fresh-machine count plan and generates distinct UUIDv4 IDs,
+generation IDs, QEMU 52:54:00 unicast MACs, independent disk/NVRAM
+destinations, and planned Windows hostnames/IPv4 addresses for 1–16
+guests. Existing host UUIDs and MACs can be supplied by a future
+authoritative preflight; collisions are rejected. Identity allocation
+is a **pure, ephemeral preview**: it does not define guests, create
+swtpm state, persist an allocation journal, personalize Windows or
+connect a NIC. Re-running it generates different candidates, so NEVER
+use its output as a recovery proof or final deployed VM inventory.
+Eight additional pure regression tests are checked into development.
+
 ## Unfinished portable deployment gates
 
 - Actual supported Ubuntu/libvirt/QEMU/swtpm/OVMF compatibility and
