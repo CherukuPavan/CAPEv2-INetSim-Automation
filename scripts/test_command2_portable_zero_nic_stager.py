@@ -39,6 +39,17 @@ class StageTests(unittest.TestCase):
                               template_sha256="0"*64,master_nvram=Path("/unused"),
                               master_uuid="0"*36)
 
+    def test_renamed_ssl55_preservation_sentinel_still_blocks_staging(self):
+        with tempfile.TemporaryDirectory() as d:
+            marker=Path(d)/"known-ssl55-preservation"
+            marker.mkdir()
+            with patch.object(stage.socket,"gethostname",return_value="renamed-reference"), \
+                 patch.object(stage,"SSL55_PRESERVATION_SENTINEL",marker), \
+                 patch.object(stage,"virsh",side_effect=AssertionError("No libvirt calls")), \
+                 patch.object(stage,"atomic_note",side_effect=AssertionError("No writes")):
+                with self.assertRaisesRegex(stage.StageBlocked,"preservation sentinel"):
+                    stage.host_guard("renamed-reference",for_stage=True)
+
     def test_hostname_mismatch_and_root_required(self):
         with patch.object(stage.socket,"gethostname",return_value="elsewhere"):
             with self.assertRaisesRegex(stage.StageBlocked,"differs"):
