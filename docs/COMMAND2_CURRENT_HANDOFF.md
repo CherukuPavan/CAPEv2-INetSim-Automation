@@ -130,6 +130,38 @@ No SSL-55 terminal action is requested now.
 
 
 
+## 2026-10-11 portable identity allocation milestone (OFFLINE ONLY)
+
+The operator uploaded CAPE_Command2_OfflinePreflightTests_20261011_103641_ZnSj1eKa.txt.
+Verified results: fresh-count 7/7, host preflight 17/17, cold
+checkpoint 13/13: total **37/37 PASS**; final report marker
+COMMAND2_OFFLINE_PREFLIGHT_TESTS_PASS. This is actual SSL55 offline
+mock acceptance, NOT a live deployment or restored snapshot.
+
+New development files:
+- scripts/command2_portable_identity_allocator.py creates a PURE
+  candidate allocation manifest for a validated fresh-count model:
+  unique random libvirt UUIDv4 and Windows generation UUIDv4 per VM,
+  QEMU unicast locally administered MAC 52:54:00:xx:xx:xx, independent
+  TPM directory identity proposal, independent disk/NVRAM destination,
+  ordered WIN11-N and 192.168.240.(100+N) proposed guest settings.
+  It refuses duplicate MAC/UUID inventory, unsafe row ordering,
+  malformed guest flags, insufficient conservative capacity.
+  It performs NO IO against libvirt/host and does not persist plans;
+  future staging needs a locked, durable, validated journal with
+  complete authoritative existing UUID/MAC inventory and full
+  host authorization. Random previews are not durable reservations.
+- scripts/test_command2_portable_identity_allocator.py contains eight
+  new synthetic negative-path tests and covers 1/5/16 VMs;
+  tests committed to Python 3.10/3.12 development CI, but ACTUAL
+  offline and GitHub Actions results are not yet independently seen.
+
+SSL-55 remains reference-only: NO new guests, copies, snapshots,
+network activation, or added disk allocations. The actual staging
+engine, safe VM memory/CPU allocation, guest Windows IP application,
+AppArmor + TPM boot compatibility, snapshot restore and network
+containment remain unimplemented/unverified.
+
 ## NEW offline acceptance for portable preflight
 
 - scripts/command2_target_host_preflight_offline_acceptance.sh runs
