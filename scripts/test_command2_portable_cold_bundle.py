@@ -74,8 +74,7 @@ class ColdBundleTests(unittest.TestCase):
                  patch.object(b,"free_bytes",return_value=200*b.GIB),\
                  patch.object(b,"state",side_effect=state),\
                  patch.object(b.os,"geteuid",return_value=0),\
-                 patch.object(b.os,"chown"),\
-                 patch.object(b.Path,"chown"):
+                 patch.object(b.os,"chown"):
                 capture=b.capture(VM,UID,HOST,checkpoint)
                 self.assertEqual(capture["result"],"COMMAND2_FULL_COLD_BUNDLE_CAPTURED")
                 self.assertEqual(capture["files_captured"],4)
