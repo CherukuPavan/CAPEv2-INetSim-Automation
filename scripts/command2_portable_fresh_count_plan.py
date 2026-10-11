@@ -12,7 +12,7 @@ import json
 from pathlib import PurePosixPath
 import sys
 
-MAX_COUNT = 16
+MAX_COUNT = 4096  # model-safety cap, NOT a target host entitlement
 GIB = 1024**3
 
 class PortablePlanBlocked(ValueError):
@@ -38,7 +38,7 @@ def plan_fresh(total, *, disk_dir, nvram_dir, analysis_subnet,
     reuse or replace a VM. Actual host inventory and isolation must be checked.
     """
     need(type(total) is int and 1 <= total <= MAX_COUNT,
-         "Count must be an integer from 1 to 16")
+         "Count must be an integer from 1 to " + str(MAX_COUNT))
     disk_base = clean_dir(disk_dir)
     nvram_base = clean_dir(nvram_dir)
     need(disk_base != nvram_base, "Disk and firmware directories must differ")
@@ -107,7 +107,7 @@ def main():
         count=args.count
         if count is None:
             need(sys.stdin.isatty(),"--count N required in noninteractive mode")
-            count=int(input("TOTAL desired Windows analysis VMs [1-16]: "))
+            count=int(input("TOTAL desired Windows analysis VMs [subject to host/subnet capacity]: "))
         out=plan_fresh(count,disk_dir=args.disk_dir,nvram_dir=args.nvram_dir,
                        analysis_subnet=args.subnet,free_gib=args.free_gib)
         print(json.dumps(out,indent=2,sort_keys=True))
