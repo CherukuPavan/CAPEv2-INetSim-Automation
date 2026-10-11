@@ -1,0 +1,173 @@
+"""Offline synthetic safety tests; no actual disks, libvirt or VM creation."""
+import json
+import os
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import command2_portable_zero_nic_stager as stage
+
+
+def entry(index=1):
+    name=f"win11_{index}"
+    return {"libvirt_name":name,
+       "libvirt_uuid_candidate":f"00000000-0000-4000-8000-{index:012d}",
+       "smbios_generation_id_candidate":f"00000000-0000-4000-8001-{index:012d}",
+       "mac_candidate":f"02:aa:bb:cc:dd:{index:02x}",
+       "guest_static_ipv4_target":f"192.168.240.{100+index}",
+       "windows_hostname_target":f"WIN11-{index}",
+       "disk_target":f"/var/lib/libvirt/images/cape-analysis/{name}.command2.qcow2",
+       "uefi_nvram_target":f"/var/lib/libvirt/qemu/nvram/{name}.command2_VARS.fd"}
+
+
+def reservation_data(rows, host="approved"):
+    return {"format":"CAPE_COMMAND2_GUEST_IDENTITY_RESERVATION",
+            "version":1,"host":host,"state":"CANDIDATES_RECORDED_NOT_APPLIED",
+            "provisioning_started":False,"libvirt_domains_created":False,
+            "host_network_modified":False,"guest_count":len(rows),"entries":rows}
+
+
+class StageTests(unittest.TestCase):
+    def test_reference_host_refuses_before_any_host_or_disk_call(self):
+        with patch.object(stage.socket,"gethostname",return_value="CSE-SSL-55.campus"), \
+             patch.object(stage,"exact_dir",side_effect=AssertionError("Filesystem touched")), \
+             patch.object(stage,"virsh",side_effect=AssertionError("libvirt touched")):
+            with self.assertRaisesRegex(stage.StageBlocked,"SSL55_REFERENCE_ONLY"):
+                stage.execute(mode="stage",approved_host="cse-ssl-55",
+                              journal_dir=Path("/unused"),template=Path("/unused"),
+                              template_sha256="0"*64,master_nvram=Path("/unused"),
+                              master_uuid="0"*36)
+
+    def test_hostname_mismatch_and_root_required(self):
+        with patch.object(stage.socket,"gethostname",return_value="elsewhere"):
+            with self.assertRaisesRegex(stage.StageBlocked,"differs"):
+                stage.host_guard("approved",for_stage=False)
+        with patch.object(stage.socket,"gethostname",return_value="approved"), \
+             patch.object(stage.os,"geteuid",return_value=1000):
+            with self.assertRaisesRegex(stage.StageBlocked,"root"):
+                stage.host_guard("approved",for_stage=True)
+
+    def test_reservation_rejects_duplicate_uuid_and_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)/"journal";folder.mkdir(mode=0o700)
+            file=folder/stage.reservation.RECORD_NAME
+            def inspect(rows):
+                file.write_text(json.dumps(reservation_data(rows)))
+                file.chmod(0o600)
+                with patch.object(stage,"exact_file",return_value=(1,2,3,4,5)):
+                    return stage.reservation_entries(folder,"approved")
+            self.assertEqual(len(inspect([entry()])),1)
+            clash=entry(2)
+            clash["libvirt_uuid_candidate"]=entry()["libvirt_uuid_candidate"]
+            with self.assertRaisesRegex(stage.StageBlocked,"Duplicate"):
+                inspect([entry(),clash])
+            clash=entry(2)
+            clash["disk_target"]=entry()["disk_target"]
+            with self.assertRaisesRegex(stage.StageBlocked,"path"):
+                inspect([entry(),clash])
+            file.write_text(json.dumps(reservation_data([entry()],"different")))
+            with patch.object(stage,"exact_file",return_value=(1,2,3,4,5)):
+                with self.assertRaisesRegex(stage.StageBlocked,"Untrusted"):
+                    stage.reservation_entries(folder,"approved")
+
+    def test_readonly_plan_no_mutating_calls(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)/"journal";folder.mkdir(mode=0o700)
+            with patch.object(stage.socket,"gethostname",return_value="approved"), \
+                 patch.object(stage,"reservation_entries",return_value=[entry(),entry(2)]), \
+                 patch.object(stage,"validate_inputs",return_value=(1,2,"/source/master.qcow2")), \
+                 patch.object(stage,"assert_no_collision"), \
+                 patch.object(stage,"virsh",return_value="<domain/>"), \
+                 patch.object(stage,"free_bytes",return_value=1000*stage.GIB), \
+                 patch.object(stage,"make_one",side_effect=AssertionError("VM creation attempted")), \
+                 patch.object(stage,"atomic_note",side_effect=AssertionError("Journal wrote")):
+                result=stage.execute(
+                    mode="plan",approved_host="approved",journal_dir=folder,
+                    template=Path("/approved/template.qcow2"),template_sha256="a"*64,
+                    master_nvram=Path("/approved/VARS.fd"),
+                    master_uuid="11111111-1111-4111-8111-111111111111")
+            self.assertEqual(result["result"],"PORTABLE_COMMAND2_ZERO_NIC_STAGE_PLAN_ONLY")
+            self.assertEqual(result["created"],[])
+            self.assertFalse(result["windows_ip_assigned"])
+            self.assertEqual(result["attached_nics"],0)
+
+    def test_collision_rejects_existing_domain_before_creation(self):
+        with patch.object(stage,"virsh",side_effect=lambda *a:
+            "win11_1" if a[:2]==("list","--all") else ""):
+            with self.assertRaisesRegex(stage.StageBlocked,"already defined"):
+                stage.assert_no_collision([entry()])
+
+    def test_insufficient_group_capacity_refuses_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)/"journal";folder.mkdir(mode=0o700)
+            with patch.object(stage.socket,"gethostname",return_value="approved"), \
+                 patch.object(stage,"reservation_entries",return_value=[entry(),entry(2)]), \
+                 patch.object(stage,"validate_inputs",return_value=(1,2,"/master")), \
+                 patch.object(stage,"assert_no_collision"), \
+                 patch.object(stage,"virsh",return_value="<domain/>"), \
+                 patch.object(stage,"free_bytes",return_value=96*stage.GIB), \
+                 patch.object(stage,"atomic_note",side_effect=AssertionError("Unexpected write")):
+                with self.assertRaisesRegex(stage.StageBlocked,"capacity"):
+                    stage.execute(mode="plan",approved_host="approved",
+                        journal_dir=folder,template=Path("/template"),
+                        template_sha256="a"*64,master_nvram=Path("/vars"),
+                        master_uuid="11111111-1111-4111-8111-111111111111")
+
+    def test_intents_exclusively_published_and_no_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)/"journal";folder.mkdir(mode=0o700)
+            path=folder/(stage.INTENT_PREFIX+"win11_1.json")
+            stage.atomic_note(folder,path.name,{"stage":"BEFORE_ANY_CLONE_FILES"})
+            self.assertEqual(json.loads(path.read_text())["stage"],"BEFORE_ANY_CLONE_FILES")
+            with self.assertRaises(FileExistsError):
+                stage.atomic_note(folder,path.name,{"stage":"retry"})
+            self.assertEqual(path.stat().st_mode & 0o777,0o600)
+
+    def test_prior_intent_refuses_plan_and_staging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)/"journal";folder.mkdir(mode=0o700)
+            (folder/(stage.INTENT_PREFIX+"win11_1.json")).write_text("{}")
+            with patch.object(stage.socket,"gethostname",return_value="approved"), \
+                 patch.object(stage,"reservation_entries",return_value=[entry()]), \
+                 patch.object(stage,"validate_inputs",return_value=(1,2,"/master")), \
+                 patch.object(stage,"assert_no_collision"), \
+                 patch.object(stage,"virsh",return_value="<domain/>"), \
+                 patch.object(stage,"free_bytes",return_value=500*stage.GIB):
+                with self.assertRaisesRegex(stage.StageBlocked,"Previous staging intent"):
+                    stage.execute(mode="plan",approved_host="approved",
+                        journal_dir=folder,template=Path("/template"),
+                        template_sha256="a"*64,master_nvram=Path("/vars"),
+                        master_uuid="11111111-1111-4111-8111-111111111111")
+
+    def test_make_one_retains_partial_intent_if_copy_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            disk=folder/"win11_1.command2.qcow2"
+            vars=folder/"win11_1.command2_VARS.fd"
+            row=entry();row["disk_target"]=str(disk);row["uefi_nvram_target"]=str(vars)
+            with patch.object(stage,"virsh",return_value="shut off"), \
+                 patch.object(stage,"exact_file",return_value=(1,2,3,4,5)), \
+                 patch.object(stage,"free_bytes",return_value=1000*stage.GIB), \
+                 patch.object(stage.renderer,"render_no_nic",return_value="<domain/>"), \
+                 patch.object(stage,"run",side_effect=stage.StageBlocked("synthetic qemu failure")):
+                with self.assertRaisesRegex(stage.StageBlocked,"incomplete stage"):
+                    stage.make_one(row,master_xml="<domain/>",
+                        master_disk="/master",master_nvram="/vars",
+                        template=Path("/template"),source_stamp=(1,2,3,4,5),
+                        vars_stamp=(1,2,3,4,5),logdir=folder)
+            self.assertTrue((folder/(stage.INTENT_PREFIX+"win11_1.json")).exists())
+            self.assertFalse(disk.exists())
+            self.assertFalse(vars.exists())
+
+    def test_source_does_not_start_or_attach_network(self):
+        source=Path(stage.__file__).read_text()
+        for code in ('virsh("start"', 'virsh("destroy"', 'virsh("shutdown"',
+                     '"net-start"', '"attach-interface"', '"nft", "flush"',
+                     '"systemctl", "enable"'):
+            self.assertNotIn(code,source)
+        self.assertIn('"network_attached":False',source)
+
+
+if __name__=="__main__":
+    unittest.main()
