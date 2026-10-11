@@ -23,6 +23,21 @@ for live host discovery, clone creation, guest IP/hostname application,
 host firewall persistence, IPv4/IPv6 egress testing, CAPE reachability,
 TPM/NVRAM snapshot restore, or final fresh-host acceptance.
 
+## New read-only Command 2 host inventory (development)
+
+See [target-host preflight](COMMAND2_TARGET_HOST_PREFLIGHT.md).
+The module command2_target_host_preflight.py evaluates a candidate
+fresh host's KVM/device/tool availability, private source template
+metadata, memory and free storage, libvirt domain names and disk
+collisions, kernel IPv4 routes/addresses, existing libvirt networks,
+and dynamically derives the external uplink with a kernel-only
+route lookup (never hardcode SSL-55's enp0s31f6).
+Any overlap with the requested 192.168.240.0/24 network is blocked.
+A free subnet suggestion does not change the plan or configure links.
+The preflight never creates a VM or proves IPv4/IPv6 isolation.
+No extra Windows guests or cold backup allocations are authorized
+on SSL-55, irrespective of read-only plans or simulated results.
+
 ## Support contract (must be established and tested)
 
 Target a documented, explicit compatibility matrix of **supported fresh Ubuntu releases, architectures, hardware and virtualization stacks**. Exact supported Ubuntu versions, kernel combinations, CAPEv2/INetSim releases, VM hypervisor versions and minimum resources remain **to be confirmed** from manual evidence plus compatibility testing. Do **not** promise success on every arbitrary computer, unsupported Linux distribution, conflicting virtualization stack or machine without CPU virtualization.
