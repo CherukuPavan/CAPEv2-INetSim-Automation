@@ -25,6 +25,7 @@ import command2_portable_zero_nic_stager as stager
 import command2_windows_guest_config as guestconfig
 import command2_isolated_network_xml_plan as netdesign
 import command2_cape_egress_guard_plan as nftplan
+import command2_cape_kvm_config_plan as capeplan
 
 
 class Command2Blocked(RuntimeError):
@@ -120,11 +121,17 @@ def proposal(*,count,approved_host,disk_dir,nvram_dir,template,subnet):
                                 subnet,[r["guest_static_ipv4_target"]
                                         for r in candidate["candidates"]])
     egress_plan=nftplan.render_cape_egress_guard(subnet)
+    # The reservation payload builder is PURE; a future durable journal
+    # is separately recorded before any VM definitions are written.
+    cape_conf=capeplan.create_cape_kvm_conf(
+        reserve.payload(candidate, approved_host), subnet)
     return candidate,{"actual_master_memory_mib":guest_ram_mib,
                       "available_ram_mib":facts["available_ram_mib"],
                       "required_total_gib":report["storage_required_gib"],
                       "isolated_network_design_only":network_plan,
                       "candidate_l3_nft_guard_only":egress_plan,
+                      "cape_kvm_machinery_plan_only":cape_conf,
+                      "cape_running_snapshots_verified":False,
                       "network_isolation_verified":False,
                       "nic_attachment_authorized":False,
                       "resource_preflight_pass":True}
