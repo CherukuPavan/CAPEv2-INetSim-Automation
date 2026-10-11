@@ -56,9 +56,15 @@ class Capture(unittest.TestCase):
                     self.assertEqual(len(records['artifacts']),4)
                     for row in records['artifacts']:
                         self.assertEqual(c.sha(target/row['name']),row['sha256'])
+                    original_meta, original_secure = c.file_meta, c.secure_dir
                     with patch.object(c,'cmd', side_effect=lambda *args,**kwargs:
                             json.dumps({'format':'qcow2','virtual-size':64*c.GIB})
-                            if args[1]=='info' else ''):
+                            if args[1]=='info' else ''), \
+                         patch.object(c.os,'geteuid',return_value=0), \
+                         patch.object(c,'file_meta',side_effect=lambda path,root_owner=False:
+                             original_meta(path,root_owner=False)), \
+                         patch.object(c,'secure_dir',side_effect=lambda path:
+                             original_secure(path,root=False)):
                         verified=c.verify(target)
                     self.assertEqual(verified['result'],'COLD_CHECKPOINT_FILE_INTEGRITY_VERIFIED')
                     self.assertFalse(verified['restore_tested'])
