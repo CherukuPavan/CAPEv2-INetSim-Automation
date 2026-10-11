@@ -64,3 +64,13 @@ This prohibits blind retry, deletion, rollback or overwrites.
 
 The scope intentionally prevents overstating mocked safety checks as
 proof that an actual VM has been deployed safely.
+
+## Count scaling beyond 16
+
+The portable-only count planner now permits N > 16 (tested in
+synthetic scenarios for N=32) while enforcing CIDR guest-IP capacity,
+CPU/RAM/disk metadata gates and a defensive 4096-entry in-memory cap.
+This does not alter the separate SSL-55 legacy stage command and never
+provisions VMs on the reference host. Actual scaling ceilings must be
+validated on the approved deployment machine; requesting 32 is not
+proof that 32 guests can run in parallel.
