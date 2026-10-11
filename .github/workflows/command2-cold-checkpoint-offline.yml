@@ -12,6 +12,7 @@ on:
       - "scripts/test_command2_portable_fresh_count_plan.py"
       - "scripts/command2_target_host_preflight.py"
       - "scripts/test_command2_target_host_preflight.py"
+      - "scripts/command2_target_host_preflight_offline_acceptance.sh"
       - "scripts/command2_continuation_plan.py"
       - "scripts/test_command2_continuation_plan.py"
       - "scripts/test_command2_shared_artifacts.py"
@@ -29,6 +30,7 @@ on:
       - "scripts/test_command2_portable_fresh_count_plan.py"
       - "scripts/command2_target_host_preflight.py"
       - "scripts/test_command2_target_host_preflight.py"
+      - "scripts/command2_target_host_preflight_offline_acceptance.sh"
       - "scripts/command2_continuation_plan.py"
       - "scripts/test_command2_continuation_plan.py"
       - "scripts/test_command2_shared_artifacts.py"
@@ -49,6 +51,7 @@ jobs:
         run: |-
           bash -n scripts/command2_cold_checkpoint_plan_acceptance.sh
           bash -n scripts/command2_cold_and_count_plan_acceptance.sh
+          bash -n scripts/command2_target_host_preflight_offline_acceptance.sh
       - name: Python 3.10 offline mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
