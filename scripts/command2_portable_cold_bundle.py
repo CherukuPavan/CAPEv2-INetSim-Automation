@@ -257,12 +257,20 @@ def verify_bundle(vm,uid,host,dest):
          manifest.get("nvram")==str(guest["nvram"]) and
          manifest.get("swtpm_dir")==str(guest["swtpm_dir"]),
          "Full cold bundle differs from exact VM/paths")
-    wanted={rel for rel,_ in bundle_paths(guest)}
     records=manifest.get("entries")
-    need(type(records) is dict and set(records)==wanted,
-         "Full disk+UEFI+swtpm inventory does not match")
+    # The CURRENT guest's swtpm inventory may legitimately have changed
+    # since the checkpoint. Validate the SAVED complete bundle instead.
+    need(type(records) is dict and
+         {"disk.qcow2","UEFI_VARS.fd"}.issubset(records) and
+         any(k.startswith("swtpm/") and k.endswith(".permall")
+             for k in records),
+         "Bundle lacks OS disk, UEFI or permanent TPM state")
     for rel,info in records.items():
-        need(rel in wanted and type(info) is dict,
+        valid=(rel in ("disk.qcow2","UEFI_VARS.fd") or
+               rel.startswith("swtpm/") and
+               FNAME.fullmatch(rel.split("/",1)[1]) is not None and
+               rel.count("/")==1)
+        need(valid and type(info) is dict,
              "Unrecognized checkpoint entry")
         file=folder/rel
         st=safe_regular(file)
