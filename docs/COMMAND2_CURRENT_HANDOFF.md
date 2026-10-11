@@ -1,6 +1,47 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 21:19 UTC — WIN11-1 STATIC IPv4 CONFIG SUCCESS; next read-only agent/network audit
+
+User screenshot of Windows CAPE_FIX FIX.PS1 apply Notepad:
+COMMAND2_WIN11_1_GUEST_OLD_IP_TO_ISOLATED_IP_V1.
+- Original win11_1 SMBIOS 732b2256-ee99-41fa-881d-fbf5c476d960,
+  MAC 02-0A-30-6A-3F-50, one NIC ifIndex=12.
+- Windows hostname already WIN11-1. DHCP disabled.
+- Old IPv4 192.168.122.125/24 and exact old default route
+  ifIndex 12 nextHop 192.168.122.1 REMOVED by explicit approved
+  oneclick script. New 192.168.240.101/24 installed with NO gateway.
+- After apply, IPv4 default route count=0, IPv6 default route
+  count=0, IPv6 address only link-local fe80. MAC/UUID verified
+  again and no Windows firewall/Defender changes. No VM restart needed.
+- Ubuntu CAPE_Command2_Win11_1_FixRetry_20261011_211846.txt
+  confirmed correct running VM and successful ISO insertion.
+- Guest configuration SUCCESS, not yet actual host-to-guest CAPE
+  agent success, packet negative IPv4/IPv6 external egress or L2
+  lateral isolation. Running snapshot/revert NOT done.
+
+New scripts/command2_ssl55_win11_1_agent_network_audit.py
+plus scripts/test_command2_ssl55_win11_1_agent_network_audit.py
+(8 synthetic tests). READ-ONLY on SSL55, verifies EXACT
+protected running VM MAC/UUID, master/trial state, manual active
+isolated network no NAT/DHCP, current enabled/replayed CAPE nft
+policy, nftables service disabled, host route to guest dev
+cape-lab0 src 192.168.240.1, then ONE harmless HTTP GET bound
+to host cape-lab0 IPv4 (192.168.240.1) against guest
+192.168.240.101:8000 without proxy or redirects and strict
+CAPEv2 agent JSON/admin identity matching. Returns exit 3
+with complete JSON report if agent unreachable, not a false
+analysis approval. No new guest commands nor ISO needed.
+Safety flags always explicitly FALSE for unperformed packet-level
+negative IPv4/IPv6 guest egress, L2 and snapshot tests.
+
+NEXT: user runs one SHA-pinned read-only host agent network audit,
+uploads TXT, then resolve agent availability and proceed toward
+running snapshot after actual containment and cold recovery
+acceptance. Continue count-driven multi-VM Command2 build,
+then Command3 and 3-command independent host verification.
+INetSim service later; never execute malware before isolation.
+
 ## 2026-10-11 ~21:14 UTC — BLOCKED Windows CAPE_FIX ISO preflight due assistant parser BUG, not proven inactive network
 
 User ran SHA pinned Windows fix optical ISO launcher from previous turn
