@@ -132,6 +132,9 @@ class RunningSnapshotTests(unittest.TestCase):
                 with patch.object(s.socket,"gethostname",return_value=HOST),\
                      patch.object(s,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
                      patch.object(s.os,"geteuid",return_value=0),\
+                     patch.object(s.os,"fstat",return_value=type(
+                         "RootLock",(),{"st_mode":0o100600,
+                                        "st_uid":0,"st_nlink":1})()),\
                      patch.object(s.sys.stdin,"isatty",return_value=True),\
                      patch("builtins.input",return_value="CAPTURE-RUNNING-WIN11_1"),\
                      patch.object(s,"plan",return_value=pre),\
@@ -150,6 +153,9 @@ class RunningSnapshotTests(unittest.TestCase):
             with patch.object(s.socket,"gethostname",return_value=HOST),\
                  patch.object(s,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
                  patch.object(s.os,"geteuid",return_value=0),\
+                 patch.object(s.os,"fstat",return_value=type(
+                     "RootLock",(),{"st_mode":0o100600,
+                                    "st_uid":0,"st_nlink":1})()),\
                  patch.object(s.sys.stdin,"isatty",return_value=True),\
                  patch("builtins.input",return_value="CAPTURE-RUNNING-WIN11_1"),\
                  patch.object(s,"plan",return_value=pre),\
