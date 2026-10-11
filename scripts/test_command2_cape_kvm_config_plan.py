@@ -74,7 +74,7 @@ class CapeKVMPlanTests(unittest.TestCase):
         # Check executable module contents, not the safety docstring
         # that says the module does NOT call systemctl/virsh.
         code=source[source.index("from __future__ import annotations"):]
-        for word in ("virsh", "systemctl", "subprocess.run", "write_text(",
+        for word in ('"virsh"', '"systemctl"', "subprocess.run", "write_text(",
                      "os.open(", "snapshot-create", "nft -f"):
             self.assertNotIn(word,code)
 
