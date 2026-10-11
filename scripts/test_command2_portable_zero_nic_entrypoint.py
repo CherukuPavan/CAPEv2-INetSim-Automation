@@ -8,9 +8,18 @@ import command2_portable_zero_nic_entrypoint as c
 
 
 def sample_blueprint(count=2):
+    rows=[]
+    for i in range(1,count+1):
+        rows.append({
+            "libvirt_name":f"win11_{i}",
+            "windows_hostname_target":f"WIN11-{i}",
+            "guest_static_ipv4_target":f"192.168.240.{100+i}",
+            "libvirt_uuid_candidate":f"00000000-0000-4000-8000-{i:012d}",
+            "mac_candidate":f"02:aa:bb:cc:dd:{i:02x}",
+            "disk_target":f"/images/win11_{i}.command2.qcow2",
+            "uefi_nvram_target":f"/nvram/win11_{i}.command2_VARS.fd"})
     return {"result":"COMMAND2_CANDIDATE_IDENTITIES_ONLY",
-       "requested_total":count,
-       "candidates":[{"libvirt_name":f"win11_{i}"} for i in range(1,count+1)]}
+            "requested_total":count,"candidates":rows}
 
 
 def args(**extra):
@@ -89,6 +98,10 @@ class ControllerTests(unittest.TestCase):
                 outcome=c.execute(**args(mode="stage",journal_dir=state))
             self.assertEqual(outcome["result"],"COMMAND2_ZERO_NIC_GROUP_STAGE_RETURNED")
             self.assertFalse(outcome["production_ready"])
+            self.assertEqual(len(outcome["guest_configuration_files"]),2)
+            self.assertTrue((state/"command2-guest-config-win11_1.json").exists())
+            self.assertTrue((state/"command2-guest-config-win11_2.json").exists())
+            self.assertFalse(outcome["guest_personalization_done"])
             self.assertFalse(outcome["guest_personalization_done"])
             self.assertEqual(stage_mock.call_args.kwargs["mode"],"stage")
             self.assertEqual(stage_mock.call_args.kwargs["master_uuid"],
