@@ -1,6 +1,49 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## ACTIVE USER DIRECTIVE: finish substantial work before replying
+
+The user explicitly objects to intermediate assistant returns after each
+commit or CI success: 'complete the work' and return only at genuine
+completion or required operator action. Do not narrate routine
+develop/commit/CI tasks as reasons for the user to reply. The hourly
+`CAPE Development & CI Watch` automation can carry out discrete GitHub
+tasks and report significant milestones or blockers. This does NOT
+allow continuous interactive terminal execution; do not claim
+background work outside actual scheduled runs.
+
+2026-10-11 new guarded implementation on development:
+- scripts/command2_identity_reservation_journal.py: a non-SSL55-only,
+  private user-owned 0700-directory, flock-protected, fsync'd,
+  exclusive publish reservation record. Exact replay is idempotent;
+  altered candidate blueprint conflicts; pending crash artifacts
+  fail closed; no VM actions. 10 synthetic tests in
+  scripts/test_command2_identity_reservation_journal.py.
+- Python 3.10/3.12 Actions run 38137777653 on
+  e9452c7b1c1cdff1f669b5973b21b8f37f121e65 completed SUCCESS,
+  validating the directory-symlink guard tests.
+- scripts/command2_portable_zero_nic_xml.py pure XML renderer validates
+  exact supplied source KVM domain, QCOW2, OVMF and emulated TPM2
+  paths and replaces UUID/genid, disk, NVRAM; strips all source NICs,
+  unsafe attached devices, inherited cdrom media, metadata, and
+  binds VNC/SPICE graphics to localhost. No VM started/defined.
+- scripts/test_command2_portable_zero_nic_xml.py adds 10 mocked XML
+  tests; development Actions run 38137920344 on
+  da93ff8ec81bd9c2926ca4b824350d5a5ddf1b56 completed SUCCESS,
+  confirming Python 3.10/3.12 offline regression steps.
+- docs/COMMAND2_IDENTITY_RESERVATION_JOURNAL.md and
+  docs/COMMAND2_PORTABLE_ZERO_NIC_XML.md added.
+
+These are components, not full portable Command 2. Remaining:
+actual target-host privileged staging under crash-safe manifest with
+authoritative inventory proof; independent QCOW2/UEFI/swtpm full clone;
+Windows hostname/static IP automation; safely persisting independent
+firewall/network guard; IPv4+IPv6 negative egress; cold restore
+verification; real CAPE parallel guest acceptance on OTHER authorized
+host. SSL-55 remains NO new VMs, backups, NIC changes, network or
+master modifications. No request for further SSL-55 commands now.
+
+
 
 ## VERIFIED GitHub Actions regression recovery — 2026-10-11 11:54 UTC
 
