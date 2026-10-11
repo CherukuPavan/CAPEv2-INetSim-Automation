@@ -38,6 +38,8 @@ on:
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_master_nic_guard.py"
       - "scripts/test_command2_ssl55_master_nic_guard.py"
+      - "scripts/command2_ssl55_win11_1_readiness.py"
+      - "scripts/test_command2_ssl55_win11_1_readiness.py"
       - "scripts/command2_ssl55_network_readonly_audit.py"
       - "scripts/test_command2_ssl55_network_readonly_audit.py"
       - "scripts/command2_portable_zero_nic_stager.py"
@@ -99,6 +101,8 @@ on:
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_master_nic_guard.py"
       - "scripts/test_command2_ssl55_master_nic_guard.py"
+      - "scripts/command2_ssl55_win11_1_readiness.py"
+      - "scripts/test_command2_ssl55_win11_1_readiness.py"
       - "scripts/command2_ssl55_network_readonly_audit.py"
       - "scripts/test_command2_ssl55_network_readonly_audit.py"
       - "scripts/command2_portable_zero_nic_stager.py"
@@ -229,6 +233,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_sequential_guest_ip.py' -v
+      - name: Python 3.10 existing SSL55 win11_1 NIC and snapshot read-only readiness tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_win11_1_readiness.py' -v
       - name: Python 3.10 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -337,6 +345,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_sequential_guest_ip.py' -v
+      - name: Python 3.12 existing SSL55 win11_1 NIC and snapshot read-only readiness tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_win11_1_readiness.py' -v
       - name: Python 3.12 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
