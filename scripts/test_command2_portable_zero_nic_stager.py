@@ -112,6 +112,22 @@ class StageTests(unittest.TestCase):
             self.assertFalse(result["windows_ip_assigned"])
             self.assertEqual(result["attached_nics"],0)
 
+    def test_source_template_and_uefi_cannot_be_shared_with_other_domain(self):
+        def fake_virsh(*argv):
+            if argv == ("list","--all","--name"):
+                return "win11\nother_guest"
+            if argv == ("domstate","other_guest"):
+                return "shut off"
+            if argv == ("dumpxml","--inactive","other_guest"):
+                return ('<domain><os><nvram>/approved/source-vars.fd</nvram></os>'
+                        '<devices><disk><source file="/approved/unrelated.qcow2"/>'
+                        '</disk></devices></domain>')
+            self.fail("unexpected command "+str(argv))
+        with patch.object(stage,"virsh",side_effect=fake_virsh):
+            with self.assertRaisesRegex(stage.StageBlocked,"UEFI variables are shared"):
+                stage.assert_cold_source_unshared(
+                    "/approved/template.qcow2","/approved/source-vars.fd")
+
     def test_collision_rejects_existing_domain_before_creation(self):
         with patch.object(stage,"virsh",side_effect=lambda *a:
             "win11_1" if a[:2]==("list","--all") else ""):
@@ -172,6 +188,7 @@ class StageTests(unittest.TestCase):
                  patch.object(stage,"exact_file",return_value=(1,2,3,4,5)), \
                  patch.object(stage,"free_bytes",return_value=1000*stage.GIB), \
                  patch.object(stage.renderer,"render_no_nic",return_value="<domain/>"), \
+                 patch.object(stage,"assert_cold_source_unshared"), \
                  patch.object(stage,"run",side_effect=stage.StageBlocked("synthetic qemu failure")):
                 with self.assertRaisesRegex(stage.StageBlocked,"incomplete stage"):
                     stage.make_one(row,master_xml="<domain/>",
@@ -229,6 +246,7 @@ class StageTests(unittest.TestCase):
                  patch.object(stage,"digest_file",wraps=stage.digest_file), \
                  patch.object(stage.crypto,"require_cleartext_candidate"), \
                  patch.object(stage.renderer,"render_no_nic",return_value=candidate_xml), \
+                 patch.object(stage,"assert_cold_source_unshared"), \
                  patch.object(stage.os,"fchown"), \
                  patch.object(stage.tempfile,"TemporaryDirectory",
                               side_effect=lambda **kwargs: orig_temp(dir=td)):
