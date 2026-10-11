@@ -86,11 +86,13 @@ def collision_check(vm,mac,subnet):
     try:
         links=json.loads(nic.cmd("ip","-j","link","show"))
         routes=json.loads(nic.cmd("ip","-j","-4","route","show","table","all"))
+        addresses=json.loads(nic.cmd("ip","-j","-4","addr","show"))
     except (TypeError,ValueError) as exc:
         raise BenignNicBlocked("Unverifiable host link/route inventory") from exc
     require(type(links) is list and type(routes) is list and
-            len(links)<=8192 and len(routes)<=8192,
-            "Host link/route inventory malformed")
+            type(addresses) is list and len(links)<=8192 and
+            len(routes)<=8192 and len(addresses)<=8192,
+            "Host link/route/address inventory malformed")
     for link in links:
         require(type(link) is dict,"Malformed host link")
         if type(link.get("address")) is str:
@@ -107,6 +109,22 @@ def collision_check(vm,mac,subnet):
         if other.overlaps(expected):
             require(route.get("dev") == nic.BRIDGE,
                     "Candidate CAPE subnet overlaps another host route")
+    for adapter in addresses:
+        require(type(adapter) is dict,"Malformed host address interface")
+        if adapter.get("ifname")==nic.BRIDGE:
+            continue
+        for row in adapter.get("addr_info",()):
+            require(type(row) is dict,"Malformed host IP entry")
+            if row.get("family")!="inet":
+                continue
+            try:
+                other=ipaddress.IPv4Network(
+                    str(row["local"])+"/"+str(row["prefixlen"]),
+                    strict=False)
+            except (ValueError,KeyError,TypeError) as exc:
+                raise BenignNicBlocked("Malformed host IPv4 address") from exc
+            require(not other.overlaps(expected),
+                    "Candidate CAPE subnet overlaps another host interface address")
     return True
 
 
