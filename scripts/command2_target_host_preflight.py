@@ -355,6 +355,7 @@ def evaluate(profile, count, disk_dir, nvram_dir, cidr):
     return {
         "result": "COMMAND2_READ_ONLY_TARGET_HOST_PREFLIGHT",
         "requested_vm_count": count,
+        "analysis_subnet": cidr,
         "planned_vms": result["planned_vms"],
         "storage_required_gib": result["conservative_required_gib"],
         "storage_reported_free_gib": free,
