@@ -146,6 +146,20 @@ class SequenceModelTests(unittest.TestCase):
         with self.assertRaisesRegex(flow.SequenceBlocked, "name"):
             flow.create_model(broken)
 
+    def test_rejects_malformed_mac_uuid_and_ip_before_simulation(self):
+        for field, invalid in (
+            ("libvirt_uuid_candidate", "not-an-uuid"),
+            ("smbios_generation_id_candidate", "invalid"),
+            ("mac_candidate", "01:23:45:67:89:ab"),
+            ("mac_candidate", "zz:zz:zz:zz:zz:zz"),
+            ("guest_static_ipv4_target", "not-an-ip"),
+        ):
+            value = fixture(1)
+            value["candidates"][0][field] = invalid
+            with self.subTest(field=field, invalid=invalid), \
+                    self.assertRaisesRegex(flow.SequenceBlocked, "invalid"):
+                flow.create_model(value)
+
     def test_no_external_system_calls_in_stage_model(self):
         import inspect
         src = inspect.getsource(flow)
