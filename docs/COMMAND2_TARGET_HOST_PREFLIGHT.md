@@ -44,6 +44,13 @@ statvfs, /dev/kvm and read-only virsh and ip commands to discover:
    name** is extracted dynamically (eno1/enp0s31f6/wlp...), without
    logging campus source IP or next-hop values. Never hardcode
    SSL-55's enp0s31f6 into the portable program.
+10. If the requested analysis CIDR overlaps a host route, assigned
+   address or existing libvirt network, the plan **fails closed**. It
+   may recommend a free candidate from a limited private-subnet pool,
+   but it does NOT automatically replace the explicitly requested CIDR,
+   assign guest IPs, or configure networking. The operator must approve
+   any nondefault subnet and the subnet candidate is not a full
+   IPv6/egress safety proof.
 9. Immediate refusal when hostname identifies the SSL-55 reference host
    (defense-in-depth only; any future write-capable entrypoint requires
    stronger operator/host authorization).
