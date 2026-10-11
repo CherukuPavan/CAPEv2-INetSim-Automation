@@ -9,6 +9,7 @@ Never run on the protected SSL-55 reference machine.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -21,6 +22,7 @@ import command2_target_host_preflight as audit
 import command2_guest_identity_blueprint as identity
 import command2_identity_reservation_journal as reserve
 import command2_portable_zero_nic_stager as stager
+import command2_windows_guest_config as guestconfig
 
 
 class Command2Blocked(RuntimeError):
@@ -109,6 +111,9 @@ def proposal(*,count,approved_host,disk_dir,nvram_dir,template,subnet):
     uuids,macs=read_inventory()
     candidate=identity.blueprint(report,existing_uuids=uuids,
                                  existing_macs=macs)
+    # Validate all per-guest Windows config schemas while still read-only.
+    for row in candidate["candidates"]:
+        guestconfig.make_guest_config(row,subnet)
     return candidate,{"actual_master_memory_mib":guest_ram_mib,
                       "available_ram_mib":facts["available_ram_mib"],
                       "required_total_gib":report["storage_required_gib"],
@@ -160,6 +165,19 @@ def execute(*, count,approved_host,disk_dir,nvram_dir,template,
     recorded=reserve.reserve(candidates,folder,expected_host=approved_host)
     require(recorded["guest_count"]==count and not recorded["guest_vm_created"],
             "Reservation output mismatches expected count")
+    # Private, exclusively created per-VM configuration files. These
+    # are NOT auto-delivered or run in Windows until a verified bootstrap
+    # channel is installed and host network containment has been accepted.
+    configs=[]
+    for row in candidates["candidates"]:
+        config=guestconfig.make_guest_config(row,subnet)
+        filename="command2-guest-config-"+row["libvirt_name"]+".json"
+        stager.atomic_note(folder,filename,config)
+        checksum=hashlib.sha256((json.dumps(config,sort_keys=True,
+                   separators=(",",":"))+"\n").encode("utf-8")).hexdigest()
+        configs.append({"name":row["libvirt_name"],
+                        "configuration_sha256":checksum,
+                        "configuration_created_but_not_delivered":True})
     master_uuid,master_nvram=source_profile()
     stage_report=stager.execute(
         mode="stage",approved_host=approved_host,journal_dir=folder,
@@ -168,6 +186,7 @@ def execute(*, count,approved_host,disk_dir,nvram_dir,template,
     return {"result":"COMMAND2_ZERO_NIC_GROUP_STAGE_RETURNED",
             "reservation_status":recorded["status"],
             "staging":stage_report,
+            "guest_configuration_files":configs,
             "guest_personalization_done":False,
             "network_isolation_verified":False,
             "production_ready":False}
