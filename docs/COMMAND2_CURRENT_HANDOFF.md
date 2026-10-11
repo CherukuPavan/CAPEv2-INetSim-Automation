@@ -2,6 +2,66 @@
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
 
+## 2026-10-11 21:29 UTC — ACTUAL SNAPSHOT READINESS REPORT; CRITICAL TPM/UEFI/BACKING RISKS
+
+User uploaded CAPE_Command2_SnapshotReadiness_20261011_212919.txt:
+- win11_1 RUNNING 4 CPUs 4GiB RAM, uuid
+  732b2256-ee99-41fa-881d-fbf5c476d960.
+- qcow2 active independent path
+  /var/lib/libvirt/images/cape-clones-staging/win11_1.command2.qcow2,
+  64GiB virtual, 29.3GiB allocated, qemu-img info says corrupt=false.
+  Crucially RUNNING dumpxml reveals explicit backingStore chain
+  win11_1.command2.qcow2 -> win11.Afterfull ->
+  win11.basicinstallwinsnapshot -> win11.qcow2 (protected master
+  referenced as backing data, not standalone clone). Do NOT rename,
+  move, flatten, rebase or modify original chain on shared SSL55.
+  qemu-img info -U --backing-chain printed only top image metadata,
+  unlike runtime XML explicit backingStore; need resolve disparity
+  before portable clone storage design.
+- OVMF secure boot pflash CODE 4M and NVRAM VARS format RAW,
+  /var/lib/libvirt/qemu/nvram/win11_1.command2_VARS.fd.
+  swtpm emulator 2.0 model tpm-tis. TPM/NVRAM must be restored
+  consistently with VM RAM+disk, not implied by snapshot metadata.
+- NO existing snapshots. virsh snapshot-create-as --print-xml
+  returned only domainsnapshot name; NOT support/restore test.
+- / disk fs available ~96 GiB, 90% used; refrain from clone
+  image copies and unbounded snapshot data accumulation.
+- CAPE bridge cape-lab0 has one live vnet0 port; host sysctl
+  ipv4.ip_forward=1 and ipv6.all.forwarding=0.
+- nft table inet cape_analysis_guard forward hook -50 drops
+  ingress and egress cape-lab0, input drops new from cape-lab0,
+  output allows only host TCP8000; presence is not packet-level
+  IPv4/IPv6 external or L2 bridge negative acceptance.
+- CAPE libvirt network remains ACTIVE manual, original Windows
+  master/trial must remain shut off.
+- VM libvirt dominfo: 'tainted: running with undesirable elevated
+  privileges' -> analyze cause before production/security claims.
+
+IMPORTANT architecture gate:
+Current scripts/command2_running_cape_snapshot_gate.py performs
+unspecified INTERNAL memory+disk snapshot via --atomic and
+requires internal metadata on separate approved hosts. This is
+UNSAFE ASSUMPTION with Windows 11 RAW pflash VARS + swtpm,
+especially if basic clone storage chain still references master.
+Libvirt internal memory snapshot with pflash has known compatibility
+restrictions, raw varstore specifically disallowed in newer
+pflash snapshot QMP implementations; external full snapshots may
+be capturable but libvirt revert functionality and TPM/UEFI
+consistency must be proven on a disposable host. Never run
+snapshot-create-as without explicit mode validation and rollback
+test for correct libvirt/QEMU/swtpm versions. Do not use
+--force or blindly try snapshot-revert on SSL55.
+
+NEXT: single small read-only version and QEMU/libvirt guest
+capability check and backing chain inspect on SSL55; no new
+guest media/commands, no snapshots, no host writes. Use findings
+to select an actually restorable CAPE running snapshot approach,
+then separate benign no-internet packet egress proof and
+count-driven portable Command2 design. User requests speed,
+avoid repeated broad inventory reports.
+Source libvirt virsh docs and QEMU TPM docs were consulted.
+
+
 ## 2026-10-11 ~21:25 UTC: LIVE SSL55 WIN11-1 CAPE AGENT 0.23 PASS
 
 User uploaded CAPE_Command2_Win11_1_AgentNetwork_20261011_212518.txt:
