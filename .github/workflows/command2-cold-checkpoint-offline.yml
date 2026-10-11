@@ -42,6 +42,8 @@ on:
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_master_nic_guard.py"
       - "scripts/test_command2_ssl55_master_nic_guard.py"
+      - "scripts/command2_ssl55_guard_systemd_unit_plan.py"
+      - "scripts/test_command2_ssl55_guard_systemd_unit_plan.py"
       - "scripts/command2_ssl55_guard_scoped_replay.py"
       - "scripts/test_command2_ssl55_guard_scoped_replay.py"
       - "scripts/command2_ssl55_persistence_design.py"
@@ -117,6 +119,8 @@ on:
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_master_nic_guard.py"
       - "scripts/test_command2_ssl55_master_nic_guard.py"
+      - "scripts/command2_ssl55_guard_systemd_unit_plan.py"
+      - "scripts/test_command2_ssl55_guard_systemd_unit_plan.py"
       - "scripts/command2_ssl55_guard_scoped_replay.py"
       - "scripts/test_command2_ssl55_guard_scoped_replay.py"
       - "scripts/command2_ssl55_persistence_design.py"
@@ -281,6 +285,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_guard_scoped_replay.py' -v
+      - name: Python 3.10 SSL55 candidate dedicated CAPE-only systemd replay service design
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_guard_systemd_unit_plan.py' -v
       - name: Python 3.10 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -417,6 +425,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_guard_scoped_replay.py' -v
+      - name: Python 3.12 SSL55 candidate dedicated CAPE-only systemd replay service design
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_guard_systemd_unit_plan.py' -v
       - name: Python 3.12 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
