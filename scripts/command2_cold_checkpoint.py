@@ -34,6 +34,7 @@ CHECKPOINTS = Path("/var/lib/libvirt/images/cape-clones-staging/cape-cold-checkp
 LOCK = Path("/run/lock/cape-command2-cold-checkpoint.lock")
 GIB = 1024 ** 3
 RESERVE_GIB = 30
+CAPTURE_EXTRA_MARGIN_GIB = 10  # shared-host operational headroom beyond reserve
 VIRTUAL_GIB = 64
 CHUNK = 4 * 1024 * 1024
 
@@ -195,7 +196,8 @@ def guards(mode):
     remaining = free_bytes()
     # Metadata-only plan for running disk. The image can change during boot.
     if mode == "capture":
-        require(remaining >= need, "Insufficient conservative cold checkpoint space")
+        require(remaining >= need + CAPTURE_EXTRA_MARGIN_GIB * GIB,
+                "Insufficient cold checkpoint space plus 10 GiB shared-host margin")
         data = json.loads(cmd("qemu-img", "info", "--output=json", str(DISK)))
         require(data.get("format") == "qcow2" and
                 data.get("virtual-size") == VIRTUAL_GIB * GIB and
@@ -278,6 +280,9 @@ def plan():
             "free_gib": round(facts["free"] / GIB, 2),
             "required_conservative_gib": VIRTUAL_GIB + RESERVE_GIB,
             "capacity_estimate_pass": facts["free"] >= facts["conservative_required"],
+            "additional_operating_margin_gib": CAPTURE_EXTRA_MARGIN_GIB,
+            "capture_capacity_gate_gib": VIRTUAL_GIB + RESERVE_GIB + CAPTURE_EXTRA_MARGIN_GIB,
+            "capture_capacity_gate_pass": facts["free"] >= (VIRTUAL_GIB + RESERVE_GIB + CAPTURE_EXTRA_MARGIN_GIB) * GIB,
             "capture_requires_guest_shutdown": True,
             "read_live_qcow2": False,
             "snapshot_or_restore_created": False,
