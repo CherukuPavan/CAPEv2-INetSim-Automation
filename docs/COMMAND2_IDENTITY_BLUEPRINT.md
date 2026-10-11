@@ -8,7 +8,7 @@ state is changed. SSL-55 remains a protected reference host.**
 - `scripts/command2_guest_identity_blueprint.py` accepts a **validated
   read-only preflight result** for a separate target machine and an
   inventory of existing UUIDs/MAC addresses. It produces candidate
-  values for the requested TOTAL count of 1–16 Windows VMs.
+  values for the requested TOTAL count of resource/subnet-bounded Windows VMs (model safety cap: 4096).
 - For each `win11_1..win11_N`, a locally-administered, unicast
   randomly generated MAC is proposed together with fresh candidate
   libvirt UUID and SMBIOS generation ID values. It excludes supplied
@@ -36,8 +36,7 @@ state is changed. SSL-55 remains a protected reference host.**
   a different supported, adequately provisioned machine.
 - Preflight is still a metadata-only assessment, not a certificate
   that the Windows source template is safe or unencrypted.
-- Candidate Ubuntu support, 4 GiB/VM planning assumption and 16-VM
-  model limit are preliminary and must be validated on actual hosts.
+- Candidate Ubuntu support, 4 GiB/VM planning assumption and model-safety cap 4096 and subnet limits are preliminary and must be validated on actual hosts.
 
 ## Offline regression tests
 
