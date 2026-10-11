@@ -1,6 +1,50 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 latest user direction: Finish SSL55 win11_1 pilot, then Command3 implementation, then test all 3 on OTHER host
+
+User explicitly emphasizes remaining win11_1 isolated NIC, Windows
+static IP, CAPE agent, *RUNNING* snapshot and revert. Original
+protected win11 master NIC restoration is already verified but does
+NOT confer a NIC on win11_1. Last known win11_1 RUNNING ZERO NIC.
+User prefers IP +1 compared with the previous **verified analysis VM**.
+Do NOT increment source win11 master NAT address on other subnet.
+Example: win11_1 192.168.240.101, win11_2 .102, win11_3 .103.
+No skipped/colliding next IPs, no extrapolation from unverified guest.
+
+New development components:
+- scripts/command2_sequential_guest_ip.py and 9 unit tests: pure
+  previous Windows analysis guest verified IPv4 + 1 allocator,
+  IPv4 overlap and collision blocks, 1/5/16 fresh guest count.
+- Integrated cross-check in scripts/command2_portable_zero_nic_entrypoint.py
+  for FRESH hosts only: actual Windows static-IP setting still
+  requires secure guest-side command delivery and host isolation.
+- scripts/command2_ssl55_win11_1_readiness.py + 7 offline tests:
+  STRICT READ-ONLY reference-host single-clone audit: live/inactive
+  NICs, exact UUID, isolated network forward/DHCP status, nft guard
+  presence, `ip -j` route/interface CIDR overlap, existing
+  snapshots, UEFI/TPM/disks and free images filesystem GiB.
+  Does NOT create/attach/define/boot anything, alter host nft,
+  write snapshots, or prove external egress containment.
+- docs/COMMAND2_SSL55_WIN11_1_PILOT_NEXT.md records requested
+  order and exact remaining piloting/blockers.
+- GitHub Actions run 38148326580 GREEN, offline Python+Windows syntax.
+
+Resolution of order: Complete and ACTUALLY VERIFY SSL55 existing
+win11_1 Command2 PILOT to permitted extent without creating new
+VMs/large artifacts on shared reference host; then Command3
+IMPLEMENTATION may proceed, followed by real 3-command portability
+ACCEPTANCE on separately approved hardware. INetSim-specific
+service simulation may be added later, but IPv4+IPv6 anti-egress
+and CAPE host/guest safety MUST NOT be deferred.
+
+NEXT USER ACTION: one read-only SSL55 readiness TXT report to
+approve any state-changing isolated network/snapshot procedure.
+Until reviewed, no connecting win11_1 NIC, bridge activation,
+firewall changes, Windows IP assignment, or snapshot operation.
+Still no additional guests or disk clones on SSL55.
+
+
 ## 2026-10-11 ~14:23 UTC — newly implemented Command2 CI fully GREEN
 
 Operator screenshot at ~14:17 showed many failed development workflows
