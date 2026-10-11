@@ -8,6 +8,7 @@ on:
       - "scripts/test_command2_cold_checkpoint*.py"
       - "scripts/command2_continuation_plan.py"
       - "scripts/test_command2_continuation_plan.py"
+      - "scripts/test_command2_shared_artifacts.py"
       - "scripts/command2_cold_checkpoint_plan_acceptance.sh"
       - "scripts/command2_cold_and_count_plan_acceptance.sh"
       - ".github/workflows/command2-cold-checkpoint-offline.yml"
@@ -18,6 +19,7 @@ on:
       - "scripts/test_command2_cold_checkpoint*.py"
       - "scripts/command2_continuation_plan.py"
       - "scripts/test_command2_continuation_plan.py"
+      - "scripts/test_command2_shared_artifacts.py"
       - "scripts/command2_cold_checkpoint_plan_acceptance.sh"
       - "scripts/command2_cold_and_count_plan_acceptance.sh"
       - ".github/workflows/command2-cold-checkpoint-offline.yml"
@@ -43,6 +45,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_continuation_plan.py' -v
+      - name: Python 3.10 peer collision guard tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_shared_artifacts.py' -v
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
@@ -55,3 +61,7 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_continuation_plan.py' -v
+      - name: Python 3.12 peer collision guard tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_shared_artifacts.py' -v
