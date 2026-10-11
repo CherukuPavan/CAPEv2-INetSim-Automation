@@ -137,6 +137,10 @@ jobs:
           bash -n scripts/command2_target_host_preflight_offline_acceptance.sh
           bash -n scripts/command2_setup_auto_report_sync.sh
           bash -n scripts/command2_upload_approved_reports.sh
+      - name: Python 3.10 ALL Command 2 unit tests (aggregate fail-fast detection)
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_*.py' -v
       - name: Python 3.10 offline mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
