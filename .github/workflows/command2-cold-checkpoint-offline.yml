@@ -20,6 +20,8 @@ on:
       - "scripts/command2_isolated_network_xml_plan.py"
       - "scripts/test_command2_isolated_network_xml_plan.py"
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
+      - "scripts/command2_ssl55_master_nic_guard.py"
+      - "scripts/test_command2_ssl55_master_nic_guard.py"
       - "scripts/command2_ssl55_network_readonly_audit.py"
       - "scripts/test_command2_ssl55_network_readonly_audit.py"
       - "scripts/command2_portable_zero_nic_stager.py"
@@ -63,6 +65,8 @@ on:
       - "scripts/command2_isolated_network_xml_plan.py"
       - "scripts/test_command2_isolated_network_xml_plan.py"
       - "scripts/command2_ssl55_network_readonly_acceptance.sh"
+      - "scripts/command2_ssl55_master_nic_guard.py"
+      - "scripts/test_command2_ssl55_master_nic_guard.py"
       - "scripts/command2_ssl55_network_readonly_audit.py"
       - "scripts/test_command2_ssl55_network_readonly_audit.py"
       - "scripts/command2_portable_zero_nic_stager.py"
@@ -149,6 +153,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_network_readonly_audit.py' -v
+      - name: Python 3.10 original SSL-55 saved NIC exact-plan restore unit tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_master_nic_guard.py' -v
       - name: Python 3.10 safe isolated libvirt network XML plan tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -221,6 +229,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_network_readonly_audit.py' -v
+      - name: Python 3.12 original SSL-55 saved NIC exact-plan restore unit tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_master_nic_guard.py' -v
       - name: Python 3.12 safe isolated libvirt network XML plan tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
