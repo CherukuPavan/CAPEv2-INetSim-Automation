@@ -202,7 +202,9 @@ def template_metadata(path):
         return {"visible": True, "qcow2_flat": False}
 
 
-def collect(disk_dir, nvram_dir, template):
+def collect(disk_dir, nvram_dir, template, count):
+    if type(count) is not int or not (1 <= count <= count_plan.MAX_COUNT):
+        raise count_plan.PortablePlanBlocked("Count exceeds portable planner safety bounds")
     tools = {x: shutil.which(x) is not None for x in REQUIRED_TOOLS}
     domain_raw = run_readonly("virsh", "-c", "qemu:///system",
                              "list", "--all", "--name") if tools["virsh"] else None
@@ -213,7 +215,7 @@ def collect(disk_dir, nvram_dir, template):
         master_off = (run_readonly("virsh", "-c", "qemu:///system",
                                   "domstate", "win11") or "").strip() == "shut off"
     occupied = []
-    for idx in range(1, count_plan.MAX_COUNT + 1):
+    for idx in range(1, count + 1):
         for target in (Path(disk_dir) / ("win11_" + str(idx) + ".command2.qcow2"),
                        Path(nvram_dir) / ("win11_" + str(idx) + ".command2_VARS.fd")):
             if target.exists() or target.is_symlink():
@@ -389,7 +391,7 @@ def main():
     parser.add_argument("--subnet", default="192.168.240.0/24")
     opts = parser.parse_args()
     try:
-        profile = collect(opts.disk_dir, opts.nvram_dir, opts.template)
+        profile = collect(opts.disk_dir, opts.nvram_dir, opts.template, opts.count)
         result = evaluate(profile, opts.count, opts.disk_dir,
                           opts.nvram_dir, opts.subnet)
         print(json.dumps(result, indent=2, sort_keys=True))
