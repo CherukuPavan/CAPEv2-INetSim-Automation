@@ -17,6 +17,9 @@ on:
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_portable_zero_nic_entrypoint.py"
       - "scripts/test_command2_portable_zero_nic_entrypoint.py"
+      - "scripts/command2_isolated_network_xml_plan.py"
+      - "scripts/test_command2_isolated_network_xml_plan.py"
+      - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_network_readonly_audit.py"
       - "scripts/test_command2_ssl55_network_readonly_audit.py"
       - "scripts/command2_portable_zero_nic_stager.py"
@@ -57,6 +60,9 @@ on:
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_portable_zero_nic_entrypoint.py"
       - "scripts/test_command2_portable_zero_nic_entrypoint.py"
+      - "scripts/command2_isolated_network_xml_plan.py"
+      - "scripts/test_command2_isolated_network_xml_plan.py"
+      - "scripts/command2_ssl55_network_readonly_acceptance.sh"
       - "scripts/command2_ssl55_network_readonly_audit.py"
       - "scripts/test_command2_ssl55_network_readonly_audit.py"
       - "scripts/command2_portable_zero_nic_stager.py"
@@ -95,6 +101,7 @@ jobs:
         run: |-
           bash -n scripts/command2_cold_checkpoint_plan_acceptance.sh
           bash -n scripts/command2_cold_and_count_plan_acceptance.sh
+          bash -n scripts/command2_ssl55_network_readonly_acceptance.sh
           bash -n scripts/command2_target_host_preflight_offline_acceptance.sh
           bash -n scripts/command2_setup_auto_report_sync.sh
           bash -n scripts/command2_upload_approved_reports.sh
@@ -142,6 +149,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_ssl55_network_readonly_audit.py' -v
+      - name: Python 3.10 safe isolated libvirt network XML plan tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_isolated_network_xml_plan.py' -v
       - name: Python 3.10 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -210,6 +221,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_ssl55_network_readonly_audit.py' -v
+      - name: Python 3.12 safe isolated libvirt network XML plan tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_isolated_network_xml_plan.py' -v
       - name: Python 3.12 integrated Command 2 count frontend mocks
         env:
           PYTHONDONTWRITEBYTECODE: "1"
