@@ -1,6 +1,48 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 user requests complete Command2 plus SSL55 NIC fix
+
+New operator request: finish ALL Command2 before starting Command3.
+User asks whether any removed NIC configuration on original win11
+or isolated clone win11_1 on SSL55 can be restored. DO NOT assume
+that a missing NIC is a malfunction. Host state cannot be modified
+through the GitHub connector; no SSH/terminal access was granted here.
+
+- Existing read-only SSL55 postrestart host TXT recorded win11_1
+  ZERO NICs in live+inactive views, cape-analysis-isolated inactive,
+  nonautostart. The previous master/trial NIC listing was empty;
+  specific master NIC loss is not yet demonstrated.
+- New scripts/command2_ssl55_network_readonly_audit.py and
+  command2_ssl55_network_readonly_acceptance.sh compare exact VM
+  UUIDs, live/inactive network interfaces, lab network state,
+  and the root-private original master backup metadata/domain.xml.
+  It NEVER defines/attaches any NIC or modifies Windows, libvirt,
+  nftables, master, trial or clone. 6 synthetic test methods added.
+  Follow-up should review ONE report before any proposed repair.
+- Original win11 may have a backed-up default NAT interface, but do
+  not reattach any interface without complete XML and scope review.
+  Win11_1 zero NIC is intended until isolation, guest static IP and
+  host IPv4+IPv6 guarded containment are independently accepted.
+- Portable scripts/command2_isolated_network_xml_plan.py generates
+  no-forward/no-NAT/no-DHCP libvirt XML design for different hosts;
+  NO host changes. Five synthetic tests added, CI workflow updated.
+- Portable and legacy staging added backup-directory sentinel to
+  BLOCK additional VM creation on renamed SSL55 reference host.
+  Never bypass reference protection or allocate extra backup/disk.
+- docs/COMMAND2_SSL55_NETWORK_RECOVERY_READONLY.md explains why a
+  guessed network change is not allowed.
+
+Status: STILL NOT COMPLETE as real two-command deployment. Remaining:
+Command1 fully portable golden Windows/bootstrap prerequisite;
+safe guest config transport and execution; isolated-network
+nftables/IPv6 guard and reboot-persistence negative egress;
+per-guest Windows hostnames/IP applied and verified after boots;
+snapshot/rollback of independent QCOW2/OVMF/swtpm; parallel CAPE
+and INetSim benign-path acceptance on a SEPARATE provisioned machine.
+Do not start Command3 or declare Command2 production ready.
+
+
 ## 2026-10-11 continued Command 2 engineering — stage + Windows config
 
 User requested to complete Command 2, without any additional
