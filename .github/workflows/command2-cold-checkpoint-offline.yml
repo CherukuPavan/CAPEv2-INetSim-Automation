@@ -12,6 +12,9 @@ on:
       - "scripts/test_command2_portable_fresh_count_plan.py"
       - "scripts/command2_portable_sequence_model.py"
       - "scripts/test_command2_portable_sequence_model.py"
+      - "scripts/command2_windows_guest_config.py"
+      - "scripts/test_command2_windows_guest_config.py"
+      - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_portable_zero_nic_stager.py"
       - "scripts/test_command2_portable_zero_nic_stager.py"
       - "scripts/command2_portable_zero_nic_xml.py"
@@ -45,6 +48,9 @@ on:
       - "scripts/test_command2_portable_fresh_count_plan.py"
       - "scripts/command2_portable_sequence_model.py"
       - "scripts/test_command2_portable_sequence_model.py"
+      - "scripts/command2_windows_guest_config.py"
+      - "scripts/test_command2_windows_guest_config.py"
+      - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_portable_zero_nic_stager.py"
       - "scripts/test_command2_portable_zero_nic_stager.py"
       - "scripts/command2_portable_zero_nic_xml.py"
@@ -124,6 +130,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_portable_zero_nic_stager.py' -v
+      - name: Python 3.10 Windows guest personalization config tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_windows_guest_config.py' -v
       - name: Python 3.10 portable provisioning stage gate tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -180,6 +190,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_portable_zero_nic_stager.py' -v
+      - name: Python 3.12 Windows guest personalization config tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_windows_guest_config.py' -v
       - name: Python 3.12 portable provisioning stage gate tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -192,3 +206,23 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_shared_artifacts.py' -v
+
+  windows-powershell-syntax:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Parse Windows guest personalization script without running it
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'scripts/command2_guest_personalize.ps1'),
+            [ref]$tokens, [ref]$errors)
+          if ($errors.Count -ne 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw 'PowerShell guest script syntax invalid'
+          }
+          Write-Output 'WINDOWS_POWERSHELL_SYNTAX_PASS_NO_GUEST_OPERATIONS'
+
