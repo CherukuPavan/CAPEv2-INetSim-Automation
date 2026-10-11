@@ -334,7 +334,7 @@ def restore(vm,uid,host,dest,expected_manifest_sha):
                  "Restored candidate file SHA mismatch")
         tpm_new=Path(str(tpm_target)+".restore-new-"+nonce)
         tpm_new.mkdir(mode=0o700)
-        tpm_new.chown(tpm_target.stat().st_uid,tpm_target.stat().st_gid)
+        os.chown(tpm_new,tpm_target.stat().st_uid,tpm_target.stat().st_gid)
         for rel,meta in manifest["entries"].items():
             if rel.startswith("swtpm/"):
                 info=copy_safe(Path(dest)/rel,tpm_new/rel.split("/",1)[1],identity=meta)
