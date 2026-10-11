@@ -1,6 +1,31 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## Development after verified original win11 NIC restore
+
+Following operator upload of successful restore report at 13:38 UTC,
+NO further SSL55 host action is needed for master NIC. Original
+master has the saved default e1000e NIC and remains shut off.
+win11_1 and trial remain intentionally networkless.
+
+Next GitHub development work: scripts/command2_cape_egress_guard_plan.py
+produces ONLY a candidate nft inet table scoped to cape-lab0, with
+FORWARD drop toward external routes, host INPUT dropping guest IPv6
+and guest IPv4 destined to non-bridge host addresses. It never
+applies firewall rules, starts libvirt networks or attaches NICs.
+Five offline regression tests added and CI job matrix extended.
+Integrated portable count frontend now includes candidate guard
+text/sha256 in its resource preview. Explicit real isolation
+verification=false and NIC attachment authorization=false remain.
+See docs/COMMAND2_CANDIDATE_NFT_EGRESS_GUARD.md for major L2
+guest lateral-isolation, existing Docker/libvirt interactions,
+spoofing, IPv6 and post-reboot live testing still unresolved.
+
+Latest new module mocked CI results not yet verified. The portable
+two-command Command2 has NOT passed a real separate-host deployment;
+do not attach guest NICs or proceed to Command3 prematurely.
+
+
 ## SUCCESS: Original SSL-55 master NIC restored (2026-10-11 13:38 UTC)
 
 User uploaded CAPE_MasterNIC_Restore_20261011_133805_Ifv1ismz.txt.
