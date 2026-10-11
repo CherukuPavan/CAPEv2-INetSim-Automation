@@ -1,6 +1,57 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 15:30 UTC — SSL55 boot-persistence report uploaded, replay design in development
+
+Source file: CAPE_Command2_BootPersistence_20261011_153057_wtbVV8dC.txt.
+Actual report fields:
+- `nftables.service`: LoadState=loaded, UnitFileState=disabled,
+  ActiveState=inactive, boot_enabled_observed=false.
+- `cape-analysis-guard.service`: LoadState=not-found,
+  ActiveState=inactive, boot_enabled_observed=false.
+- `/etc/nftables.conf`: root-owned trusted regular file, 243 bytes,
+  global_flush_present=true, guard_reference_present=false,
+  includes_present=false. DO NOT enable/restart `nftables.service`;
+  it might flush Docker/libvirt/campus firewall rules.
+- Original 3 VMs (win11, win11_1, win11_trial_1) all SHUT OFF,
+  all autostart disabled; original win11 NIC previously restored.
+- CAPE isolated network defined, persistent, but ACTIVE=no,
+  AUTOSTART=no, no forwarding/DHCP.
+- Existing `cape_analysis_guard` expected shape PRESENT but not
+  reboot-persistent; external IPv4/IPv6 negative tests and CAPE
+  agent unchanged/not performed. safe_to_attach_win11_1_nic=false.
+
+New development components COMMITTED, not applied on SSL55:
+- `scripts/command2_ssl55_persistence_design.py`: pure strict
+  host report-to-repair-model and 6 synthetic tests.
+- `scripts/command2_ssl55_guard_scoped_replay.py`: root-only,
+  explicitly authorized optional `--mode reconcile`, which
+  retains any valid existing guard and can ONLY atomically
+  add missing fixed-hash (`58b84446ad74ac7ea8b14aa57d94c19945baa3db7330e54c7fb2312a9577ea14`)
+  inet CAPE table. Never changes nftables.service or master/clone.
+  Read-only `--mode plan` default. Nine synthetic tests.
+  No root-only authorization manifest installed on SSL55.
+- `scripts/command2_ssl55_guard_systemd_unit_plan.py`: pure
+  candidate isolated systemd unit text for libvirtd.service OR
+  virtqemud.service dependency; neither dependency was verified
+  from the user report. FOUR synthetic tests. NO unit installed,
+  started or enabled and reboot persistence not proven.
+- `docs/COMMAND2_SSL55_GUARD_PERSISTENCE_DESIGN.md`: root
+  cause/requirements. Strict fail-closed no-flush deployment path.
+- CI run 38152196804 SUCCESS for guard replay tests; CI
+  run 38152466068 SUCCESS for added systemd candidate unit and
+  entire offline + Windows parser jobs.
+
+Next work: determine actual SSL55 libvirt service unit, review and
+implement tightly scoped root-controlled installer + approve a
+dedicated CAPE-only service; verify it after reboot without
+disrupting general host firewall, then perform benign guest
+network qualification before assigning 192.168.240.101 and
+capturing RUNNING snapshot. The real guest remains NIC-less.
+Do not repeat master NIC repair, make extra VMs/disks on SSL55,
+or treat passing offline CI as host acceptance.
+
+
 ## 2026-10-11 15:16 — SSL55 CAPE nft guard report received; staged benign NIC fix
 
 Operator uploaded CAPE_Command2_GuardNetwork_20261011_151629_yRxE0i87.txt:
