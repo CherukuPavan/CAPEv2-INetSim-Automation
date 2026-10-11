@@ -133,10 +133,16 @@ class ColdTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             source=Path(tmp)/'src';source.write_bytes(b'a'*30)
             meta=c.file_meta(source)
-            source.write_bytes(b'b'*30)
-            with self.assertRaisesRegex(c.Blocked, 'Source changed'):
+            # Change the LENGTH, not only the contents: coarse filesystem
+            # mtime resolution can make same-size rewrites indistinguishable.
+            # A changed-size fixture is deterministic on GitHub runners.
+            source.write_bytes(b'b'*31)
+            with patch.object(c,'free_bytes',
+                              side_effect=AssertionError('Unexpected copy')), \
+                 self.assertRaisesRegex(c.Blocked, 'Source changed'):
                 c.copy_file(source,Path(tmp)/'dest',mode=0o600,owner=(0,0),
                             expected_identity=meta['identity'])
+            self.assertFalse((Path(tmp)/'dest').exists())
 
 if __name__ == '__main__':
     unittest.main()
