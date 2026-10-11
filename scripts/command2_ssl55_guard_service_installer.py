@@ -226,6 +226,24 @@ def apply(staging, approved_plan_sha):
               separators=(",",":")).encode()).hexdigest()==approved_plan_sha,
               "Host state changed under installation lock")
         source=inspect_sources(staging)
+        # Ubuntu may not pre-create /usr/local/libexec. Ensure its parent
+        # is trusted root-owned before create-only installation there.
+        rootlocal=Path("/usr/local")
+        local_info=rootlocal.lstat()
+        require(stat.S_ISDIR(local_info.st_mode) and
+                local_info.st_uid==0 and not local_info.st_mode & 0o022,
+                "Cannot trust /usr/local for root-only helper installation")
+        parent=INSTALL_DIR.parent
+        require(parent==Path("/usr/local/libexec"),
+                "Unreviewed helper installation parent")
+        if parent.exists() or parent.is_symlink():
+            entry=parent.lstat()
+            require(stat.S_ISDIR(entry.st_mode) and entry.st_uid==0 and
+                    not entry.st_mode & 0o022,
+                    "Untrusted /usr/local/libexec parent")
+        else:
+            parent.mkdir(mode=0o755)
+            fsync_directory(rootlocal)
         INSTALL_DIR.mkdir(mode=0o700)
         AUTH_DIR.mkdir(mode=0o700)
         for name,data in source.items():
@@ -245,6 +263,9 @@ def apply(staging, approved_plan_sha):
         fsync_directory(AUTH_DIR)
         write_exclusive(UNIT_FILE,checked["unit_text"].encode(),0o644)
         fsync_directory(UNIT_FILE.parent)
+        # Syntax/ExecStart validation before enabling a new systemd unit.
+        # Unlike systemctl start, systemd-analyze verify does not run it.
+        command("systemd-analyze","verify",str(UNIT_FILE))
         # Do not use --now: enabling schedules the dedicated unit at
         # subsequent boot without immediately starting lab or service.
         command("systemctl","daemon-reload")
