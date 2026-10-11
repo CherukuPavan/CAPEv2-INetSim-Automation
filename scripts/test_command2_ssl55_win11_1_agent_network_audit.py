@@ -88,6 +88,7 @@ class ReadOnlyAgentTests(unittest.TestCase):
 
     def test_full_audit_never_claims_external_egress_or_snapshot(self):
         with patch.object(m,"check_vm",return_value={"correct_guest_running":True}),\
+             patch.object(m.sys,"argv",["audit"]),\
              patch.object(m,"check_lab",return_value={"cape_guard_service_active_success":True}),\
              patch.object(m,"check_ipv4_route",return_value={"dev":m.BRIDGE}),\
              patch.object(m,"probe_agent",return_value={
@@ -108,6 +109,7 @@ class ReadOnlyAgentTests(unittest.TestCase):
 
     def test_unavailable_agent_keeps_report_but_nonzero_exit(self):
         with patch.object(m,"check_vm",return_value={}),\
+             patch.object(m.sys,"argv",["audit"]),\
              patch.object(m,"check_lab",return_value={}),\
              patch.object(m,"check_ipv4_route",return_value={}),\
              patch.object(m,"probe_agent",return_value={
