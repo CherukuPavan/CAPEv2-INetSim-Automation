@@ -1,6 +1,60 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+
+## OPERATOR DIRECTIVE — SSL-55 IS REFERENCE-ONLY (2026-10-11)
+
+**HARD RESTRICTION:** DO NOT create, stage, define, boot or allocate
+ANY ADDITIONAL Windows VMs on SSL-55. The operator wants to preserve
+the existing `win11`, `win11_trial_1` and successfully verified
+`win11_1`. Do not create `win11_2`, `win11_3` etc. on this host,
+and do not allocate disk-heavy clone images or cold backup copies there
+given only ~96 GiB free. Leave CAPE analysis network inactive and
+never run malware before isolation acceptance.
+
+**PRIMARY GOAL:** a portable, count-driven Command 2 for a **DIFFERENT,
+supported, sufficiently provisioned machine**. After that machine
+has its own independently verified Command 1 Windows master/template,
+Command 2 asks for TOTAL number of analysis VMs N and produces
+`win11_1` ... `win11_N` with unique guest hostnames, MACs, IPs,
+libvirt UUIDs, UEFI and TPM, secure isolation, CAPE reachability
+and clean restore readiness. Testing counts and failure cases on SSL-55
+must use pure models, synthetic mocks, host read-only metadata or
+the existing Windows clone ONLY; multi-VM physical acceptance must be
+performed on a **separate approved host with capacity**, not SSL-55.
+
+**Code protection:** `scripts/command2_stage_independent_clones.py`
+now calls `prohibit_reference_host_staging()` for `--mode stage`
+and refuses SSL-55 BEFORE even creating its stage-lock file.
+Regression tests cover the hostname and FQDN. This is a safety
+refusal for the legacy SSL-55 adapter, not the finished portable
+Command 2 installer. Other future write entrypoints must implement
+the same reference-host protection.
+
+**LAST OPERATOR TXT REPORT:** `CAPE_Command2A_ColdAndCountPlan_20261011_100418_seoiKLvu.txt`
+showed 12 offline cold-checkpoint tests: 10 passed,
+1 FAIL and 1 ERROR. Both were **test-fixture bugs**:
+  - temp directories made with default modes caused a mocked
+    non-root `verify` test to fail before its intended manifest test;
+  - mocked complete capture omitted a simulated privileged context in
+    its subsequent `verify` call.
+The launcher stopped on unit tests and DID NOT run cold-checkpoint or
+VM-count host plans. The tests were fixed in `development`; production
+owner checks were NOT relaxed. All 22 existing mocked checkpoint and
+continuation tests then passed locally as an unprivileged user. Seven
+additional fresh-host pure-planner tests also passed locally. The
+new GitHub Actions results remain unverified until checked separately.
+
+**NEW portable planning model:** `scripts/command2_portable_fresh_count_plan.py`
+generates 1–16 total guest names/IPs from supplied host-specific paths,
+CIDR and resources and refuses colliding domains/paths, unsafe example
+NAT subnet and insufficient estimated capacity. It performs ZERO host
+changes. It is not a portable deployer: actual host discovery,
+Windows master validation, unique runtime IDs, isolation and VM
+creation are NOT implemented or accepted.
+
+**NO NEXT SSL-55 STAGING COMMAND IS AUTHORIZED.**
+
 This is a state handoff, not a complete deployment approval. User builds
 incrementally on shared Ubuntu host SSL-55; user pastes carefully guarded
 terminal commands and uploads one report instead of repeated console output.
