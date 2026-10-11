@@ -103,6 +103,40 @@ RESULT: COMMAND2_OFFLINE_PREFLIGHT_TESTS_PASS.
 Tests are synthetic and do NOT prove host deploy, egress isolation
 or VM snapshot restore. This is the latest REAL operator report.
 
+## 2026-10-11 continuation: automatic report verification and candidate identities
+
+Operator SSL-55 screenshot confirms the private user-level
+`cape-approved-report-upload.timer` was enabled, with the next
+scheduled invocation around 11:32 UTC. The connected Drive folder
+`CAPE_SSL55_AutoReports` EXISTS and is readable via ChatGPT,
+but during initial follow-up it had **zero report files**.
+Do not claim end-to-end auto-upload success until a report is actually
+fetched from this folder. Setup copies earlier reports to the allowlist
+directory and `find -mmin +1` intentionally delays their selection;
+the first manual service trigger may have run too soon.
+An hourly condition-watch automation can review new Drive reports and
+make safe, narrow `development` GitHub code/test fixes when possible.
+It is NOT a remote shell, continuous deployment, or instant notification.
+
+NEW development-only module:
+`scripts/command2_guest_identity_blueprint.py` proposes unique candidate
+libvirt UUIDs, SMBIOS generation IDs, local-admin MACs, Windows
+hostnames and isolated IPv4 assignments for TOTAL N=1..16 using a
+preflight record and supplied occupied identity inventories.
+Fresh random values are NOT reserved/persisted or applied. It
+validates exact guest numbering, artifact paths, CIDR and IP offset,
+rejects reference SSL-55, malformed inventories and collisions.
+`scripts/test_command2_guest_identity_blueprint.py` adds 13 mocked
+tests. Development Python 3.10/3.12 CI includes the new tests, but
+the test results and CI conclusion must be independently verified.
+`docs/COMMAND2_IDENTITY_BLUEPRINT.md` documents limits and future
+durable lock/reservation/rollback acceptance.
+Read-only target preflight now includes analysis_subnet in its output.
+
+Still pending: independent target-host real acceptance, full VM
+creation/personality, complete disk/UEFI/TPM restore, CAPE network
+and IPv4/IPv6 containment validation. NO extra VMs on SSL-55.
+
 ## OPERATOR DIRECTIVE — SSL-55 IS REFERENCE-ONLY (2026-10-11)
 
 **HARD RESTRICTION:** DO NOT create, stage, define, boot or allocate
