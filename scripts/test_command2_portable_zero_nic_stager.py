@@ -182,6 +182,69 @@ class StageTests(unittest.TestCase):
             self.assertFalse(disk.exists())
             self.assertFalse(vars.exists())
 
+    def test_full_synthetic_zero_nic_stage_emits_completion_and_independent_artifacts(self):
+        import tempfile
+        row=entry()
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            source=root/"source.qcow2";source.write_bytes(b"independent synthetic disk")
+            fw=root/"master_VARS.fd";fw.write_bytes(b"synthetic firmware vars")
+            row["disk_target"]=str(root/"win11_1.command2.qcow2")
+            row["uefi_nvram_target"]=str(root/"win11_1.command2_VARS.fd")
+            candidate_xml=(f'<domain><name>win11_1</name>'
+                f'<uuid>{row["libvirt_uuid_candidate"]}</uuid>'
+                f'<genid>{row["smbios_generation_id_candidate"]}</genid>'
+                f'<os><nvram>{row["uefi_nvram_target"]}</nvram></os>'
+                f'<devices><disk device="disk"><source file="{row["disk_target"]}"/>'
+                '</disk><tpm><backend type="emulator" version="2.0"/></tpm>'
+                '</devices></domain>')
+            calls=[]
+            def fake_run(*args,**kwargs):
+                calls.append(args)
+                if args[:2]==("qemu-img","convert"):
+                    Path(args[-1]).write_bytes(b"synthetic fake QCOW2")
+                    return ""
+                if args[:2]==("qemu-img","info"):
+                    return json.dumps({"format":"qcow2","virtual-size":stage.VIRTUAL_BYTES})
+                if args[:2]==("qemu-img","check"):
+                    return ""
+                self.fail("unexpected host command: "+str(args))
+            def fake_virsh(*args):
+                if args==("domstate","win11") or args==("domstate","win11_1"):
+                    return "shut off"
+                if args==("dumpxml","--inactive","win11_1"):
+                    return candidate_xml
+                if args==("dumpxml","--inactive","win11"):
+                    return "<domain/>"
+                if args[0]=="define":
+                    data=Path(args[1]).read_text()
+                    self.assertNotIn("<interface",data)
+                    return ""
+                self.fail("unexpected libvirt call: "+str(args))
+            orig_temp=tempfile.TemporaryDirectory
+            with patch.object(stage,"exact_file",return_value=(1,2,3,4,5)), \
+                 patch.object(stage,"free_bytes",return_value=1024*stage.GIB), \
+                 patch.object(stage,"run",side_effect=fake_run), \
+                 patch.object(stage,"virsh",side_effect=fake_virsh), \
+                 patch.object(stage,"digest_file",wraps=stage.digest_file), \
+                 patch.object(stage.crypto,"require_cleartext_candidate"), \
+                 patch.object(stage.renderer,"render_no_nic",return_value=candidate_xml), \
+                 patch.object(stage.os,"fchown"), \
+                 patch.object(stage.tempfile,"TemporaryDirectory",
+                              side_effect=lambda **kwargs: orig_temp(dir=td)):
+                result=stage.make_one(row,master_xml="<domain/>",
+                    master_disk="/source/master.qcow2",master_nvram=fw,
+                    template=source,source_stamp=(1,2,3,4,5),
+                    vars_stamp=(1,2,3,4,5),logdir=root)
+            self.assertEqual(result["status"],"SHUT_OFF_ZERO_NICS_STAGED")
+            self.assertEqual(result["nic_count"],0)
+            self.assertTrue(Path(row["disk_target"]).exists())
+            self.assertEqual(Path(row["uefi_nvram_target"]).read_bytes(),fw.read_bytes())
+            self.assertTrue((root/(stage.INTENT_PREFIX+"win11_1.json")).exists())
+            self.assertTrue((root/(stage.COMPLETE_PREFIX+"win11_1.json")).exists())
+            self.assertTrue(any(call[:2]==("qemu-img","convert") for call in calls))
+            self.assertFalse(list(root.glob(".command2-incomplete-*")))
+
     def test_source_does_not_start_or_attach_network(self):
         source=Path(stage.__file__).read_text()
         for code in ('virsh("start"', 'virsh("destroy"', 'virsh("shutdown"',
