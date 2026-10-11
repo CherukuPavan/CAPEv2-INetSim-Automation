@@ -24,6 +24,7 @@ def verified(count=5):
         "host_modified": False,
         "deploy_authorized": False,
         "requested_vm_count": count,
+        "analysis_subnet": "192.168.240.0/24",
         "planned_vms": planned["planned_vms"],
     }
 
@@ -101,6 +102,20 @@ class IdentityBlueprintTests(unittest.TestCase):
         v = deepcopy(verified(2))
         v["planned_vms"][1]["disk"] = v["planned_vms"][0]["disk"]
         with self.assertRaisesRegex(b.BlueprintBlocked, "Duplicated"):
+            b.blueprint(v)
+
+    def test_wrong_ip_or_network_identity_is_refused(self):
+        v = deepcopy(verified(2))
+        v["planned_vms"][1]["planned_ipv4"] = "192.168.240.202"
+        with self.assertRaisesRegex(b.BlueprintBlocked, "Unexpected guest IP"):
+            b.blueprint(v)
+        v = deepcopy(verified(2))
+        v["analysis_subnet"] = "192.168.241.0/24"
+        with self.assertRaisesRegex(b.BlueprintBlocked, "Unexpected guest IP"):
+            b.blueprint(v)
+        v = deepcopy(verified(2))
+        v["analysis_subnet"] = "not-a-cidr"
+        with self.assertRaisesRegex(b.BlueprintBlocked, "subnet missing"):
             b.blueprint(v)
 
     def test_inventory_must_be_valid_and_finite(self):
