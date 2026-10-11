@@ -197,10 +197,12 @@ def apply(staging):
         expected=hashlib.sha256(ps).hexdigest().upper().encode()
         need(batch.count(b"__PS_SHA256__")==1,
              "Windows launcher expected checksum placeholder missing")
-        (t/"FIX.PS1").write_bytes(ps)
-        (t/"SETUP.CMD").write_bytes(batch.replace(b"__PS_SHA256__",expected))
+        payload=t/"payload"
+        payload.mkdir(mode=0o700)
+        (payload/"FIX.PS1").write_bytes(ps)
+        (payload/"SETUP.CMD").write_bytes(batch.replace(b"__PS_SHA256__",expected))
         command("genisoimage","-quiet","-J","-R","-V","CAPE_FIX",
-                "-o",str(t/"candidate.iso"),str(t))
+                "-o",str(t/"candidate.iso"),str(payload))
         candidate=t/"candidate.iso"
         need(candidate.is_file() and candidate.stat().st_size<10485760,
              "Candidate ISO missing or unexpectedly large")
