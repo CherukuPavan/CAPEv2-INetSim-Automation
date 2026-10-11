@@ -55,7 +55,8 @@ class StageTests(unittest.TestCase):
             def inspect(rows):
                 file.write_text(json.dumps(reservation_data(rows)))
                 file.chmod(0o600)
-                with patch.object(stage,"exact_file",return_value=(1,2,3,4,5)):
+                with patch.object(stage,"exact_file",return_value=(1,2,3,4,5)), \
+                     patch.object(stage,"exact_dir",return_value=folder):
                     return stage.reservation_entries(folder,"approved")
             self.assertEqual(len(inspect([entry()])),1)
             clash=entry(2)
@@ -67,7 +68,8 @@ class StageTests(unittest.TestCase):
             with self.assertRaisesRegex(stage.StageBlocked,"path"):
                 inspect([entry(),clash])
             file.write_text(json.dumps(reservation_data([entry()],"different")))
-            with patch.object(stage,"exact_file",return_value=(1,2,3,4,5)):
+            with patch.object(stage,"exact_file",return_value=(1,2,3,4,5)), \
+                 patch.object(stage,"exact_dir",return_value=folder):
                 with self.assertRaisesRegex(stage.StageBlocked,"Untrusted"):
                     stage.reservation_entries(folder,"approved")
 
