@@ -32,7 +32,12 @@ def require(condition, why):
 def mac_ok(value):
     if not isinstance(value, str):
         return False
-    return bool(re.fullmatch(r"52:54:00:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}", value))
+    if not re.fullmatch(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}", value):
+        return False
+    first = int(value[:2], 16)
+    # Locally administered or globally assigned unicast addresses both
+    # exist on real hosts; reject multicast/broadcast, not vendor OUIs.
+    return first & 1 == 0 and value != "00:00:00:00:00:00"
 
 
 def fresh_mac(existing, random_bytes=None):
