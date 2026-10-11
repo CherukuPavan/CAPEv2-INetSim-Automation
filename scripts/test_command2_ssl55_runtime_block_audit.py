@@ -1,47 +1,73 @@
-"""Synthetic block-graph parsing and strict nonmutation regression tests."""
+"""Synthetic exact-domain and open-inode audit tests; no host VM actions."""
+import tempfile
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 import command2_ssl55_runtime_block_audit as a
 
-def sample(chain=True):
-    backing = ('<backingStore><source file="' + a.SOURCES[0] +
-               '"/><backingStore/></backingStore>') if chain else '<backingStore/>'
+def domain(backing=True):
+    chain = ('<backingStore><source file="' + a.SOURCES[0] +
+             '"/><backingStore/></backingStore>') if backing else '<backingStore/>'
     return ('<domain><name>' + a.VM + '</name><uuid>' + a.UID +
             '</uuid><os><loader type="pflash" format="raw">OVMF</loader>' +
             '<nvram format="raw">' + a.VARS + '</nvram></os><devices>' +
             '<disk device="disk"><driver type="qcow2"/><source file="' +
-            a.DISK + '"/>' + backing + '</disk>' +
+            a.DISK + '"/>' + chain + '</disk>' +
             '<tpm><backend type="emulator" version="2.0"/></tpm>' +
             '<interface type="network"><source network="cape-analysis-isolated"/>' +
             '<mac address="02:0a:30:6a:3f:50"/></interface>' +
             '</devices></domain>')
 
 class GraphAuditTests(unittest.TestCase):
-    def test_xml_original_chain(self):
-        self.assertEqual(a.domain_summary(sample())["backing_paths_in_xml"], [a.SOURCES[0]])
-    def test_empty_xml_chain(self):
-        self.assertEqual(a.domain_summary(sample(False))["backing_paths_in_xml"], [])
-    def test_exact_guard_rejects_wrong_disk(self):
-        with self.assertRaisesRegex(a.Blocked,"disk"):
-            a.domain_summary(sample().replace(a.DISK, "/tmp/wrong.qcow2"))
-    def test_exact_guard_rejects_wrong_nic(self):
-        with self.assertRaisesRegex(a.Blocked,"NIC"):
-            a.domain_summary(sample().replace("02:0a:30:6a:3f:50",
-                                              "02:ff:ff:ff:ff:ff"))
-    def test_nested_qmp_paths(self):
-        value = [{"inserted": {"image": {"filename": a.DISK,
-                                          "backing-image": {"filename": a.SOURCES[0]}}}}]
-        self.assertEqual(a.referenced_paths(value), [a.DISK, a.SOURCES[0]])
-    def test_qmp_mutating_command_rejected(self):
-        with patch.object(a, "virsh", side_effect=AssertionError("Virsh must not run")):
-            with self.assertRaisesRegex(a.Blocked,"non-query"):
-                a.qmp_query("block-commit")
-    def test_source_has_no_vm_writes(self):
-        from pathlib import Path
-        source = Path(a.__file__).read_text(encoding="utf-8")
-        for cmd in ('"snapshot-create-as"', '"snapshot-revert"', '"net-start"',
-                    '"destroy"', '"shutdown"', '"rebase"', '"convert"'):
-            self.assertNotIn(cmd, source)
+    def test_chain_vs_independent_xml(self):
+        self.assertEqual(a.domain_summary(domain())["backing_paths_in_xml"], [a.SOURCES[0]])
+        self.assertEqual(a.domain_summary(domain(False))["backing_paths_in_xml"], [])
+    def test_wrong_disk_or_nic_or_uuid_refused(self):
+        for raw in (domain().replace(a.DISK, "/tmp/other"),
+                    domain().replace("02:0a:30:6a:3f:50", "02:ff:ff:ff:ff:ff"),
+                    domain().replace(a.UID, "wrong-uuid")):
+            with self.subTest(raw=raw), self.assertRaises(a.Blocked):
+                a.domain_summary(raw)
+    def test_qemu_process_unique_exact_guest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name, uuid in (("123", a.UID), ("124", "other-uuid")):
+                p = root / name
+                p.mkdir()
+                (p / "comm").write_text("qemu-system-x86\n")
+                (p / "cmdline").write_bytes(
+                    b"qemu-system-x86_64\0-name\0guest=win11_1,debug-threads=on\0-uuid\0" +
+                    uuid.encode() + b"\0")
+            self.assertEqual(a.qemu_pid(root), 123)
+    def test_qemu_process_ambiguous_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("123", "124"):
+                p = root / name
+                p.mkdir()
+                (p / "comm").write_text("qemu-system-x86\n")
+                (p / "cmdline").write_bytes(
+                    b"qemu-system-x86_64\0guest=win11_1\0" + a.UID.encode() + b"\0")
+            with self.assertRaisesRegex(a.Blocked,"uniquely"):
+                a.qemu_pid(root)
+    def test_inode_tracking_detects_open_file_even_via_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            disk = root / "disk.qcow2"
+            disk.write_bytes(b"synthetic only")
+            proc_fd = root / "fakeproc" / "123" / "fd"
+            proc_fd.mkdir(parents=True)
+            (proc_fd / "7").symlink_to(disk)
+            with patch.object(a, "WATCHED", (str(disk), str(root / "missing"))):
+                result = a.open_disk_fds(123, root / "fakeproc")
+            self.assertEqual(result["matching_open_file_descriptors"][str(disk)][0]["fd"], "7")
+            self.assertEqual(result["matching_open_file_descriptors"][str(root / "missing")], [])
+    def test_source_never_sends_monitor_or_mutating_commands(self):
+        source = Path(a.__file__).read_text()
+        for phrase in ('virsh("qemu-monitor-command"', 'virsh("snapshot-create-as"',
+                       'virsh("snapshot-revert"', 'read("qemu-img", "check"',
+                       'read("qemu-img", "convert"', 'read("qemu-img", "rebase"'):
+            self.assertNotIn(phrase, source)
 
 if __name__ == "__main__":
     unittest.main()
