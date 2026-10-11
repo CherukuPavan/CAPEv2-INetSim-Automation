@@ -313,17 +313,22 @@ def prohibit_reference_host_staging():
 def deploy(count,mode):
     os.umask(0o077)
     check(mode in ("plan","stage"),"Invalid staging mode")
-    if mode=="stage":
-        # Enforce before opening even the staging lock file.
-        prohibit_reference_host_staging()
-    check(not GUARD_LOCK.is_symlink(),"Unsafe shared staging lock")
-    lock=os.open(GUARD_LOCK,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     journal={"result":"IN_PROGRESS","mode":mode,
              "requested_clones":count,"created":[],
              "windows_personalized":False,
              "analysis_network_connected":False,
              "runtime_egress_isolation_verified":False,
              "malware_execution_authorized":False}
+    if mode=="stage":
+        # Enforce before opening even the staging lock file.
+        try:
+            prohibit_reference_host_staging()
+        except MultiStageError as exc:
+            journal["result"]="BLOCKED_OR_PARTIAL_REVIEW_REQUIRED"
+            journal["reason"]=str(exc)
+            return journal
+    check(not GUARD_LOCK.is_symlink(),"Unsafe shared staging lock")
+    lock=os.open(GUARD_LOCK,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     try:
         info=os.fstat(lock)
         check(info.st_uid==0 and not(info.st_mode&0o077),
