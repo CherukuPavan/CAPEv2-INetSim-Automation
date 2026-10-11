@@ -1,6 +1,29 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## SUCCESS: Original SSL-55 master NIC restored (2026-10-11 13:38 UTC)
+
+User uploaded CAPE_MasterNIC_Restore_20261011_133805_Ifv1ismz.txt.
+Actual terminal script output: ORIGINAL_SHUTOFF_WIN11_SAVED_NIC_RESTORED.
+Script post-apply libvirt verification reported:
+- Protected original win11 UUID 289d89be-68ec-4c62-90e1-ea930849266f.
+- Exactly ONE saved network interface restored on default libvirt
+  network, original backed-up e1000e and MAC 52:54:00:62:a0:00.
+- Original master still SHUT OFF and snapshot finalshutoffversion retained.
+- win11_1 and win11_trial_1 reported untouched.
+- Host firewall untouched, no libvirt network started, no extra VM.
+- Earlier plan evidence sha256 dd474f43350c10932fdd3d9abceef1c3f9fe2a74ee79e06edcdfb262f4005f83.
+
+Original master NIC repair is FINISHED per the guarded host apply
+script output. DO NOT REPEAT apply or boot master. The original
+default-network NIC is NAT-capable if clean master is booted later,
+so NEVER run malware through it. Treat win11_1 ZERO NIC as intentional
+until isolated network IPv4+IPv6 egress/reboot persistence is PROVEN.
+No new VMs/copies on SSL-55. The separate machine portable
+Command 2 cloning/guest personalization/network/restore gates
+remain unfinished. Command 3 blocked until full Command 2 acceptance.
+
+
 ## OPERATOR SSL-55 NIC RESTORE PLAN verified 2026-10-11 13:35 UTC
 
 User uploaded CAPE_MasterNIC_RepairPlan_20261011_133515_FfV4f1Cf.txt.
