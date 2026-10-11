@@ -31,6 +31,8 @@ on:
       - "scripts/test_command2_running_cape_snapshot_gate.py"
       - "scripts/command2_cape_kvm_config_plan.py"
       - "scripts/test_command2_cape_kvm_config_plan.py"
+      - "scripts/command2_quarantined_benign_nic.py"
+      - "scripts/test_command2_quarantined_benign_nic.py"
       - "scripts/command2_guarded_isolated_nic.py"
       - "scripts/test_command2_guarded_isolated_nic.py"
       - "scripts/command2_cape_egress_guard_plan.py"
@@ -100,6 +102,8 @@ on:
       - "scripts/test_command2_running_cape_snapshot_gate.py"
       - "scripts/command2_cape_kvm_config_plan.py"
       - "scripts/test_command2_cape_kvm_config_plan.py"
+      - "scripts/command2_quarantined_benign_nic.py"
+      - "scripts/test_command2_quarantined_benign_nic.py"
       - "scripts/command2_guarded_isolated_nic.py"
       - "scripts/test_command2_guarded_isolated_nic.py"
       - "scripts/command2_cape_egress_guard_plan.py"
@@ -221,6 +225,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_guarded_isolated_nic.py' -v
+      - name: Python 3.10 quarantined benign pre-network acceptance regression
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_quarantined_benign_nic.py' -v
       - name: Python 3.10 guarded running CAPE memory snapshot regression
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -345,6 +353,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_guarded_isolated_nic.py' -v
+      - name: Python 3.12 quarantined benign pre-network acceptance regression
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_quarantined_benign_nic.py' -v
       - name: Python 3.12 guarded running CAPE memory snapshot regression
         env:
           PYTHONDONTWRITEBYTECODE: "1"
