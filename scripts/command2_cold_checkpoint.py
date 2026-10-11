@@ -160,6 +160,30 @@ def assert_stopped_processes():
             raise Blocked("Clone emulator or swtpm process still active")
 
 
+def assert_no_shared_artifacts():
+    # Exact stopped-guest storage cannot be safely copied if another
+    # libvirt domain also points to the same underlying disk or VARS file.
+    peers = set(virsh("list", "--all", "--name").splitlines()) - {VM, ""}
+    protected = {os.path.realpath(DISK), os.path.realpath(NVRAM)}
+    for peer in sorted(peers):
+        views = [virsh("dumpxml", "--inactive", peer)]
+        if virsh("domstate", peer).lower() == "running":
+            views.append(virsh("dumpxml", peer))
+        for xml in views:
+            root = ET.fromstring(xml)
+            for source in root.findall("./devices/disk/source"):
+                path = source.get("file")
+                if path and os.path.realpath(path) in protected:
+                    raise Blocked("Other libvirt guest shares protected clone disk or firmware")
+            nvram = root.findtext("./os/nvram")
+            if nvram and os.path.realpath(nvram) in protected:
+                raise Blocked("Other libvirt guest shares clone UEFI VARS")
+            for source in root.findall("./devices/tpm/backend/source"):
+                path = source.get("path", "")
+                if UUID in path:
+                    raise Blocked("Other libvirt guest references clone swtpm state")
+
+
 def guards(mode):
     require(os.geteuid() == 0, "Host root is required (sudo)")
     for name, identity, state in (MASTER, TRIAL):
@@ -205,6 +229,7 @@ def guards(mode):
                 "Source is not an independent 64 GiB qcow2")
         cmd("qemu-img", "check", "-q", "-f", "qcow2", str(DISK), timeout=3600)
         assert_stopped_processes()
+        assert_no_shared_artifacts()
     return {"status": state, "domain_xml": domain, "disk": disk,
             "nvram": nvram, "tpm": tpm, "free": remaining,
             "conservative_required": need}
@@ -326,6 +351,7 @@ def capture():
             # Final guest state and source metadata gate after slow disk copy.
             require(virsh("domstate", VM).lower() == "shut off", "Clone started during copy")
             assert_stopped_processes()
+            assert_no_shared_artifacts()
             for source, _, metadata in items:
                 require(stamp(source) == metadata["identity"], "Source mutated during checkpoint")
             require(virsh("dumpxml", "--inactive", VM) == facts["domain_xml"],
@@ -356,6 +382,7 @@ def capture():
                     os.close(dfd)
             require(virsh("domstate", VM).lower() == "shut off", "Clone became active before publish")
             assert_stopped_processes()
+            assert_no_shared_artifacts()
             require(not final.exists() and not final.is_symlink(), "Checkpoint name collision")
             partial.rename(final)
             dfd = os.open(CHECKPOINTS, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
