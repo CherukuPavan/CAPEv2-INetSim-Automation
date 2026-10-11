@@ -17,6 +17,8 @@ on:
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_portable_zero_nic_entrypoint.py"
       - "scripts/test_command2_portable_zero_nic_entrypoint.py"
+      - "scripts/command2_benign_snapshot_revert_gate.py"
+      - "scripts/test_command2_benign_snapshot_revert_gate.py"
       - "scripts/command2_cape_agent_probe.py"
       - "scripts/test_command2_cape_agent_probe.py"
       - "scripts/command2_running_cape_snapshot_gate.py"
@@ -72,6 +74,8 @@ on:
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_portable_zero_nic_entrypoint.py"
       - "scripts/test_command2_portable_zero_nic_entrypoint.py"
+      - "scripts/command2_benign_snapshot_revert_gate.py"
+      - "scripts/test_command2_benign_snapshot_revert_gate.py"
       - "scripts/command2_cape_agent_probe.py"
       - "scripts/test_command2_cape_agent_probe.py"
       - "scripts/command2_running_cape_snapshot_gate.py"
@@ -197,6 +201,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_cape_agent_probe.py' -v
+      - name: Python 3.10 benign running-snapshot restore-gate mocks
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3.10 -B -m unittest discover -s scripts -p 'test_command2_benign_snapshot_revert_gate.py' -v
       - name: Python 3.10 CAPE config IP/snapshot naming regression
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -293,6 +301,10 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -B -m unittest discover -s scripts -p 'test_command2_cape_agent_probe.py' -v
+      - name: Python 3.12 benign running-snapshot restore-gate mocks
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -B -m unittest discover -s scripts -p 'test_command2_benign_snapshot_revert_gate.py' -v
       - name: Python 3.12 CAPE config IP/snapshot naming regression
         env:
           PYTHONDONTWRITEBYTECODE: "1"
