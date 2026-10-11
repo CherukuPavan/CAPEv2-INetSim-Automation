@@ -1,6 +1,43 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 later Command2 guest autoconfiguration milestone
+
+User expects not just static IP PLANS but actual per-Windows-clone
+automatic hostname+IP configuration after creating the N VMs.
+
+Committed scripts/command2_guest_startup_autoconfig.ps1 opt-in
+Windows startup task bootstrap: Install requires exact local SMBIOS
+UUID+Administrator+-ApproveInstall; installed into approved golden
+Windows template once by future Command1. In future cloned guest,
+boot-time startup task reads read-only CAPE_CMD2 optical media
+with exact guest-config.json and companion SHA256. With ZERO NIC,
+invokes Identity/hostname rename+reboot through existing script.
+With one approved NIC, requires host network-approved.json matching
+VM UUID/MAC and all host IPv4, IPv6, reboot persistence, L2
+containment flags TRUE before invoking Windows static-IP mode.
+WITHOUT approval it waits and refuses IP changes.
+
+Added scripts/test_command2_guest_startup_autoconfig.py (4 source
+tests) and CI Windows AST parser now validates BOTH Windows
+PowerShell files. GitHub Actions run 38148724851 completed
+SUCCESS for Ubuntu offline tests and Windows script syntax.
+
+IMPORTANT STILL MISSING: host-side per-VM optical ISO generation,
+binding/attaching to shut-off guest, trustworthy proof distribution
+and boot/reboot verification; source Windows startup task not actually
+installed; neither current SSL55 original master nor win11_1 guest
+has been modified by these commits. Windows static IP has NOT
+been applied anywhere by the assistant. Capturing and testing a
+running CAPE snapshot for win11_1 still requires live SSL55
+read-only audit and independent shared-host isolation approval.
+INetSim-specific services may be deferred; basic external egress
+containment and agent positive reachability cannot be deferred.
+
+Latest handoff reference: docs/COMMAND2_WINDOWS_GUEST_STARTUP_BOOTSTRAP.md
+and docs/COMMAND2_SSL55_WIN11_1_PILOT_NEXT.md.
+
+
 ## 2026-10-11 latest user direction: Finish SSL55 win11_1 pilot, then Command3 implementation, then test all 3 on OTHER host
 
 User explicitly emphasizes remaining win11_1 isolated NIC, Windows
