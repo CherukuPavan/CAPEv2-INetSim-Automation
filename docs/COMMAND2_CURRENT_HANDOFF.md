@@ -1,6 +1,45 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
 **CANONICAL CODE BRANCH = `development`. NEVER commit to `main`.**
+## 2026-10-11 ~19:41+ — OPERATOR AUTHORIZED SSL55 DEDICATED GUARD UNIT INSTALL+ENABLE
+
+User explicitly replied 'yes carry on' to approval for ONLY a
+dedicated CAPE guard systemd service on SSL-55, with existing
+nftables, VMs and CAPE analysis network left INACTIVE/unchanged.
+
+New code scripts/command2_ssl55_guard_service_installer.py and
+11 synthetic test methods on development; all source dependencies
+pinned by Git blob SHA, no overwrite/symlink, root-only install.
+- `--mode plan`: strict root READ-ONLY host checks and deterministic
+  report SHA256 including exact candidate systemd unit text and
+  selected ACTIVE libvirtd.service or virtqemud.service backend.
+- `--mode install`: must match reviewed SHA256, interactive literal
+  INSTALL-ENABLE-ONLY-CAPE-GUARD-SSL55, exclusive root flock;
+  revalidates all protected VMs/guard/base firewall/network, then
+  creates only /usr/local/libexec/cape-command2 root-only scripts,
+  /etc/cape-command2/ssl55-guard-replay-approved.json (0600),
+  and /etc/systemd/system/cape-analysis-guard.service (0644).
+  Validates unit via `systemd-analyze verify`, then ONLY calls
+  `systemctl daemon-reload` and `systemctl enable cape-analysis-guard.service`
+  WITHOUT --now. Never starts bridge/VM, edits nftables.conf,
+  enables base nftables.service, writes nft rules or adds NIC.
+  Post-check asserts service enabled but inactive, base nftables
+  disabled/inactive, original guard and VMs unchanged.
+  On partial error leaves files intact and warns against blind retry.
+
+GitHub Actions workflow 38169636288 PASSED both offline and
+Windows jobs, aggregate Python 3.10 339/339 tests PASS. These are
+only mocked/offline, not host acceptance. Installer not yet run
+on SSL55 at time of this handoff. Next step: user runs immutable
+GitHub SHA pinned installer+plan launcher in SSL55 terminal and
+uploads one TXT report of plan/guarded apply or BLOCKED details.
+NO reboot/guest network/NIC commands yet. Dedicated service
+enablement is not a proved reboot-persistence or external egress
+guarantee. `win11_1` still shut off with zero NIC and no snapshot.
+
+Installer instructions: docs/COMMAND2_SSL55_GUARD_SERVICE_INSTALL.md.
+
+
 ## 2026-10-11 15:30 UTC — SSL55 boot-persistence report uploaded, replay design in development
 
 Source file: CAPE_Command2_BootPersistence_20261011_153057_wtbVV8dC.txt.
