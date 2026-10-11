@@ -125,6 +125,21 @@ def vm_xml(xml,current_vm):
     return True
 
 
+def parse_key_values(body,separator=":"):
+    """Accept arbitrary virsh/systemd column whitespace; never guess."""
+    need(type(body) is str and separator in (":","="),
+         "Unexpected host status format")
+    found={}
+    for line in body.splitlines():
+        key,sep,value=line.partition(separator)
+        if not sep:
+            continue
+        key=key.strip().lower()
+        need(key not in found, "Duplicate host status field: "+key)
+        found[key]=value.strip().lower()
+    return found
+
+
 def preflight(staging):
     need(os.geteuid()==0,"Run protected inspection with sudo")
     host=socket.gethostname().split(".",1)[0].lower()
@@ -162,13 +177,31 @@ def preflight(staging):
          len(ips)==1 and ips[0].get("address")=="192.168.240.1" and
          ips[0].get("netmask")=="255.255.255.0",
          "Unexpected CAPE libvirt isolation network")
-    info=virsh("net-info","cape-analysis-isolated").lower()
-    need("active:     yes" in info or
-         any(x.strip()=="active: yes" for x in info.splitlines()),
-         "Isolated network unexpectedly inactive")
-    need(command("systemctl","is-active","cape-analysis-guard.service")=="active" and
-         command("systemctl","is-enabled","nftables.service")=="disabled",
-         "CAPE guard or host general nftables baseline changed")
+    network_info=parse_key_values(
+        virsh("net-info","cape-analysis-isolated"), separator=":")
+    need(network_info.get("active")=="yes" and
+         network_info.get("autostart")=="no" and
+         network_info.get("persistent")=="yes" and
+         network_info.get("bridge")=="cape-lab0",
+         "CAPE network is not active/manual/persistent on expected bridge")
+    service_info=parse_key_values(command(
+        "systemctl","show","--no-pager",
+        "--property=LoadState,UnitFileState,ActiveState,Result,ExecMainStatus",
+        "cape-analysis-guard.service"),separator="=")
+    base_info=parse_key_values(command(
+        "systemctl","show","--no-pager",
+        "--property=LoadState,UnitFileState,ActiveState",
+        "nftables.service"),separator="=")
+    need(service_info.get("loadstate")=="loaded" and
+         service_info.get("unitfilestate")=="enabled" and
+         service_info.get("activestate")=="active" and
+         service_info.get("result")=="success" and
+         service_info.get("execmainstatus")=="0",
+         "CAPE nftables guard unit not loaded/enabled/active/successful")
+    need(base_info.get("loadstate")=="loaded" and
+         base_info.get("unitfilestate")=="disabled" and
+         base_info.get("activestate")=="inactive",
+         "Unexpected base nftables service status")
     command("nft","list","table","inet","cape_analysis_guard")
     need(shutil.which("genisoimage") is not None,
          "Host ISO generator missing")
