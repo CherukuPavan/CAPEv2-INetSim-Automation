@@ -29,7 +29,8 @@ to satisfy this threshold; obtain approved extra capacity or redesign.
     private modes, and free space. Does not read live QCOW2 contents.
   - CAPTURE: typed operator authorization plus exact shut-off clone.
     Refuses concurrent clone QEMU/swtpm processes, unexpected interfaces,
-    snapshots, changed master, incorrect QCOW2 or insufficient storage.
+    snapshots, changed master, other domains sharing the same disk/NVRAM,
+    incorrect QCOW2 or insufficient storage.
     Copies **clone-only** cold QCOW2, UEFI VARS, and swtpm state files
     excluding the transient lock file. Creates a private manifest with
     SHA-256 file hashes, original ownership/mode metadata and libvirt XML.
@@ -46,10 +47,11 @@ to satisfy this threshold; obtain approved extra capacity or redesign.
   conservative missing-clone storage budget 4*64+30 = 286 GiB.
 - scripts/command2_cold_and_count_plan_acceptance.sh [TOTAL]: single-TXT
   operator wrapper, offline regressions then two read-only plans.
-- 3 new Python test modules: 19 local synthetic tests passed, including
+- 3 new Python test modules: 22 local synthetic tests passed, including
   full simulated capture->verify, partial failure, changed source,
   unexpected guest NIC, TPM symlink, resource floor, name collision.
-  This is NOT equivalent to SSL-55 or independent host verification.
+  Additional tests reject any other libvirt domain sharing clone disk
+  or UEFI VARS. This is NOT equivalent to SSL-55 verification.
 - .github/workflows/command2-cold-checkpoint-offline.yml: Python
   3.10 and 3.12 development CI. Actual run conclusion must be verified.
 
