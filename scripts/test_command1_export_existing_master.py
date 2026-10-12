@@ -89,6 +89,32 @@ class GoldenMaster(unittest.TestCase):
             with self.assertRaisesRegex(m.MasterExportBlocked,"CORRUPTION"):
                 m.manifest_check(dest)
 
+    def test_master_flatten_reads_exact_checked_backing_chain(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            top=root/"top.qcow2";top.write_bytes(b"active Windows changes")
+            lower=root/"backing.qcow2";lower.write_bytes(b"older Windows files")
+            data=[
+                {"format":"qcow2","filename":str(top),
+                 "virtual-size":64*1024**3,
+                 "full-backing-filename":str(lower)},
+                {"format":"qcow2","filename":str(lower),
+                 "virtual-size":64*1024**3}]
+            with patch.object(m,"run",return_value=json.dumps(data)):
+                paths,capacity=m.backing_chain(top)
+                self.assertEqual(paths,[top,lower])
+                self.assertEqual(capacity,64*1024**3)
+            bad=list(data)
+            bad[0]=dict(data[0],**{
+                "full-backing-filename":"/other/unreviewed.qcow2"})
+            with patch.object(m,"run",return_value=json.dumps(bad)),\
+                 self.assertRaisesRegex(m.MasterExportBlocked,"chain"):
+                m.backing_chain(top)
+            lower.unlink()
+            with patch.object(m,"run",return_value=json.dumps(data)),\
+                 self.assertRaises(m.MasterExportBlocked):
+                m.backing_chain(top)
+
     def test_source_rejects_powered_master_or_forged_id(self):
         with patch.object(m.os,"geteuid",return_value=0),\
              patch.object(m,"virsh",return_value="running"),\
