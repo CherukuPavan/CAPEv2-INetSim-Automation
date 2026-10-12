@@ -42,6 +42,7 @@ PHASES={
     "identity-attach":("command2_portable_guest_identity_attach.py","attach","plan"),
     "identity-boot":("command2_portable_identity_boot.py","boot","plan"),
     "approved-firstboot":("command2_portable_approved_firstboot.py","boot","plan"),
+    "graceful-shutdown":("command2_graceful_shutdown.py","shutdown","plan"),
     "nic-attach":("command2_guarded_isolated_nic.py","attach","plan"),
     "network-approve":("command2_portable_network_approval_iso.py","apply","plan"),
     "cold-capture":("command2_portable_cold_bundle.py","capture","plan"),
@@ -175,6 +176,11 @@ def choose(args):
             argv+=["--receipt",absolute(args.network_receipt,"network_receipt")]
     elif phase=="identity-boot":
         argv+=["--journal",str(args.journal)]
+    elif phase=="graceful-shutdown":
+        need(type(args.shutdown_timeout) is int and 90<=args.shutdown_timeout<=900,
+             "Graceful Windows shutdown timeout must be 90..900 seconds")
+        argv+=["--scope","portable-other","--journal",str(args.journal),
+               "--timeout-seconds",str(args.shutdown_timeout)]
     elif phase=="approved-firstboot":
         argv+=["--journal",str(args.journal),
                "--receipt",absolute(args.network_receipt,"network_receipt")]
@@ -453,6 +459,7 @@ def main():
     p.add_argument("--xml-backup-dir",type=Path)
     p.add_argument("--acknowledge-restore")
     p.add_argument("--acknowledge-revert")
+    p.add_argument("--shutdown-timeout",type=int,default=360)
     args=p.parse_args()
     try:
         if args.phase==BATCH_PHASE:
