@@ -97,8 +97,11 @@ def vm_guard(vm,uuid):
     need(root.findtext("name")==vm and root.findtext("uuid")==uuid and
          len(root.findall("./devices/interface"))==0,
          "Expected staged identity-only clone with zero NICs")
-    need(len(root.findall("./devices/disk[@device='disk']"))==1,
-         "Expected one staged guest system disk")
+    disks=root.findall("./devices/disk[@device='disk']")
+    need(len(disks)==1 and disks[0].find("source") is not None and
+         disks[0].find("driver") is not None and
+         disks[0].find("driver").get("type")=="qcow2",
+         "Expected one standalone staged QCOW2 guest system disk")
 
 def plan(*,host,vm,journal,config,dest):
     host_guard(host)
@@ -107,6 +110,10 @@ def plan(*,host,vm,journal,config,dest):
     journal=Path(journal);config=Path(config);dest=Path(dest)
     if dest.exists() or dest.is_symlink():
         raise MediaBlocked("Refuse to replace or reuse existing ISO")
+    need(journal.name=="command2-identity-reservation.json" and
+         config==journal.parent/("command2-guest-config-"+vm+".json") and
+         dest==journal.parent/(vm+".command2_identity.iso"),
+         "Media paths must match immutable journal staging folder")
     outdir=guarded_dir(dest.parent)
     reservation=read_json(journal)
     need(reservation.get("format")=="CAPE_COMMAND2_GUEST_IDENTITY_RESERVATION"
@@ -115,11 +122,13 @@ def plan(*,host,vm,journal,config,dest):
          "Reservation journal not canonical or host mismatch")
     rows=reservation.get("entries")
     count=reservation.get("guest_count")
+    index=int(match.group(1))-1
     need(type(rows) is list and type(count) is int and
          1<=count<=16 and len(rows)==count and
-         rows[int(match.group(1))-1]["libvirt_name"]==vm,
+         index<count and type(rows[index]) is dict and
+         rows[index].get("libvirt_name")==vm,
          "VM absent from ordered recorded reservation")
-    row=rows[int(match.group(1))-1]
+    row=rows[index]
     expected=guestconfig.make_guest_config(row,
                             ip_prefix_from_config(read_json(config)))
     raw=Path(config).read_bytes()
