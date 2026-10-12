@@ -162,6 +162,13 @@ def build(host,journal,already):
     need(not virsh("list","--name").strip(),
          "Require ALL host guest domains off during NAT attachment")
     net,views=check_network_references()
+    # Live and persistent NAT must agree on the source master's gateway,
+    # subnet and DHCP ranges BEFORE touching any guest or reservation.
+    persistent=profile.ref.nat_details(
+         ET.tostring(views[1],encoding="unicode"))
+    need(net["ipv4"]==persistent["ipv4"] and
+         net["dynamic_dhcp_ranges"]==persistent["dynamic_dhcp_ranges"],
+         "Active and persistent default NAT gateway/DHCP pool differ")
     leases=profile.ref.lease_inventory(virsh("net-dhcp-leases",NETWORK))
     domain_macs=occupied_domain_macs()
     wanted=[r["mac_candidate"].lower() for r in rows]
@@ -179,8 +186,10 @@ def build(host,journal,already):
         # same IP again. Reconstruct EXACT deterministic candidate targets
         # without falsely treating them as newly available.
         subnet=ipaddress.IPv4Network(net["ipv4"]["subnet"])
-        need(str(subnet)=="192.168.122.0/24",
-             "Only tested default master NAT subnet supported for APPLY")
+        need(subnet.prefixlen==24 and subnet.is_private and
+             str(ipaddress.IPv4Address(int(subnet.network_address)+1))==
+             net["ipv4"]["gateway"],
+             "Approved source master's private /24 NAT gateway changed")
         candidates=[]
         for i,r in enumerate(rows,1):
             ip=str(ipaddress.IPv4Address(int(subnet.network_address)+200+i))
@@ -209,8 +218,9 @@ def build(host,journal,already):
         need(all(x in live for x in pairs),
              "Missing expected guest reservation in live+config")
         need(len({x[1] for x in live})==len(live) and
-             len({x[0] for x in live})==len(live),
-             "Conflicting NAT DHCP host MAC/IP duplicate")
+             len({x[0] for x in live})==len(live) and
+             len({x[2] for x in live})==len(live),
+             "Conflicting NAT DHCP host MAC/IP/name duplicate")
     else:
         need(all(mac not in {x[0] for x in live} and
                  ip not in {x[1] for x in live} and
