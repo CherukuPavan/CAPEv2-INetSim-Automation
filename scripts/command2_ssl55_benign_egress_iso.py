@@ -44,6 +44,25 @@ def command(*args,timeout=50):
     return p.stdout.strip()
 def virsh(*args):return command("virsh","-c","qemu:///system",*args)
 
+def parse_network_info(raw):
+    """Parse libvirt net-info key/value lines, allowing alignment whitespace."""
+    need(isinstance(raw,str),"Unexpected libvirt net-info response")
+    props={}
+    for line in raw.splitlines():
+        key,sep,value=line.partition(":")
+        if not sep:continue
+        key=key.strip().lower()
+        need(key not in props,"Duplicate libvirt net-info key: "+key)
+        props[key]=value.strip().lower()
+    for key in ("active","persistent","autostart","bridge"):
+        need(key in props,"Missing required libvirt net-info field: "+key)
+    need(props["active"] in ("yes","no") and
+         props["persistent"] in ("yes","no") and
+         props["autostart"] in ("yes","no"),
+         "Malformed libvirt net-info status")
+    return props
+
+
 def domxml(raw):
     root=ET.fromstring(raw)
     need(root.findtext("name")==VM and root.findtext("uuid")==UUID,
@@ -93,8 +112,12 @@ def plan(powershell,launcher):
     old_saved=domxml(virsh("dumpxml","--inactive",VM))
     need(old_live==old_saved,"Live/persistent optical media differ")
     net=virsh("net-info",NET)
-    need(any(x.strip().lower()=="active: yes" for x in net.splitlines()),
-         "Analysis network not active")
+    props=parse_network_info(net)
+    need(props.get("active")=="yes" and
+         props.get("persistent")=="yes" and
+         props.get("autostart")=="no" and
+         props.get("bridge")=="cape-lab0",
+         "Analysis network inactive or configuration unexpectedly changed")
     network=ET.fromstring(virsh("net-dumpxml",NET))
     port=network.find("port");bridge=network.find("bridge")
     dns=network.find("dns")
