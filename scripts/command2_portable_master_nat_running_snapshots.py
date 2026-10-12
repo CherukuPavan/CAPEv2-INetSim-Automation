@@ -144,7 +144,8 @@ def assess(host,journal,evidence_dir,with_snapshots):
              proof["cape_agent"]["valid"] is True,
              "Guest Agent/MAC identity differs from canonical journal")
         receipt_sha=attest_guest(row,host,evidence_dir)
-        stack=native.inspect(vm)
+        stack=native.inspect(vm,
+            require_capture_headroom=not with_snapshots)
         need(stack.get("uefi_variable_store_real_format")=="qcow2" and
              stack.get("swtpm2_present") is True and
              stack.get("snapshot_created") is False,
