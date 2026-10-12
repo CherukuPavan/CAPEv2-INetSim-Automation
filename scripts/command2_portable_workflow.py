@@ -495,7 +495,7 @@ def graceful_shutdown_batch(args):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan"))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
@@ -531,6 +531,19 @@ def main():
             return approved_firstboot_batch(args)
         if args.phase==SHUTDOWN_BATCH_PHASE:
             return graceful_shutdown_batch(args)
+        if args.phase=="master-nat-plan":
+            need(args.mode=="plan","Master-equivalent NAT phase is read-only")
+            host=canonical_host(args.approved_host)
+            need(os.geteuid()==0,
+                 "Root required for count-driven guest identity reservation")
+            absolute(args.journal,"journal")
+            child=Path(__file__).resolve().with_name(
+                "command2_portable_master_nat_profile.py")
+            need(child.is_file() and not child.is_symlink(),
+                 "Approved master NAT profile script missing")
+            return subprocess.run([sys.executable,"-B",str(child),
+                   "--mode","plan","--approved-host",host,
+                   "--journal",str(args.journal)],check=False).returncode
         if args.phase==CAPTURE_BATCH_PHASE:
             host=canonical_host(args.approved_host)
             need(os.geteuid()==0,"Root required for private snapshot evidence")
