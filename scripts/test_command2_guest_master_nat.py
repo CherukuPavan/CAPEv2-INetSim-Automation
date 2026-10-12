@@ -44,7 +44,7 @@ class WindowsMasterNAT(unittest.TestCase):
                "Invoke-Expression","powershell -EncodedCommand"):
             self.assertNotIn(prohibited,self.src)
     def test_readonly_https_is_explicit_and_reported(self):
-        self.assertIn("-RequireHTTPS",self.src)
+        self.assertIn("[switch]$RequireHTTPS",self.src)
         self.assertIn("TcpTestSucceeded",self.src)
         self.assertIn("Invoke-WebRequest -Uri",self.src)
         self.assertIn("external_https_witnessed=$httpsOk",self.src)
@@ -53,7 +53,8 @@ class WindowsMasterNAT(unittest.TestCase):
         self.assertIn('ValidateSet("Plan","Identity","Network","Verify")',
                       self.old)
         self.assertNotIn('"MasterNat"',self.old)
-        self.assertIn("do_not_enable_default_gateway",str(
-            Path(__file__).resolve().parent/"command2_windows_guest_config.py"
-            ).replace("command2_windows_guest_config.py","do_not_enable_default_gateway"))
+        prior=(Path(__file__).resolve().parent/
+               "command2_windows_guest_config.py").read_text(encoding="utf-8")
+        self.assertIn('"do_not_enable_default_gateway":True',prior)
+        self.assertIn('"default_gateway":None',prior)
 if __name__=="__main__":unittest.main()
