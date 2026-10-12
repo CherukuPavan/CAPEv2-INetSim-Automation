@@ -61,7 +61,7 @@ def check_one_live(row):
 def audit(host,journal):
     workflow.canonical_host(host)
     need(os.geteuid()==0,"Root required for canonical private journal")
-    need(type(journal) is Path and journal.is_absolute() and
+    need(isinstance(journal,Path) and journal.is_absolute() and
          journal.name=="command2-identity-reservation.json",
          "Exact private Command2 reservation required")
     batch.private_evidence_folder(journal.parent)
