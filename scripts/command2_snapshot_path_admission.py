@@ -111,6 +111,10 @@ def classify_xml(vm, expected_uuid, raw, state, names):
 def inventory(guest_expectations):
     seen=set()
     values=[]
+    require(len({vm for vm,_ in guest_expectations})==len(guest_expectations),
+            "Guest name/UUID list invalid or duplicated")
+    require(len({uuid for _,uuid in guest_expectations})==len(guest_expectations),
+            "Guest name/UUID list invalid or duplicated")
     for vm,uuid in guest_expectations:
         require(type(vm) is str and VM_RE.fullmatch(vm) is not None and
                 type(uuid) is str and len(uuid)==36 and
