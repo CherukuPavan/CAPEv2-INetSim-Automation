@@ -21,6 +21,7 @@ revalidate libvirt, UUIDs, paths, networking and storage.
 | --- | --- | --- |
 | `stage` | Count-driven 1..16 shut-off zero-NIC clones and per-guest reserved JSON | On a supported other Ubuntu/KVM host only; prerequisite Command 1 master+bootstrap. Initial clone firmware RAW. |
 | `network-install` | New dedicated `inet cape_analysis_cmd2_guard` nft rules and persistent libvirt `cape-analysis-isolated` network; start network, **autostart OFF** | Actual reboot persistence, IPv4+IPv6 packet negatives, peer L2 and host/CAPE/INetSim positive traffic NOT proven; no guest NICs attached. |
+| `guard-persistence` | Create-only root-pinned nft policy + independent CAPE-only systemd replay unit, **enable without starting** | Requires already active, checked network+nft policy, zero running/autostart guests, existing nftables.service disabled/inactive, and typed approval. Physical reboot persistence still NOT proved. |
 | `identity-build` | One SHA-verified, UUID-bound per-guest read-only optical configuration ISO | Windows SYSTEM startup bootstrap must be installed beforehand. |
 | `identity-attach` | Inserts the ISO into exactly one previously empty CD-ROM on a shut-off zero-NIC clone | Operator separately boots guest to perform hostname personalization and verifies identity; no automatic guest start. |
 | `nic-attach` | Adds exactly one isolated network NIC in saved XML, after root-private network acceptance receipt | The real packet-isolation/reboot evidence is operator-witnessed; the receipt cannot be invented by the software. |
@@ -58,12 +59,15 @@ present and independently reviewed. Default `--subnet auto` uses host
 route, IPv4 address and libvirt network collision inventories; after
 staging, all later phases derive the subnet from immutable per-VM config.
 
-The isolated network installer makes the *new*, dedicated nft table and
-persistent libvirt network active on the second host **only with explicit
+The isolated network installer creates a *new*, dedicated nft table
+and persistent libvirt network on the second host **only with explicit
 per-host approval**, without modifying existing Docker/campus firewall
-objects or enabling guest NICs. It does NOT install nft persistence or
-enable the CAPE network on reboot. Until a separate approved reboot and
-packet-path test passes, NIC-attachment receipts must not be signed.
+objects or enabling guest NICs. The separate `guard-persistence` phase
+creates a pinned CAPE-only replay helper, policy, and systemd unit and
+enables (never starts) it. It does not change `/etc/nftables.conf`,
+modify `nftables.service`, enable libvirt network or guest autostart,
+or reboot the host. Until **the actual reboot and IPv4/IPv6/L2
+packet-path tests pass**, NIC-attachment receipts must not be signed.
 
 The existing real SSL55 base VM is **not** a supported target for this
 portable entrypoint. Never run `--mode apply` there.
@@ -114,9 +118,9 @@ without performing the physical tests.
 
 1. Install+prove the trusted Windows SYSTEM task in the Command 1
    source master and verify the identity/bootstrap flow on both clones.
-2. Host guard *reboot persistence* installer with independent
-   validation, actual guest IPv4+IPv6 and peer-L2 negative probes,
-   and CAPE/INetSim positive paths.
+2. Physically verify the new guard replay unit after a real reboot;
+   independently validate actual guest IPv4+IPv6 and peer-L2 negative
+   probes, and CAPE/INetSim positive service paths.
 3. Real cold restore followed by OVMF+TPM reboot tests; standard
    libvirt running snapshot behavior with swtpm state must be
    empirically proven or replaced by a properly engineered custom
