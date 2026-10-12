@@ -194,6 +194,45 @@ operator TTY and a separate per-guest approval and **is not** a completed
 unattended production Command 2. Do NOT synthesize receipt booleans.
 No real other-host guest or SSL-55 VM has been booted by this change.
 
+## SSL55 UI visible; PORTABLE all-N QCOW2 image-level release validation
+
+The operator confirmed that the saved `cape_candidate_win11_1` appears
+in virt-manager after closing/reopening **only the viewer**. The current
+Windows VM continues to run; do NOT press Apply/Revert in the GUI.
+
+The REAL post-capture snapshot XML contained TWO disk entries named
+`sda` (Windows OS disk, `snapshot='internal'`) and `sdb`
+(auxiliary UEFI pflash entry, `snapshot='no'`), while QEMU separately
+exposed the `cape_candidate_win11_1` internal label in BOTH Windows
+disk and independent UEFI QCOW2 image. Previously the generic
+`command2_running_snapshot_batch_gate.snapshot_metadata()` checked
+`len(disks)==1`, incorrectly rejecting the known-good physical layout.
+This is now corrected to REQUIRE exactly one internally snapshotted
+Windows OS `sda`, allow ONLY an optional `sdb` with
+`snapshot='no'`, reject unknown/duplicate entries, and then inspect
+both *actual* QCOW2 images for the per-VM named snapshot before
+verifying the off-guest two-cycle witness. Missing/symlinked/backed
+or improperly snapshotted UEFI files now stop registration. This
+is independent firmware checkpoint verification, NOT TPM state proof.
+
+`command2_ssl55_swtpm_sync_audit.py` is a separate read-only
+host-inventory utility. It locates the exact swtpm process tied to the
+guest's state directory, inspects TPM file size/modification times
+(no TPM content reads), confirms image/VM/snapshot identity, and keeps
+`snapshot_revert_authorized=false`. It does NOT interact with swtpm's
+control socket, initiate QEMU migration, or mutate the guest.
+Upstream [QEMU TPM docs](https://www.qemu.org/docs/master/specs/tpm)
+support TPM blob migration in principle; [libvirt's TPM snapshot RFE](https://bugzilla.redhat.com/show_bug.cgi?id=1855367)
+was closed WONTFIX. Thus real compatibility must be verified by a
+**disposable benign** guest test, not assumed in production.
+
+The Windows benign witness reads only public TPM endorsement key
+fingerprint `Get-TpmEndorsementKeyInfo -HashAlgorithm Sha256` in
+addition to Secure Boot, TPM readiness and BitLocker status. A stable
+fingerprint helps identify accidental TPM replacement but cannot
+prove NV/volatile state rollback; the witness continues to report
+`TPM_UEFI_FULL_STATE_ROLLBACK_PROVEN=FALSE`.
+
 ## SSL55 physical running snapshot achieved; full-state restore remains HOLD
 
 On 2026-10-12 the existing reference `win11_1` was safely migrated to
