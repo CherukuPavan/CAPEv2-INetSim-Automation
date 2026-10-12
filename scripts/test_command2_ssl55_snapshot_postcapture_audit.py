@@ -30,6 +30,8 @@ class PostCapture(unittest.TestCase):
                             '<memory snapshot="no"/>'),
             SNAPXML.replace('<disk name="sda" snapshot="internal"/>',
                             '<disk name="sda" snapshot="no"/>'),
+            SNAPXML.replace('<disk name="sda" snapshot="internal"/>',
+                            '<disk name="firmware" snapshot="internal"/>'),
             SNAPXML.replace(m.UUID,"wrong-uuid"),
             SNAPXML.replace(m.SNAP,"unknown-snapshot"),
         ):
