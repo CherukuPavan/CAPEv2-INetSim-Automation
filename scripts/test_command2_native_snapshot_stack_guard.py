@@ -15,11 +15,11 @@ def versions(libvirt="10.10.0",qemu="9.1.0"):
             "Using API: QEMU 10.10.0\n"
             "Running hypervisor: QEMU "+qemu+"\n"
             "Running against daemon: "+libvirt)
-def xml(fmt="qcow2", tpm=True):
+def xml(fmt="qcow2", tpm=True, varspath=VARS):
     tp='<tpm><backend type="emulator" version="2.0"/></tpm>' if tpm else ""
     return ('<domain type="kvm"><name>win11_1</name>'
             '<os><loader type="pflash" readonly="yes">/code.fd</loader>'
-            f'<nvram format="{fmt}">{VARS}</nvram></os>'
+            f'<nvram format="{fmt}">{varspath}</nvram></os>'
             '<memory unit="MiB">4096</memory>'
             '<devices><disk device="disk" type="file">'
             f'<source file="{DISK}"/><target dev="sda"/></disk>'
@@ -35,12 +35,12 @@ class NativeSnapshotStack(unittest.TestCase):
         with self.assertRaisesRegex(g.NativeBlocked,"Cannot read"):
             g.parse_versions("Using library: libvirt 12.0.0")
 
-    def fake_inspect(self,fmt="qcow2",tpm=True,actual="qcow2"):
+    def fake_inspect(self,fmt="qcow2",tpm=True,actual="qcow2",varspath=VARS):
         def mockcmd(*args):
             if args[0]=="virsh" and args[-2:]==("version","--daemon"):
                 return versions()
             if args[0]=="virsh" and args[-2:]==("dumpxml",VM):
-                return xml(fmt,tpm)
+                return xml(fmt,tpm,varspath)
             if args[0]=="qemu-img":
                 return json.dumps({"format":actual,"virtual-size":1<<20})
             self.fail("Unexpected command "+str(args))
@@ -57,6 +57,11 @@ class NativeSnapshotStack(unittest.TestCase):
         self.assertFalse(result["real_swtpm_rollback_tested"])
         self.assertFalse(result["physical_cape_ready"])
         self.assertFalse(result["snapshot_created"])
+
+    def test_explicit_firmware_qcow2_sidecar_is_admitted_on_other_host(self):
+        result=self.fake_inspect(varspath=VARS+".qcow2")
+        self.assertEqual(result["uefi_variable_store_real_format"],"qcow2")
+        self.assertFalse(result["physical_cape_ready"])
 
     def test_raw_nvram_blocked_regardless_of_other_features(self):
         with self.assertRaisesRegex(g.NativeBlocked,"QCOW2 NVRAM"):
