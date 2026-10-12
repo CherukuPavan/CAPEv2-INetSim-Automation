@@ -95,7 +95,7 @@ class NatFirstBoot(unittest.TestCase):
                 Path("/root/evidence"))
             self.assertEqual(found[0]["reserved_ip"],"192.168.122.201")
             def prior_and_selected(*args,**kwargs):
-                if args==("list","--name"):return VM+"\\n"+current
+                if args==("list","--name"):return VM+"\n"+current
                 return prior(*args,**kwargs)
             with patch.object(m.network,"virsh",side_effect=prior_and_selected):
                 selected_running=m.completed_running_clones(
