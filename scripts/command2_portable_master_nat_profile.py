@@ -132,7 +132,8 @@ def inspect(host,journal):
     need(proposed["auto_apply_authorized"] is False,
          "Unsafe allocator auto-apply flag")
     for x in proposed["clones"]:
-        x["guest_nic_port_isolated"]=False
+        need(x["guest_nic_port_isolated"] is False,
+             "Default NAT planner incorrectly assumed guest isolation")
         x["public_nat_requires_independent_analysis_egress_policy"]=True
         x["old_isolated_guest_ip_from_journal_must_not_be_reused"]=True
     return {
