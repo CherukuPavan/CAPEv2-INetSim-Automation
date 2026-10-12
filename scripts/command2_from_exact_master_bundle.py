@@ -139,9 +139,8 @@ def run(mode,host,bundle,disk_dir,nvram_dir,journal_dir,iso_dir,count):
          "COMMAND2_ALL_N_MASTER_NAT_NICS_AND_DHCP_APPLIED_VERIFIED",
          "One-NAT-per-VM or unique DHCP lease reservation incomplete; STOP")
     made=media.build(host,journal,config["iso_dir"])
-    need(made["result"] in (
-         "COMMAND2_ALL_N_WINDOWS_NAT_OPTICAL_MEDIA_BUILT",
-         "COMMAND2_ALL_N_MASTER_NAT_MEDIA_BUILT"),
+    need(made["result"]==
+         "COMMAND2_ALL_N_WINDOWS_NAT_ISOS_BUILT_NOT_ATTACHED",
          "NAT guest provisioning media incomplete, review status")
     return {**report,
         "result":"COMMAND2_EXACT_MASTER_ALL_N_COLD_STAGE_NAT_MEDIA_READY",
