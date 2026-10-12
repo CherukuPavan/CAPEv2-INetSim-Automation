@@ -39,6 +39,26 @@ class WindowsStartupBootstrapTests(unittest.TestCase):
                   "guest_l2_separation_verified"):
             self.assertIn(s,self.text)
 
+    def test_windows_master_shutdown_policy_is_set_only_during_reviewed_install(self):
+        for required in (
+            "ActivePowerButtonACIndex",
+            "AssertWindowsACPIShutdownPolicy",
+            "ConfigureWindowsACPIShutdownPolicy",
+            "powercfg.exe /query SCHEME_CURRENT SUB_BUTTONS PBUTTONACTION",
+            "powercfg.exe /setacvalueindex SCHEME_CURRENT SUB_BUTTONS PBUTTONACTION 3",
+            "powercfg.exe /setactive SCHEME_CURRENT",
+            "Windows ACPI power-button action is not Shutdown",
+            "acpi_power_button_shutdown_verified=$true",
+            "windows_acpi_shutdown_policy_configured=$true"):
+            self.assertIn(required,self.text)
+        verify=self.text.split('if ($Mode -eq "Verify") {',1)[1].split(
+             'if ($Mode -eq "Install") {',1)[0]
+        self.assertIn("AssertWindowsACPIShutdownPolicy",verify)
+        self.assertNotIn("ConfigureWindowsACPIShutdownPolicy",verify)
+        live_run=self.text.split('$media=OpticalConfig',1)[1]
+        self.assertNotIn("ConfigureWindowsACPIShutdownPolicy",live_run)
+        self.assertNotIn("powercfg.exe /setacvalueindex",live_run)
+
     def test_cd_media_must_be_optical_and_integrity_checked(self):
         for s in ("CAPE_CMD2","Win32_LogicalDisk","DriveType -ne 5",
                   "Get-FileHash","guest-config.json","guest-config.sha256",
