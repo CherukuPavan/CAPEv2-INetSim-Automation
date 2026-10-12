@@ -94,6 +94,15 @@ class NatFirstBoot(unittest.TestCase):
             found=m.completed_running_clones("lab02",[oldrow],current,net,
                 Path("/root/evidence"))
             self.assertEqual(found[0]["reserved_ip"],"192.168.122.201")
+            def prior_and_selected(*args,**kwargs):
+                if args==("list","--name"):return VM+"\\n"+current
+                return prior(*args,**kwargs)
+            with patch.object(m.network,"virsh",side_effect=prior_and_selected):
+                selected_running=m.completed_running_clones(
+                    "lab02",[oldrow],current,net,Path("/root/evidence"),
+                    requested_is_running=True)
+            self.assertEqual(len(selected_running),1)
+            self.assertEqual(selected_running[0]["vm"],VM)
             cert["real_guest_https_from_nat_ipv4"]=False
             with self.assertRaisesRegex(m.NatBootBlocked,"lacks exact"):
                 m.completed_running_clones("lab02",[oldrow],current,net,
