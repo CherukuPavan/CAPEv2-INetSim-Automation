@@ -69,6 +69,14 @@ def safe_snapshot_metadata(raw):
     need(len(disks)>=1,"Snapshot has no explicit disk metadata")
     internal=[d for d in disks if d.get("snapshot")=="internal"]
     need(len(internal)>=1,"No internal disk snapshot")
+    # This exact SSL55 clone exposes its Windows system disk as sda.
+    # An internal snapshot on a different device (such as NVRAM alone)
+    # must NEVER be mistaken for a verified Windows OS-disk checkpoint.
+    need(sum(d.get("name")=="sda" and d.get("snapshot")=="internal"
+             for d in disks)==1,
+         "Exact Windows OS disk sda not present as one INTERNAL snapshot")
+    need(len({d.get("name") for d in disks})==len(disks),
+         "Duplicate snapshot disk entries: manual review")
     # Never infer that NVRAM or swtpm state was snapshotted just because
     # the guest OS disk was captured with internal memory.
     dom=root.find("domain")
