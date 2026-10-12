@@ -193,15 +193,20 @@ def inspect(host,journal,vm,iso):
                 candidates.append(details)
         except TransportBlocked:
             pass
-    need(len(candidates)==1,
+    # The same clone can legitimately retain its original static IP
+    # AND have a reserved DHCP IP during benign setup. Both must map to
+    # the exact approved MAC, so prefer the already-proven target address.
+    need(1<=len(candidates)<=2 and
+         len({x["ip"] for x in candidates})==len(candidates),
          "No unique elevated CAPE Agent reachable at target or original "
          "template IP with EXACT guest neighbor MAC")
+    selected=next((x for x in candidates if x["ip"]==wanted),candidates[0])
     return {
        "result":"COMMAND2_EXACT_GUEST_BENIGN_AGENT_TRANSPORT_PLAN_ONLY",
        "vm":vm,"uuid":row["libvirt_uuid_candidate"],
        "mac":row["mac_candidate"].lower(),
-       "bootstrap_ip":candidates[0]["ip"],
-       "agent_version":candidates[0]["agent_version"],
+       "bootstrap_ip":selected["ip"],
+       "agent_version":selected["agent_version"],
        "target_nat_ipv4":wanted,
        "source_gateway":gateway,
        "iso":str(iso),
@@ -255,18 +260,24 @@ def store(ip,source,filename,content):
          "CAPE Agent /store response not recognized")
     return {"remote_path":dest,"bytes":len(content)}
 
+def verified_evidence_folder(evidence):
+    path=Path(evidence)
+    need(path.is_absolute() and path.is_dir() and
+         not path.is_symlink(),
+         "Existing exact root-private guest evidence folder required")
+    st=path.stat()
+    need(st.st_uid==0 and stat.S_ISDIR(st.st_mode) and
+         stat.S_IMODE(st.st_mode)==0o700,
+         "Existing root-only 0700 guest evidence directory required")
+    return path
+
 def stage(host,journal,vm,iso,evidence_dir):
     need(sys.stdin.isatty(),"Direct operator TTY required for guest file writes")
     before=inspect(host,journal,vm,iso)
     phrase="UPLOAD-ONLY-TRUSTED-NAT-WINDOWS-SETUP-"+vm.upper()
     need(input("Type "+phrase+" for only two reviewed guest files: ")==phrase,
          "Operator did not approve Windows NAT setup upload")
-    evidence=Path(evidence_dir)
-    need(evidence.is_absolute() and evidence.is_dir() and
-         not evidence.is_symlink() and
-         evidence.stat().st_uid==0 and
-         stat.S_IMODE(evidence.stat().st_mode)==0o700,
-         "Existing root-only 0700 guest evidence directory required")
+    evidence=verified_evidence_folder(evidence_dir)
     outcome=evidence/(vm+STAGE_SUFFIX)
     need(not outcome.exists() and not outcome.is_symlink(),
          "Guest provisioning already has a stage witness; do not retry")
