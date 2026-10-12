@@ -154,9 +154,10 @@ class OneNat(unittest.TestCase):
             after={**b,"captured":True}
             state=[False];calls=[]
             def create(*a,**kw):
-                calls.append(a)
+                calls.append((a,kw))
                 self.assertEqual(a,("snapshot-create-as","--domain",VM,
                                     "--name",THIRD,"--atomic"))
+                self.assertEqual(kw,{"timeout":1800})
                 state[0]=True
             fs=SimpleNamespace(st_mode=stat.S_IFREG|0o600,st_uid=0,st_nlink=1)
             with patch.object(m,"LOCK",Path(td)/"lock"),\
@@ -164,7 +165,9 @@ class OneNat(unittest.TestCase):
                  patch("builtins.input",return_value=m.APPROVE),\
                  patch.object(m.os,"fstat",return_value=fs),\
                  patch.object(m,"check",side_effect=lambda x:after if x else b),\
-                 patch.object(m.dual,"virsh",side_effect=create):
+                 patch.object(m.post,"virsh",side_effect=create),\
+                 patch.object(m.dual,"virsh",
+                              side_effect=AssertionError("wrong wrapper")):
                 out=m.capture()
             self.assertTrue(out["captured"])
             self.assertEqual(len(calls),1)
@@ -185,11 +188,25 @@ class OneNat(unittest.TestCase):
                  patch("builtins.input",return_value=m.APPROVE),\
                  patch.object(m.os,"fstat",return_value=fs),\
                  patch.object(m,"check",return_value=b),\
-                 patch.object(m.dual,"virsh",side_effect=error),\
+                 patch.object(m.post,"virsh",side_effect=error),\
+                 patch.object(m.dual,"virsh",
+                              side_effect=AssertionError("wrong wrapper")),\
                  self.assertRaisesRegex(m.OneNatCaptureBlocked,"POSSIBLY_PARTIAL"):
                 m.capture()
             self.assertEqual(len(count),1)
             self.assertNotIn("snapshot-revert",str(count))
+    def test_real_timeout_signature_prevents_original_ssl55_failure(self):
+        import inspect
+        # The actual physical failure was due to invoking dual.virsh
+        # with timeout=1800, even though only post.virsh supports it.
+        self.assertNotIn("timeout",
+                         inspect.signature(m.dual.virsh).parameters)
+        self.assertIn("timeout",
+                      inspect.signature(m.post.virsh).parameters)
+        body=inspect.getsource(m.capture)
+        self.assertIn('post.virsh("snapshot-create-as"',body)
+        self.assertNotIn('dual.virsh("snapshot-create-as"',body)
+
     def test_no_snapshot_deletion_or_restore_or_vm_power(self):
         s=Path(m.__file__).read_text(encoding="utf-8")
         for prohibited in ('"snapshot-revert"','"snapshot-delete"',
