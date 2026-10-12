@@ -93,6 +93,30 @@ def infer_firewall(nft_dump):
             "guard_chain_names_present":True,
             "rule_count_at_least_three":True,
             "packet_path_negative_tested_here":False}
+def existing_nat_inventory():
+    # Read-only: reuse/provisioning feasibility is NOT approval to attach
+    # an Internet NIC to a running Windows malware-analysis guest.
+    existing=[x.strip() for x in
+              virsh("net-list","--all","--name").splitlines() if x.strip()]
+    if "default" not in existing:
+        return {"libvirt_default_network_exists":False,
+                "approved_internet_attachment":False}
+    doc=ET.fromstring(virsh("net-dumpxml","default"))
+    forward=doc.find("forward")
+    dhcp=doc.findall(".//dhcp")
+    info=virsh("net-info","default")
+    status={}
+    for line in info.splitlines():
+        key,sep,val=line.partition(":")
+        if sep:status[key.strip().lower()]=val.strip().lower()
+    return {"libvirt_default_network_exists":True,
+            "default_network_is_nat":forward is not None and
+                                     forward.get("mode","nat")=="nat",
+            "default_network_active":status.get("active")=="yes",
+            "default_network_has_dhcp":bool(dhcp),
+            "approved_internet_attachment":False,
+            "this_is_only_a_provisioning_candidate":True}
+
 def assess():
     need(os.geteuid()==0 and
          socket.gethostname().split(".",1)[0].lower()=="cse-ssl-55",
@@ -114,6 +138,7 @@ def assess():
     bridge=inspect_network(virsh("net-dumpxml",NET))
     guard=infer_firewall(cmd("nft","-j","list","table","inet",
                              "cape_analysis_guard"))
+    candidate=existing_nat_inventory()
     host_route=cmd("ip","-4","route","get","1.1.1.1")
     need(" dev " in " "+host_route,
          "Host route query failed")
@@ -124,6 +149,7 @@ def assess():
         "protected_master_and_trial_off":True,
         "saved_domain":saved,"live_domain":live,
         "analysis_network":bridge,"guard":guard,
+        "trusted_setup_nat_candidate_inventory":candidate,
         "host_has_ipv4_default_route_candidate":True,
         "host_ipv4_forwarding_sysctl_on":flags=="1",
         "host_route_does_not_prove_guest_internet":True,
