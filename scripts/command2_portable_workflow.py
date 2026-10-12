@@ -564,10 +564,14 @@ def main():
                 "command2_portable_master_nat_firstboot.py")
             need(child.is_file() and not child.is_symlink(),
                  "Master NAT firstboot helper not present")
-            return subprocess.run([sys.executable,"-B",str(child),
+            argv=[sys.executable,"-B",str(child),
                 "--mode","boot" if args.mode=="apply" else "plan",
                 "--approved-host",host,"--journal",str(args.journal),
-                "--vm",args.vm],check=False).returncode
+                "--vm",args.vm]
+            if args.witness_dir is not None:
+                absolute(args.witness_dir,"witness_dir")
+                argv+=["--evidence-dir",str(args.witness_dir)]
+            return subprocess.run(argv,check=False).returncode
         if args.phase=="master-nat-running-snapshots":
             host=canonical_host(args.approved_host)
             need(os.geteuid()==0,
