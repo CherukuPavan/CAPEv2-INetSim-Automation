@@ -63,9 +63,8 @@ def classify_xml(vm, expected_uuid, raw, state, names):
             tpm.get("version")=="2.0",
             "Independent Windows TPM2 expected")
     nv=root.find("./os/nvram")
-    require(nv is not None and nv.text and
-            nv.text.endswith("/"+vm+".command2_VARS.fd") or
-            (nv is not None and nv.text and
+    require(nv is not None and type(nv.text) is str and
+            (nv.text.endswith("/"+vm+".command2_VARS.fd") or
              nv.text.endswith("/"+vm+".command2_VARS.fd.qcow2")),
             "Unexpected OVMF guest NVRAM path")
     format=nv.get("format","raw")
@@ -187,8 +186,11 @@ def main():
             require(host=="cse-ssl-55" and not a.guest and a.journal is None,
                     "SSL55 reference request on wrong host or mixed target")
             require(virsh("domuuid","win11").lower()==MASTER_UUID and
-                    virsh("domstate","win11").lower()=="shut off",
-                    "Protected SSL55 master changed")
+                    virsh("domstate","win11").lower()=="shut off" and
+                    virsh("domuuid","win11_trial_1").lower()==
+                       "e75f6fef-347d-462f-9738-4de3df6bfa74" and
+                    virsh("domstate","win11_trial_1").lower()=="shut off",
+                    "Protected SSL55 master/trial identity or power state changed")
             rows=[("win11_1",PILOT_UUID)]
         else:
             require(host not in ("cse-ssl-55","ssl-55"),
