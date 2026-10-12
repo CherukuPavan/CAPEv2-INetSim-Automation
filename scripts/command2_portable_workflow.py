@@ -33,6 +33,7 @@ BATCH_PHASE="identity-batch"
 BOOT_BATCH_PHASE="identity-boot-batch"
 APPROVED_BOOT_BATCH_PHASE="approved-firstboot-batch"
 CAPTURE_BATCH_PHASE="snapshot-capture-batch"
+SHUTDOWN_BATCH_PHASE="graceful-shutdown-batch"
 
 PHASES={
     "stage":("command2_portable_zero_nic_entrypoint.py","stage","plan"),
@@ -432,9 +433,69 @@ def approved_firstboot_batch(args):
         "production_ready":False},sort_keys=True),flush=True)
     return 0
 
+def graceful_shutdown_batch(args):
+    """All-N read-only shutdown preflight then ordered exact graceful requests.
+
+    A request acknowledgement is NOT completion; child exits zero only
+    after verifying actual SHUT OFF. Failure leaves remaining VMs unchanged.
+    Never force stops a stalled guest, including in an interrupted batch.
+    """
+    import command2_graceful_shutdown as controlled
+    host=canonical_host(args.approved_host)
+    need(os.geteuid()==0,"Root required for private per-VM identity")
+    need(args.vm is None,"Count-driven shutdown cannot select a single guest")
+    need(args.journal is not None and args.journal.is_absolute() and
+         args.journal.name=="command2-identity-reservation.json",
+         "Canonical root-private Command2 reservation required")
+    need(type(args.shutdown_timeout) is int and 90<=args.shutdown_timeout<=900,
+         "Graceful Windows shutdown timeout must be 90..900 seconds")
+    if args.mode=="apply":
+        need(sys.stdin.isatty(),"Direct operator TTY required for shutdown")
+    snapshotgate.private_evidence_folder(args.journal.parent)
+    rows=snapshotgate.reservation_rows(args.journal,host)
+    need(bool(rows),"Empty Command2 guest reservation")
+    journal_hash=hashlib.sha256(args.journal.read_bytes()).hexdigest()
+    preflight=[]
+    for row in rows:
+        report=controlled.inspect(host,"portable-other",
+                                  row["libvirt_name"],args.journal)
+        preflight.append({"vm":row["libvirt_name"],
+            "state":report["state"],
+            "qga_channel_present":report["capabilities"]["qga_channel"],
+            "acpi_present":report["capabilities"]["acpi"],
+            "shutdown_completed":report["already_off"]})
+    print(json.dumps({"result":"COMMAND2_ALL_N_GRACEFUL_SHUTDOWN_PREFLIGHT",
+        "vm_count":len(rows),"mode":args.mode,"guests":preflight,
+        "no_hard_poweroff_supported":True,
+        "journal_sha256":journal_hash,"no_host_changes":True},
+        sort_keys=True,indent=2),flush=True)
+    if args.mode=="plan":return 0
+    for row in rows:
+        need(hashlib.sha256(args.journal.read_bytes()).hexdigest()==journal_hash,
+             "Reserved guest identities changed; stop all shutdown requests")
+        one=argparse.Namespace(**vars(args))
+        one.phase="graceful-shutdown"
+        one.vm=row["libvirt_name"]
+        script,argv,_=choose(one)
+        result=subprocess.run([sys.executable,"-B",str(script),*argv],
+                              check=False)
+        if result.returncode!=0:
+            print(json.dumps({"result":"COMMAND2_GRACEFUL_SHUTDOWN_BATCH_HALTED",
+                  "failed_vm":one.vm,"returncode":result.returncode,
+                  "other_guests_not_forced_off":True,
+                  "no_automatic_retry_or_hard_stop":True},
+                  sort_keys=True),file=sys.stderr,flush=True)
+            return 2
+    print(json.dumps({"result":"COMMAND2_ALL_N_GRACEFUL_SHUTDOWN_REQUESTS_ACCEPTED",
+         "vm_count":len(rows),"each_child_confirmed_shut_off":True,
+         "guest_disks_and_tpm_not_modified_by_shutdown_helper":True,
+         "still_need_snapshot_cape_release_gates":True},
+         sort_keys=True),flush=True)
+    return 0
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
@@ -468,6 +529,8 @@ def main():
             return identity_boot_batch(args)
         if args.phase==APPROVED_BOOT_BATCH_PHASE:
             return approved_firstboot_batch(args)
+        if args.phase==SHUTDOWN_BATCH_PHASE:
+            return graceful_shutdown_batch(args)
         if args.phase==CAPTURE_BATCH_PHASE:
             host=canonical_host(args.approved_host)
             need(os.geteuid()==0,"Root required for private snapshot evidence")
