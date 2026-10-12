@@ -41,7 +41,8 @@ def virsh(*args):
             "Read-only libvirt query returned failure")
     return res.stdout.strip()
 
-def classify_xml(vm, expected_uuid, raw, state, names):
+def classify_xml(vm, expected_uuid, raw, state, names, *, expected_disk=None,
+                 expected_nvram=None, expected_mac=None):
     root=ET.fromstring(raw)
     require(root.tag=="domain" and root.findtext("name")==vm and
             root.findtext("uuid")==expected_uuid,
@@ -53,6 +54,12 @@ def classify_xml(vm, expected_uuid, raw, state, names):
             disks[0].find("driver") is not None and
             disks[0].find("driver").get("type")=="qcow2",
             "Expected standalone single QCOW2 OS disk")
+    source_path=disks[0].find("source").get("file")
+    require(type(source_path) is str and Path(source_path).is_absolute(),
+            "Windows disk source must be an absolute file path")
+    if expected_disk is not None:
+        require(source_path==expected_disk,
+                "Live/saved VM disk path differs from identity reservation")
     backing=disks[0].find("backingStore")
     require(backing is None or
             (backing.find("source") is None and
@@ -67,6 +74,11 @@ def classify_xml(vm, expected_uuid, raw, state, names):
             (nv.text.endswith("/"+vm+".command2_VARS.fd") or
              nv.text.endswith("/"+vm+".command2_VARS.fd.qcow2")),
             "Unexpected OVMF guest NVRAM path")
+    require(Path(nv.text).is_absolute(),
+            "Windows UEFI NVRAM must have an absolute file path")
+    if expected_nvram is not None:
+        require(nv.text in (expected_nvram,expected_nvram+".qcow2"),
+                "VM UEFI variable path differs from identity reservation")
     format=nv.get("format","raw")
     require(format in ("raw","qcow2"),"Unexpected OVMF NVRAM format")
     nics=root.findall("./devices/interface")
@@ -76,6 +88,14 @@ def classify_xml(vm, expected_uuid, raw, state, names):
         require(nics[0].get("type")=="network" and source is not None and
                 source.get("network")=="cape-analysis-isolated",
                 "Analysis guest connected to non-isolated libvirt network")
+    guest_mac=None
+    if nics:
+        nicmac=nics[0].find("mac")
+        guest_mac=(nicmac.get("address","").lower()
+                   if nicmac is not None else None)
+        if expected_mac is not None:
+            require(guest_mac==expected_mac,
+                    "VM NIC MAC differs from identity reservation")
     snap="cape_ready_"+vm
     snap_exists=snap in names
     if format=="raw":
@@ -100,6 +120,9 @@ def classify_xml(vm, expected_uuid, raw, state, names):
         action=("Inspect running snapshot XML and witness two benign TPM/UEFI/"
                 "Windows/Agent/IPv4/IPv6/L2 reversions; shut VM off for CAPE.")
     return {"vm":vm,"uuid":expected_uuid,"state":state,
+            "disk_source":source_path,"nic_mac":guest_mac,
+            "journal_identity_bound":all(v is not None for v in
+                                         (expected_disk,expected_nvram,expected_mac)),
             "ovmf_xml_format":format,"ovmf_xml_path":nv.text,
             "isolated_nic_count":len(nics),
             "expected_running_snapshot":snap,
@@ -141,32 +164,75 @@ def rows_from_reserved_journal(path, host):
                 entry.get("libvirt_name")==f"win11_{index}" and
                 type(entry.get("libvirt_uuid_candidate")) is str,
                 "Invalid ordered VM identity reservation")
-        result.append((entry["libvirt_name"],
-                       entry["libvirt_uuid_candidate"]))
+        disk=entry.get("disk_target")
+        nvram=entry.get("uefi_nvram_target")
+        mac=entry.get("mac_candidate")
+        require(type(disk) is str and Path(disk).is_absolute() and
+                Path(disk).name==f"win11_{index}.command2.qcow2" and
+                type(nvram) is str and Path(nvram).is_absolute() and
+                Path(nvram).name==f"win11_{index}.command2_VARS.fd" and
+                type(mac) is str and
+                re.fullmatch(r"02:(?:[0-9a-f]{2}:){4}[0-9a-f]{2}",mac),
+                "Missing or malformed journal disk, UEFI or MAC identity")
+        result.append((entry["libvirt_name"],entry["libvirt_uuid_candidate"],
+                       disk,nvram,mac))
     return result
 
 def inventory(guest_expectations):
-    seen=set()
-    values=[]
-    require(len({vm for vm,_ in guest_expectations})==len(guest_expectations),
-            "Guest name/UUID list invalid or duplicated")
-    require(len({uuid for _,uuid in guest_expectations})==len(guest_expectations),
-            "Guest name/UUID list invalid or duplicated")
-    for vm,uuid in guest_expectations:
+    # Explicit --guest permits an advisory inventory without a journal.
+    # A journal-bound inventory must compare ALL reserved disk/UEFI/MAC
+    # identities, not just the easily duplicated domain name and UUID.
+    require(bool(guest_expectations),"No Command 2 guests requested")
+    parsed=[]
+    for item in guest_expectations:
+        require(type(item) in (tuple,list) and len(item) in (2,5),
+                "Guest expectation structure invalid")
+        vm,uid=item[:2]
         require(type(vm) is str and VM_RE.fullmatch(vm) is not None and
-                type(uuid) is str and len(uuid)==36 and
-                vm not in seen,"Guest name/UUID list invalid or duplicated")
-        seen.add(vm)
-        require(virsh("domuuid",vm).lower()==uuid,
+                type(uid) is str and
+                re.fullmatch(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}",uid),
+                "Malformed guest name or canonical UUID")
+        parsed.append((vm,uid,*(item[2:] if len(item)==5 else
+                                (None,None,None))))
+    require(len({r[0] for r in parsed})==len(parsed) and
+            len({r[1] for r in parsed})==len(parsed),
+            "Guest name/UUID list invalid or duplicated")
+    reserved= [r for r in parsed if r[2] is not None]
+    require(len(reserved) in (0,len(parsed)),
+            "Mixed journal-bound and advisory guest inventory refused")
+    if reserved:
+        for pos in (2,3,4):
+            require(len({r[pos] for r in reserved})==len(reserved),
+                    "Reservation has duplicate disk, firmware or MAC identity")
+    values=[]
+    for vm,uid,disk,nvram,mac in parsed:
+        require(virsh("domuuid",vm).lower()==uid,
                 "Guest libvirt UUID mismatch: "+vm)
         state=virsh("domstate",vm).lower()
-        root=virsh("dumpxml","--inactive",vm)
+        saved=virsh("dumpxml","--inactive",vm)
         snames=set(virsh("snapshot-list",vm,"--name").splitlines())
-        values.append(classify_xml(vm,uuid,root,state,snames))
-    require(bool(values),"No Command 2 guests requested")
+        detail=classify_xml(vm,uid,saved,state,snames,
+                            expected_disk=disk,expected_nvram=nvram,
+                            expected_mac=mac)
+        if state=="running":
+            # A changed live NIC/disk/NVRAM may not yet be in saved XML.
+            # Read both and refuse a misleading readiness classification.
+            live=classify_xml(vm,uid,virsh("dumpxml",vm),state,snames,
+                              expected_disk=disk,expected_nvram=nvram,
+                              expected_mac=mac)
+            for field in ("disk_source","ovmf_xml_path","ovmf_xml_format",
+                          "isolated_nic_count","nic_mac"):
+                require(detail[field]==live[field],
+                        "Running VM live/saved XML differs: "+field)
+        values.append(detail)
+    for field in ("disk_source","ovmf_xml_path"):
+        require(len({r[field] for r in values})==len(values),
+                "Multiple Command 2 VMs share the same disk or UEFI state")
     return {"result":"COMMAND2_SNAPSHOT_LIFECYCLE_INVENTORY_READONLY",
             "host":socket.gethostname().split(".",1)[0].lower(),
             "guest_count":len(values),"guests":values,
+            "all_guests_bound_to_private_journal":bool(reserved),
+            "live_saved_xml_cross_checked_when_running":True,
             "no_guest_or_network_mutation":True,
             "all_snapshots_working":False,
             "production_ready":False}
