@@ -30,6 +30,7 @@ revalidate libvirt, UUIDs, paths, networking and storage.
 | `firmware-sidecar` | Copies existing RAW pflash NVRAM into a separate, checked QCOW2 sidecar | Guest SHUT OFF, existing full cold backup SHA pinned. Original RAW unchanged. |
 | `firmware-activate` | Saved-only XML transition to QCOW2 sidecar with exclusive backup of original XML | Requires separate actual full disk/OVMF/swtpm restore witness. Boot/TPM/Secure Boot/BitLocker must be rechecked. |
 | `snapshot-capture` | Explicit, one-VM running internal disk+RAM snapshot attempt after full cold-backup and stack checks | Actual TPM/OVMF rollback is NOT established by successful snapshot creation. |
+| `snapshot-revert-once` | One **destructive but explicitly approved disposable-host** `virsh snapshot-revert` back into RUNNING saved RAM/disk state; requires exact shut-off VM UUID, hashed full cold bundle, present QCOW2 OVMF, live libvirt/nft isolation and typed per-VM consent | **No** automatic guest shutdown or retry, **no** TPM/UEFI proof from the host alone; repeat with separate approval after off-guest Windows/TPM baseline comparison and clean shutdown. |
 | `snapshot-batch` | Checks all recorded `cape_ready_win11_N` snapshots captured while RUNNING, with each VM SHUT OFF for CAPE and two real witnessed benign revert cycles | Read-only gate; does NOT perform the revert tests or prove witness cryptographically. |
 | `cape-register` | Propose or explicitly write backed-up `kvm.conf` with one UNIQUE snapshot per VM, only if the batch snapshot gate passes | Neither CAPE service restart nor two real parallel benign jobs is automated/accepted yet. |
 
@@ -56,6 +57,13 @@ master, scripts, file paths, available RAM/disk and machine inventory are
 present and independently reviewed. Default `--subnet auto` uses host
 route, IPv4 address and libvirt network collision inventories; after
 staging, all later phases derive the subnet from immutable per-VM config.
+
+The isolated network installer makes the *new*, dedicated nft table and
+persistent libvirt network active on the second host **only with explicit
+per-host approval**, without modifying existing Docker/campus firewall
+objects or enabling guest NICs. It does NOT install nft persistence or
+enable the CAPE network on reboot. Until a separate approved reboot and
+packet-path test passes, NIC-attachment receipts must not be signed.
 
 The existing real SSL55 base VM is **not** a supported target for this
 portable entrypoint. Never run `--mode apply` there.
