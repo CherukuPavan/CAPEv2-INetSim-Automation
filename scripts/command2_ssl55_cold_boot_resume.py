@@ -7,6 +7,7 @@ Operator must explicitly approve network activation and clone startup.
 """
 from __future__ import annotations
 import argparse
+import fcntl
 import http.client
 import ipaddress
 import json
@@ -31,6 +32,7 @@ SUBNET=ipaddress.ip_network("192.168.240.0/24")
 DISK="/var/lib/libvirt/images/cape-clones-staging/win11_1.command2.qcow2"
 VARS="/var/lib/libvirt/qemu/nvram/win11_1.command2_VARS.fd"
 BACKUP=Path("/var/lib/libvirt/images/cape-clones-staging/cape-win11_1-cold-recovery/cold-b8c6f2d3b4ba4e948dc476b2a1b35c2d")
+LOCK=Path("/run/lock/cape-command2-ssl55-cold-boot-resume.lock")
 
 class Blocked(Exception):pass
 def need(condition,msg):
@@ -146,7 +148,7 @@ def guard_firewall():
     try:
         import command2_ssl55_existing_guard_readonly as guard
         guard.guard_policy_structure(raw,text)
-    except (ImportError,AttributeError) as exc:
+    except (ImportError,AttributeError,RuntimeError,ValueError) as exc:
         raise Blocked("Verified CAPE firewall inspector unavailable") from exc
     return True
 
@@ -241,6 +243,22 @@ def agent():
         return False
     finally:c.close()
 
+def resume_serialized():
+    need(not LOCK.is_symlink(),"Refusing symlinked operation lock")
+    fd=os.open(LOCK,os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
+    try:
+        st=os.fstat(fd)
+        need(stat.S_ISREG(st.st_mode) and st.st_uid==0 and
+             st.st_nlink==1 and stat.S_IMODE(st.st_mode)==0o600,
+             "Unsafe operation lock")
+        try: fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise Blocked("Another cold-boot continuation is active") from exc
+        return resume()
+    finally:
+        os.close(fd)
+
+
 def resume():
     need(sys.stdin.isatty(),"Use controlling terminal for approval")
     first=plan()
@@ -280,7 +298,7 @@ def main():
     ap.add_argument("--mode",choices=("plan","resume"),default="plan")
     a=ap.parse_args()
     try:
-        result=plan() if a.mode=="plan" else resume()
+        result=plan() if a.mode=="plan" else resume_serialized()
         print(json.dumps(result,indent=2,sort_keys=True))
         return 0
     except (Blocked,OSError,subprocess.TimeoutExpired,ValueError,TypeError,
