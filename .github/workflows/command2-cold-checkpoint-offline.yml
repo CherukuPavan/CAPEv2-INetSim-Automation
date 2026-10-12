@@ -71,6 +71,8 @@ on:
       - "scripts/command2_cape_registration_gate.py"
       - "scripts/test_command2_cape_registration_gate.py"
       - "scripts/register_cape_clones.py"
+      - "scripts/command2_windows_benign_snapshot_witness.ps1"
+      - "scripts/test_command2_windows_benign_snapshot_witness.py"
       - "scripts/command2_native_snapshot_stack_guard.py"
       - "scripts/test_command2_native_snapshot_stack_guard.py"
       - "scripts/command2_snapshot_recovery_preflight.py"
@@ -208,6 +210,8 @@ on:
       - "scripts/command2_cape_registration_gate.py"
       - "scripts/test_command2_cape_registration_gate.py"
       - "scripts/register_cape_clones.py"
+      - "scripts/command2_windows_benign_snapshot_witness.ps1"
+      - "scripts/test_command2_windows_benign_snapshot_witness.py"
       - "scripts/command2_native_snapshot_stack_guard.py"
       - "scripts/test_command2_native_snapshot_stack_guard.py"
       - "scripts/command2_snapshot_recovery_preflight.py"
@@ -661,7 +665,8 @@ jobs:
             'scripts/command2_windows_one_nic_diagnostic.ps1',
             'scripts/command2_ssl55_win11_1_oneclick_guest_fix.ps1',
             'scripts/command2_guest_benign_egress_probe.ps1',
-            'scripts/command2_guest_benign_egress_probe_v2.ps1'
+            'scripts/command2_guest_benign_egress_probe_v2.ps1',
+            'scripts/command2_windows_benign_snapshot_witness.ps1'
           )
           foreach ($scriptName in $scripts) {
             $tokens = $null
