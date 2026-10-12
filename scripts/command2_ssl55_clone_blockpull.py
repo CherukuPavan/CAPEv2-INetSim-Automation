@@ -9,6 +9,7 @@ No VM shutdown, restart, snapshot, network changes, or master file writes.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -32,6 +33,7 @@ BACKING = (
 GIB = 1024 ** 3
 RESERVE = 40 * GIB
 OVERHEAD = 4 * GIB
+LOCK = Path("/run/lock/cape-command2-ssl55-blockpull.lock")
 
 class Blocked(RuntimeError):
     pass
@@ -162,51 +164,64 @@ def preflight():
 
 def apply():
     need(sys.stdin.isatty(), "Interactive local terminal required")
-    first = preflight()
-    print(json.dumps({k:v for k,v in first.items()
-                      if k != "source_master_stamps"}, indent=2, sort_keys=True),
-          flush=True)
-    phrase = "FLATTEN-WIN11_1-CLONE-ONLY"
-    need(input("Type " + phrase + " to APPROVE LIVE writes to win11_1 QCOW2 only: ") ==
-         phrase, "Explicit live disk operation approval missing")
-    second = preflight()
-    need(first["source_master_stamps"] == second["source_master_stamps"] and
-         first["live_backing_chain"] == second["live_backing_chain"],
-         "Preflight backing inputs changed before operation")
-    # ONLY this single guarded guest and its existing disk-target. Do not
-    # include --base, --shallow, blockcommit, blockcopy, --pivot or --delete.
-    argv = ["virsh", "-c", "qemu:///system",
-            "blockpull", VM, second["target"], "--wait", "--verbose"]
-    print("BEGIN CLONE-ONLY LIVE BLOCKPULL; never interrupt by reboot/shutdown",
-          flush=True)
-    result = subprocess.run(argv, check=False)
-    need(result.returncode == 0,
-         "Blockpull failed/interrupted. Preserve VM and disks; inspect blockjob "
-         "status before any retry")
-    need(virsh("domstate", VM).lower() == "running",
-         "VM state changed during blockpull; preserve all files")
-    for name, uid in (MASTER, TRIAL):
-        need(virsh("domuuid", name).lower() == uid and
-             virsh("domstate", name).lower() == "shut off",
-             "Protected domain changed during blockpull")
-    for path, old in first["source_master_stamps"].items():
-        need(meta(path) == old,
-             "PROTECTED MASTER FILE CHANGED: immediately stop and inspect")
-    after_live = xml_chain(virsh("dumpxml", VM))
-    after_saved = xml_chain(virsh("dumpxml", "--inactive", VM))
-    need(not after_live["chain"] and not after_saved["chain"],
-         "Blockpull returned but live/saved backing XML not both empty. "
-         "Do not reboot; inspect manual reconciliation")
-    need(virsh("domblklist", VM, "--details").find(str(DISK)) >= 0,
-         "Clone disk source disappeared")
-    return {"result": "CLONE_LIVE_BLOCKPULL_COMPLETED_XML_CHAIN_EMPTY",
-            "master_disk_metadata_unchanged": True,
-            "guest_running": True,
-            "live_chain_empty": True, "saved_chain_empty": True,
-            "independent_cold_boot_verified": False,
-            "running_snapshot_restore_verified": False,
-            "negative_egress_verified": False,
-            "full_cold_recovery_verified": False}
+    need(not LOCK.is_symlink(), "Unsafe blockpull lock symlink")
+    fd = os.open(LOCK, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        info = os.fstat(fd)
+        need(stat.S_ISREG(info.st_mode) and info.st_uid == 0 and
+             stat.S_IMODE(info.st_mode) == 0o600 and info.st_nlink == 1,
+             "Unsafe blockpull lock metadata")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise Blocked("Another clone blockpull operation has the lock") from exc
+        first = preflight()
+        print(json.dumps({k:v for k,v in first.items()
+                          if k != "source_master_stamps"}, indent=2, sort_keys=True),
+              flush=True)
+        phrase = "FLATTEN-WIN11_1-CLONE-ONLY"
+        need(input("Type " + phrase + " to APPROVE LIVE writes to win11_1 QCOW2 only: ") ==
+             phrase, "Explicit live disk operation approval missing")
+        second = preflight()
+        need(first["source_master_stamps"] == second["source_master_stamps"] and
+             first["live_backing_chain"] == second["live_backing_chain"],
+             "Preflight backing inputs changed before operation")
+        # ONLY this single guarded guest and its existing disk-target. Do not
+        # include --base, --shallow, blockcommit, blockcopy, --pivot or --delete.
+        argv = ["virsh", "-c", "qemu:///system",
+                "blockpull", VM, second["target"], "--wait", "--verbose"]
+        print("BEGIN CLONE-ONLY LIVE BLOCKPULL; never interrupt by reboot/shutdown",
+              flush=True)
+        result = subprocess.run(argv, check=False)
+        need(result.returncode == 0,
+             "Blockpull failed/interrupted. Preserve VM and disks; inspect blockjob "
+             "status before any retry")
+        need(virsh("domstate", VM).lower() == "running",
+             "VM state changed during blockpull; preserve all files")
+        for name, uid in (MASTER, TRIAL):
+            need(virsh("domuuid", name).lower() == uid and
+                 virsh("domstate", name).lower() == "shut off",
+                 "Protected domain changed during blockpull")
+        for path, old in first["source_master_stamps"].items():
+            need(meta(path) == old,
+                 "PROTECTED MASTER FILE CHANGED: immediately stop and inspect")
+        after_live = xml_chain(virsh("dumpxml", VM))
+        after_saved = xml_chain(virsh("dumpxml", "--inactive", VM))
+        need(not after_live["chain"] and not after_saved["chain"],
+             "Blockpull returned but live/saved backing XML not both empty. "
+             "Do not reboot; inspect manual reconciliation")
+        need(virsh("domblklist", VM, "--details").find(str(DISK)) >= 0,
+             "Clone disk source disappeared")
+        return {"result": "CLONE_LIVE_BLOCKPULL_COMPLETED_XML_CHAIN_EMPTY",
+                "master_disk_metadata_unchanged": True,
+                "guest_running": True,
+                "live_chain_empty": True, "saved_chain_empty": True,
+                "independent_cold_boot_verified": False,
+                "running_snapshot_restore_verified": False,
+                "negative_egress_verified": False,
+                "full_cold_recovery_verified": False}
+    finally:
+        os.close(fd)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
