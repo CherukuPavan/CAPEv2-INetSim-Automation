@@ -114,5 +114,57 @@ class NetworkShapeTests(unittest.TestCase):
             with self.assertRaisesRegex(s.Blocked,"no longer"):
                 s.network_preflight()
 
+
+class IPv6InventoryTests(unittest.TestCase):
+    def _with_data(self,ipv6_json,link_json='[{"ifname":"cape-lab0"}]'):
+        import json
+        def mocked(*args,**kw):
+            if args==("ip","-j","link","show","dev",s.BRIDGE):
+                return link_json
+            if args==("ip","-j","-6","addr","show","dev",s.BRIDGE):
+                return ipv6_json
+            self.fail("Unexpected read-only command: "+str(args))
+        with patch.object(s,"read",side_effect=mocked):
+            return s.bridge_ipv6()
+
+    def test_empty_ipv6_inventory_is_valid_when_exact_bridge_exists(self):
+        got=self._with_data("[]")
+        self.assertTrue(got["no_global_ipv6_address_on_bridge"])
+        self.assertTrue(got["ipv6_inventory_empty"])
+        self.assertTrue(got["kernel_bridge_link_present"])
+
+    def test_link_local_ipv6_remains_allowed(self):
+        got=self._with_data('[{"ifname":"cape-lab0","addr_info":'
+                            '[{"family":"inet6","local":"fe80::1","scope":"link"}]}]')
+        self.assertTrue(got["no_global_ipv6_address_on_bridge"])
+        self.assertFalse(got["ipv6_inventory_empty"])
+
+    def test_no_ipv6_addr_info_field_fails_closed(self):
+        with self.assertRaisesRegex(s.Blocked,"address list"):
+            self._with_data('[{"ifname":"cape-lab0"}]')
+
+    def test_unexpected_public_ipv6_rejected(self):
+        with self.assertRaisesRegex(s.Blocked,"Non-link-local"):
+            self._with_data('[{"ifname":"cape-lab0","addr_info":'
+                            '[{"family":"inet6","local":"2001:db8::1","scope":"global"}]}]')
+
+    def test_wrong_kernel_link_refuses_empty_ipv6_as_evidence(self):
+        with self.assertRaisesRegex(s.Blocked,"kernel link"):
+            self._with_data("[]",link_json='[{"ifname":"virbr0"}]')
+
+    def test_wrong_ipv6_interface_fails_closed(self):
+        with self.assertRaisesRegex(s.Blocked,"interface identity"):
+            self._with_data('[{"ifname":"virbr0","addr_info":[]}]')
+
+    def test_malformed_ipv6_payload_rejected(self):
+        with self.assertRaisesRegex(s.Blocked,"inventory"):
+            self._with_data('{"ifname":"cape-lab0"}')
+
+    def test_unknown_ipv6_scope_fails_closed(self):
+        with self.assertRaisesRegex(s.Blocked,"Non-link-local"):
+            self._with_data('[{"ifname":"cape-lab0","addr_info":'
+                            '[{"family":"inet6","local":"fd00::1","scope":"universe"}]}]')
+
+
 if __name__=="__main__":
     unittest.main()
