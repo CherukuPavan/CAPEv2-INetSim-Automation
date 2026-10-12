@@ -113,11 +113,9 @@ try {
 } catch { Deny "Invalid Windows NAT JSON configuration" }
 $nic=RequireGuest $conf
 $index=[int]$nic.ifIndex
-$ipinterfaces=@(Get-NetIPInterface -InterfaceIndex $index
-    -AddressFamily IPv4 -ErrorAction Stop)
+$ipinterfaces=@(Get-NetIPInterface -InterfaceIndex $index -AddressFamily IPv4 -ErrorAction Stop)
 if ($ipinterfaces.Count -ne 1) { Deny "Ambiguous matching IPv4 interface" }
-$ipv4s=@(Get-NetIPAddress -InterfaceIndex $index -AddressFamily IPv4
-    -ErrorAction Stop)
+$ipv4s=@(Get-NetIPAddress -InterfaceIndex $index -AddressFamily IPv4 -ErrorAction Stop)
 $unapproved=@($ipv4s | Where-Object {
     $_.IPAddress -ne [string]$conf.ipv4 -and
     $_.IPAddress -notlike "169.254.*"
@@ -157,12 +155,10 @@ if ($Mode -eq "Apply") {
         if ($existingTarget.Count -ne 0) {
             Deny "Existing static IPv4 requires separate manual review"
         }
-        Set-NetIPInterface -InterfaceIndex $index -AddressFamily IPv4
-            -Dhcp Enabled -ErrorAction Stop
+        Set-NetIPInterface -InterfaceIndex $index -AddressFamily IPv4 -Dhcp Enabled -ErrorAction Stop
     }
     # Return to DHCP-provided DNS rather than leaving cloned master DNS.
-    Set-DnsClientServerAddress -InterfaceIndex $index
-        -ResetServerAddresses -ErrorAction Stop
+    Set-DnsClientServerAddress -InterfaceIndex $index -ResetServerAddresses -ErrorAction Stop
     & ipconfig.exe /renew ([string]$nic.Name) | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Deny "Windows DHCP renewal failed; do not restart automatically"
@@ -193,29 +189,25 @@ if ([string]$ipinterfaces[0].Dhcp -ne "Enabled" -or
     $existingTarget.Count -ne 1) {
     Deny "DHCP enabled and exact NAT IP/prefix not yet verified"
 }
-$routes=@(Get-NetRoute -InterfaceIndex $index -AddressFamily IPv4
-    -DestinationPrefix "0.0.0.0/0" -ErrorAction Stop |
+$routes=@(Get-NetRoute -InterfaceIndex $index -AddressFamily IPv4 -DestinationPrefix "0.0.0.0/0" -ErrorAction Stop |
     Where-Object { $_.NextHop -eq [string]$conf.default_gateway })
 if ($routes.Count -ne 1) {
     Deny "NAT IPv4 default gateway route differs"
 }
-$servers=@(Get-DnsClientServerAddress -InterfaceIndex $index
-    -AddressFamily IPv4 -ErrorAction Stop)
+$servers=@(Get-DnsClientServerAddress -InterfaceIndex $index -AddressFamily IPv4 -ErrorAction Stop)
 if ($servers.Count -ne 1 -or
     [string]$conf.dns_ipv4 -notin @($servers[0].ServerAddresses)) {
     Deny "Windows NAT DNS differs from verified default gateway"
 }
 $httpsOk=$false
 if ($RequireHTTPS) {
-    $tcp=Test-NetConnection -ComputerName www.microsoft.com
-        -Port 443 -InformationLevel Detailed -WarningAction SilentlyContinue
+    $tcp=Test-NetConnection -ComputerName www.microsoft.com -Port 443 -InformationLevel Detailed -WarningAction SilentlyContinue
     if ($tcp.TcpTestSucceeded -ne $true -or
         [string]$tcp.SourceAddress -ne [string]$conf.ipv4) {
         Deny "External HTTPS/TCP 443 did not use the expected NAT IPv4"
     }
     try {
-        $head=Invoke-WebRequest -Uri "https://www.microsoft.com" -Method Head
-            -UseBasicParsing -TimeoutSec 20 -ErrorAction Stop
+        $head=Invoke-WebRequest -Uri "https://www.microsoft.com" -Method Head -UseBasicParsing -TimeoutSec 20 -ErrorAction Stop
     } catch { Deny "Windows real HTTPS HEAD failed; no internet claim" }
     $httpsOk=([int]$head.StatusCode -ge 200 -and
               [int]$head.StatusCode -lt 400)
