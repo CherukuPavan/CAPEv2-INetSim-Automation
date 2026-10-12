@@ -15,6 +15,7 @@ param(
     [ValidateSet("Plan","Apply","Verify")][string]$Mode="Plan",
     [switch]$ApproveBenignNat,
     [switch]$ApproveRename,
+    [switch]$ApproveLegacyMasterIpTransition,
     [switch]$RequireHTTPS
 )
 Set-StrictMode -Version Latest
@@ -57,6 +58,7 @@ function RequireGuest([object]$c) {
         [string]$c.bridge -cne "virbr0" -or
         [string]$c.addressing -cne "libvirt_dhcp_reservation" -or
         [int]$c.expected_nic_count -ne 1 -or
+        [string]$c.exact_golden_windows_bootstrap_ip -cne "192.168.122.125" -or
         [int]$c.prefix_length -ne 24 -or
         $c.malware_public_internet_authorized -ne $false -or
         $c.network_isolation_proved_by_this_profile -ne $false) {
@@ -120,8 +122,15 @@ $unapproved=@($ipv4s | Where-Object {
     $_.IPAddress -ne [string]$conf.ipv4 -and
     $_.IPAddress -notlike "169.254.*"
 })
-if ($unapproved.Count -ne 0) {
-    Deny "Existing foreign IPv4 on expected NIC; refuse overwrite"
+# An exact full-disk clone inherits its source master's previous Windows
+# static address. In the approved SSL55 master it was 192.168.122.125.
+# Reject ANY other address and reject a different old subnet/prefix.
+$legacyPresent=($unapproved.Count -eq 1 -and
+    [string]$unapproved[0].IPAddress -ceq
+        [string]$conf.exact_golden_windows_bootstrap_ip -and
+    [int]$unapproved[0].PrefixLength -eq 24)
+if ($unapproved.Count -gt 0 -and -not $legacyPresent) {
+    Deny "Unknown old Windows guest IPv4; cannot blindly overwrite cloned master"
 }
 $existingTarget=@($ipv4s | Where-Object {
     $_.IPAddress -eq [string]$conf.ipv4 -and $_.PrefixLength -eq 24
@@ -136,6 +145,8 @@ if ($Mode -eq "Plan") {
         expected_ipv4=[string]$conf.ipv4
         existing_target_ipv4=($existingTarget.Count -eq 1)
         current_dhcp=[string]$ipinterfaces[0].Dhcp
+        exact_source_master_static_ipv4_present=$legacyPresent
+        source_static_ip_conversion_approved=$false
         target_hostname=[string]$conf.hostname
         actual_hostname=[Environment]::MachineName
         guest_changes_made=$false
@@ -149,13 +160,28 @@ if ($Mode -eq "Apply") {
     if (-not $ApproveBenignNat) {
         Deny "Explicit -ApproveBenignNat required to configure internet"
     }
-    # DHCP may already be working, as proven on SSL55. A legacy static
-    # IP that differs from the chosen reservation is NOT silently removed.
+    # Only the exact recorded golden-master static address may be
+    # removed in a ONE-TIME, separately approved benign transition.
+    # CAPE Agent sends this via async /execute so losing the old TCP
+    # endpoint cannot be misreported as a completed change.
+    if ($legacyPresent -and -not $ApproveLegacyMasterIpTransition) {
+        Deny "Explicit -ApproveLegacyMasterIpTransition required for source address"
+    }
     if ([string]$ipinterfaces[0].Dhcp -ne "Enabled") {
-        if ($existingTarget.Count -ne 0) {
-            Deny "Existing static IPv4 requires separate manual review"
+        if ($existingTarget.Count -ne 0 -and -not $legacyPresent) {
+            Deny "Unexpected existing static IPv4 requires separate review"
         }
         Set-NetIPInterface -InterfaceIndex $index -AddressFamily IPv4 -Dhcp Enabled -ErrorAction Stop
+    }
+    if ($legacyPresent) {
+        $stillLegacy=@(Get-NetIPAddress -InterfaceIndex $index -AddressFamily IPv4 -ErrorAction Stop |
+            Where-Object { $_.IPAddress -ceq [string]$conf.exact_golden_windows_bootstrap_ip })
+        if ($stillLegacy.Count -gt 1) {
+            Deny "Multiple duplicate source master IPs found after DHCP enablement"
+        }
+        if ($stillLegacy.Count -eq 1) {
+            Remove-NetIPAddress -InterfaceIndex $index -IPAddress ([string]$conf.exact_golden_windows_bootstrap_ip) -Confirm:$false -ErrorAction Stop
+        }
     }
     # Return to DHCP-provided DNS rather than leaving cloned master DNS.
     Set-DnsClientServerAddress -InterfaceIndex $index -ResetServerAddresses -ErrorAction Stop
