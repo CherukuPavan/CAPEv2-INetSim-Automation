@@ -1,5 +1,14 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 — BLOCKPULL REPORT: PASS PLAN; APPLY NOT STARTED (STDIN WRAPPER ERROR)
+
+Uploaded `CAPE_Command2_Blockpull_20261012_064231.txt`:
+- `--mode plan` **PASS** read-only: free 95.4 GiB, expected maximum growth 38.72 GiB, 40 GiB reserve, target sda, 64 GiB virtual, clone currently 29.28 GiB allocated, live and saved backing chains exactly expected.
+- `--mode apply` immediately BLOCKED `Interactive local terminal required`. The preceding command launched `bash <<'BASH'` (Bash reads its stdin from the heredoc) and piped `sudo python3 ... --mode apply | tee`. Thus Python stdin was NOT a TTY. It refused **before blockpull**, no flatten happened. This is operator invocation error, not VM/libvirt test failure; do not reinstall or repeat network setup.
+- CORRECTION: explicitly redirect just apply's standard input from `/dev/tty`: `sudo python3 -B "$FILE" --mode apply </dev/tty 2>&1 | tee "$REPORT"`. Preserve exact immutable file/blob SHA and preflight; do not bypass approval or failure guard. Interactive approval phrase remains `FLATTEN-WIN11_1-CLONE-ONLY`.
+- If original master backing path stamps, XML, host free-space, or VM identities changed, preflight correctly refuses. If real blockpull begins and fails/interrupts, NO blind retry, blockjob inspection needed. If succeeds, verify post-operation report; TPM/UEFI and running-memory snapshot/restore still unverified. No master changes authorized.
+
+
 ## 2026-10-12 — GUARDED LIVE CLONE-ONLY BLOCKPULL PILOT PREPARED (NOT EXECUTED)
 
 - The live QEMU PID holds open all three protected master image layers and the clone top. Current `win11_1` is **not proven independent**, despite qemu-img -U output without on-disk backing metadata.
