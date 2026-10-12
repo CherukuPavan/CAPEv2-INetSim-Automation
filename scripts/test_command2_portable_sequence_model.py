@@ -84,6 +84,21 @@ class SequenceModelTests(unittest.TestCase):
         self.assertFalse(result["real_checkpoint_restored"])
         self.assertFalse(result["operator_action_authorized"])
 
+    def test_running_snapshot_is_mandatory_after_cold_restore(self):
+        model=flow.create_model(fixture(1))
+        for stage in flow.STATES[1:]:
+            if stage=="RUNNING_CAPE_SNAPSHOT_REVERT_VERIFIED":
+                with self.assertRaisesRegex(flow.SequenceBlocked,"proof missing"):
+                    flow.advance(model,"win11_1",stage,
+                                 {"snapshot_created_when_guest_running":True})
+                with self.assertRaisesRegex(flow.SequenceBlocked,"Stage order"):
+                    flow.advance(model,"win11_1",
+                                 "READY_FOR_APPROVED_BENIGN_ANALYSIS",
+                                 gate("READY_FOR_APPROVED_BENIGN_ANALYSIS"))
+            model=flow.advance(model,"win11_1",stage,gate(stage))
+        self.assertEqual(model["guests"]["win11_1"]["stage"],
+                         "READY_FOR_APPROVED_BENIGN_ANALYSIS")
+
     def test_thirty_two_guest_state_machine_is_simulated_only(self):
         model = flow.create_model(fixture(32))
         self.assertEqual(model["guest_count"], 32)
