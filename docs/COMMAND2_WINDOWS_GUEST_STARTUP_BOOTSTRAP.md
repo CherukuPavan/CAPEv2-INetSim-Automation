@@ -9,6 +9,54 @@ Files:
 or installed by the current Command 2 frontend.** The Windows GitHub
 Actions job only parses syntax. Neither file executes from CI.
 
+## Command 1 source-master installation and read-only proof (2026-10-12 hardening)
+
+The pre-existing Windows script now offers a separate `-Mode Verify`.
+Both `-Mode Install` and `-Mode Verify` require the exact **reviewed**
+SHA-256 values of the bootstrap runner and guest personalizer, as well as
+the expected source Windows SMBIOS UUID. These inputs must come from a
+trusted pinned repository revision, NOT from an untrusted optical disk.
+
+The bootstrap's `Verify` mode rejects a different source UUID, missing or
+modified local `ProgramData\\CAPECommand2` scripts, a disabled or missing
+`CAPECommand2GuestInit` scheduled task, a principal other than privileged
+SYSTEM ServiceAccount, extra/unexpected triggers/actions, or an action
+that does not run the precise installed script at startup. It only reads
+local state; it never boots/renames the guest, attaches a NIC, or installs
+the task. `Install` likewise checks both exact reviewed source script
+hashes BEFORE copying and verifies the registered task immediately
+after installation. The user must explicitly approve installation.
+
+**Illustrative Windows Administrator PowerShell syntax** (values are
+unresolved placeholders; do NOT execute without reviewing the original
+Windows VM, correct source paths and approved SHA-256 values):
+
+```powershell
+# Execute from the directory holding BOTH reviewed .ps1 files.
+.\\command2_guest_startup_autoconfig.ps1 -Mode Verify `
+  -ExpectedTemplateUuid '<EXACT_COMMAND1_MASTER_SMBIOS_UUID>' `
+  -ExpectedRunnerSha256 '<REVIEWED_SHA256_FROM_PINNED_REPO>' `
+  -ExpectedPersonalizerSha256 '<REVIEWED_SHA256_FROM_PINNED_REPO>'
+# For first-time installation only, use -Mode Install and -ApproveInstall
+# with the exact same reviewed UUID and SHA arguments; never silently
+# register this task in the original protected SSL-55 master.
+```
+
+The updated `command2_guest_personalize.ps1` refuses duplicate or
+prefix-mismatched addresses and treats a coincidentally matching DHCP
+lease as **not** a proven static IPv4 address. `Verify` fails closed if
+DHCP is enabled, the exact static IPv4 is missing, or any IPv4/IPv6
+default route remains on the analysis NIC. Network apply re-reads the
+live Windows address, DHCP and both route families after writing.
+
+**Development limitation:** this improves guest payload integrity and
+read-only acceptance, but `command1_pre_vm.sh` does NOT yet deliver,
+install or verify the Windows task inside the Command 1 source Windows
+master. Until that transport is implemented and exercised on real Windows,
+Command 1 is NOT fully automatic and clone identity/IPv4 application
+remains unverified. Powershell parser and Python static regressions do NOT
+prove a real Windows scheduled-task execution or network acceptance.
+
 ## Purpose
 
 Command 1's approved golden Windows analysis VM will eventually receive
