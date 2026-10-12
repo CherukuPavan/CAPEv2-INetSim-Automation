@@ -80,9 +80,21 @@ def check_online():
          len(root.findall(".//dhcp/range"))>=1,
          "Master default NAT no longer on expected DHCP virbr0")
     info=virsh("net-info",DEFAULT)
-    need("Active: " in info and
-         any(line.lower().strip()=="active: yes" for line in info.splitlines()),
-         "Default NAT not active")
+    # virsh aligns net-info values with variable whitespace:
+    # "Active:          yes" is normal, not evidence of an inactive NAT.
+    # Split once on the colon and trim both sides, as other working
+    # SSL55 audits do. Never infer "active" from the network definition.
+    fields={}
+    for line in info.splitlines():
+        key,sep,value=line.partition(":")
+        if sep:
+            key=key.strip().lower()
+            need(key not in fields,"Duplicate net-info field: "+key)
+            fields[key]=value.strip().lower()
+    need(fields.get("name")==DEFAULT and
+         fields.get("active")=="yes" and
+         fields.get("bridge")=="virbr0",
+         "Existing default NAT must be ACTIVE on bridge virbr0")
     return {"network":DEFAULT,"bridge":"virbr0",
             "ipv4_gateway":"192.168.122.1",
             "dhcp_network_present":True,
