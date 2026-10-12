@@ -176,3 +176,34 @@ Source guidance: [CAPE saving the VM](https://capev2.readthedocs.io/en/latest/in
 [libvirt virsh snapshot/revert](https://www.libvirt.org/manpages/virsh.html),
 [QEMU TPM emulator and migration](https://www.qemu.org/docs/master/specs/tpm),
 [libvirt snapshot+swtpm limitation discussion](https://lists.libvirt.org/archives/list/users%40lists.libvirt.org/message/QGU2EQQSUC6X6CGK4QPTHH2EIWMOXHOP/).
+
+
+## Portable Windows network authorization media stage (development)
+
+New `scripts/command2_portable_network_approval_iso.py` and offline tests
+bridge the previously missing step between attaching ONE host-approved isolated
+NIC and Windows' SYSTEM-startup static-IP personalization:
+
+- Preconditions: exact OTHER host, root-private journal/guest configuration,
+  correct clone UUID/MAC/disk, VM SHUT OFF, one `cape-analysis-isolated`
+  NIC already attached, one known identity ISO in the existing CD-ROM,
+  and the `COMMAND2_SEPARATE_HOST_NETWORK_ACCEPTANCE_V1` root-private
+  receipt accepted by the existing NIC gate. This receipt is only operator
+  evidence; it MUST reflect actual independently witnessed packet tests.
+- New immutable ISO has the **same** CAPE_CMD2 label for the Windows
+  startup task, embeds the original `guest-config.json`+SHA256 and new
+  `network-approved.json`+SHA256 bound to the exact VM UUID/MAC/name, and
+  is built in the clone's libvirt storage directory.
+- Explicit typed approval; saved-CD-ROM `virsh change-media --update
+  --config` only, no boot/power changes, OS disk, NAT, firewall, interface
+  attachment, or unapproved network routing. The previous optical ISO
+  is retained untouched. Partial results must be inspected before retry.
+- The Windows startup bootstrap still must be previously installed in a
+  clean approved master and proved to run SYSTEM. The new ISO does NOT
+  itself configure guest IPs; when the operator separately boots the
+  prepared clone, the bootstrap consumes and verifies the new media before
+  invoking the previously implemented Windows NIC/IPv4 personalization.
+- The proposed phase is not a substitute for independently proving actual
+  IPv4/IPv6 negative egress and L2 containment on the target host. The
+  production release gate remains BLOCKED until those physical checks and
+  repeated snapshot/revert with TPM/OVMF both pass for each guest.
