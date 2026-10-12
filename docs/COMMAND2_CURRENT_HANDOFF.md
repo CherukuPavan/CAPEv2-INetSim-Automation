@@ -1,5 +1,17 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 07:15 UTC — COLD CAPACITY PASS AND STOPPED-ONLY BACKUP CODE
+
+User's REAL `CAPE_Command2_RecoveryPlan_20261012_071501.txt`:
+- Result `COMMAND2_COLD_RECOVERY_CAPACITY_READONLY`; 94.69 GiB free, clone disk apparent 29.98 GiB/allocated 29.97 GiB.
+- Conservative ONE cold file-copy bound: 74.98 GiB total including 40GiB shared-host reserve + 5GiB overhead. Capacity PASS at inspection time, must recheck immediately before capture.
+- OVMF VARS 540672 bytes; swtpm 2.0 `tpm2-00.permall` 9234 bytes present. No shutdown/snapshot/copy/restore yet. Raw private repo URL 404 is expected, authenticated `gh api` fallback succeeded and exit status 0.
+- Legacy `scripts/command2_cold_checkpoint.py` is unsuitable for current SSL55: asserts trial running, network inactive, ZERO clone NIC, and intentionally refuses capture on SSL55; DO NOT remove its safety refusal.
+- NEW `scripts/command2_ssl55_stopped_backup.py` is separately bounded, development-only `--mode plan/capture`, target exact SSL55 clone UID, master and trial both shut off, dedicated isolated CAPE NIC, empty backing chain, OVMF/swtpm. **No VM lifecycle commands in this script.** Capture requires operator to have separately *gracefully shut off win11_1* and it refuses any running libvirt guest or remaining clone QEMU/swtpm PID. It checks peer disk/NVRAM refs, resource reserve, qemu-img check, writes new root-private cold directory with disk+VARS+TPM persistent state/domain XML/manifest, hashes each file on copy. Requires typed phrase and no blind retry. CI synthetic tests added.
+- Only after cold bundle actually SAVED and success reported should operator independently restart exact clone after verifying isolated bridge/guard persists, then read-only run the established `command2_ssl55_post_blockpull_acceptance.py` to verify cold-boot disk independence and CAPE agent. Even that does NOT prove backup restoration or running snapshot/revert. No malware execution before containment negative proof.
+- Keep original master win11 and win11_trial_1 immutable and off; no external routing, no IP changes. Do not assume snapshot/TPM/UEFI restore.
+
+
 ## 2026-10-12 07:12 UTC — POST-BLOCKPULL STILL PASS; RECOVERY CAPACITY REPORT STILL PENDING
 
 Uploaded `CAPE_Command2_PostBlockpull_20261012_071208.txt` (NOT the requested `CAPE_Command2_RecoveryPlan_*.txt`). Existing post-blockpull read-only acceptance remained `SSL55_POST_BLOCKPULL_READONLY_ACCEPTED`:
