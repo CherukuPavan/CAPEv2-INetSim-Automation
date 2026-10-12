@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import ipaddress
 import os
 from pathlib import Path
 import re
@@ -27,7 +28,7 @@ import sys
 import command2_portable_workflow as flow
 import command2_running_snapshot_batch_gate as batch
 import command2_snapshot_recovery_preflight as cold
-import command2_native_snapshot_stack_guard as native
+import command2_guarded_isolated_nic as nic
 import command2_cape_agent_probe as agent
 
 LOCK=Path("/run/lock/cape-command2-disposable-revert.lock")
@@ -60,6 +61,9 @@ def plan(host,journal,vm,bundle,manifest_sha):
          "Another guest running; one isolated benign revert test at a time")
     # Final CAPE snapshot gate uses the INACTIVE domain because CAPE
     # starts from a VM that is currently shut off.
+    bridge_ip=str(ipaddress.IPv4Address(int(ipaddress.IPv4Network(subnet).network_address)+1))
+    try:nic.verify_network_live(subnet,bridge_ip)
+    except nic.NicBlocked as e:raise RevertBlocked("Actual libvirt/nft isolation guard not present") from e
     vmstate=batch.live_domain(vm,row)
     snap="cape_ready_"+vm
     meta=batch.snapshot_metadata(vm,snap)
@@ -84,6 +88,7 @@ def plan(host,journal,vm,bundle,manifest_sha):
         "master_off":True,
         "snapshot_captured_running_internal_disk_ram":True,
         "qcow2_ovmf_active":True,
+        "host_nft_libvirt_isolation_structure_verified":True,
         "guest_modified":False,"snapshot_reverted":False,
         "swtpm_uefi_atomic_rollback_proven":False,
         "repeated_benign_cycles_proven":False,
@@ -113,6 +118,9 @@ def revert_once(host,journal,vm,bundle,manifest_sha):
         virsh("snapshot-revert",vm,prior["snapshot"],timeout=1800)
         need(virsh("domstate",vm).lower()=="running",
              "Post-revert VM not running: preserve guest state and investigate")
+        bridge_ip=str(ipaddress.IPv4Address(int(ipaddress.IPv4Network(prior["subnet"]).network_address)+1))
+        try:nic.verify_network_live(prior["subnet"],bridge_ip)
+        except nic.NicBlocked as e:raise RevertBlocked("Lab isolation disappeared after revert") from e
         probe=agent.probe_agent(prior["guest_ip"])
         need(probe.get("result")=="COMMAND2_CAPE_AGENT_READONLY_VERIFIED",
              "Reverted VM's CAPE Agent did not pass admin HTTP probe")
@@ -150,7 +158,7 @@ def main():
         print(json.dumps(result,sort_keys=True,indent=2))
         return 0
     except (RevertBlocked,flow.WorkflowBlocked,batch.GateBlocked,
-            cold.RecoveryBlocked,native.NativeBlocked,OSError,ValueError,
+            cold.RecoveryBlocked,nic.NicBlocked,OSError,ValueError,
             TypeError) as e:
         print(json.dumps({"result":"COMMAND2_DISPOSABLE_REVERT_BLOCKED",
              "reason":str(e),"blind_retry_authorized":False},indent=2),
