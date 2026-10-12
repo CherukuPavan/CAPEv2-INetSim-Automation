@@ -18,7 +18,7 @@ def row(i):
 def domain(r):
     return (f'<domain type="kvm"><name>{r["libvirt_name"]}</name>'
             f'<uuid>{r["libvirt_uuid_candidate"]}</uuid>'
-            f'<os><nvram format="raw">{r["uefi_nvram_target"]}</nvram></os>'
+            f'<os><nvram format="qcow2">{r["uefi_nvram_target"]}.qcow2</nvram></os>'
             '<devices><disk device="disk" type="file">'
             '<driver type="qcow2"/></disk><tpm><backend type="emulator" version="2.0"/>'
             '</tpm><interface type="network">'
@@ -128,6 +128,18 @@ class SnapshotBatch(unittest.TestCase):
                  patch.object(g.os,"stat",wraps=g.os.stat):
                 with self.assertRaisesRegex(g.GateBlocked,"Root private"):
                     g.private_evidence_folder(root)
+
+    def test_raw_nvram_or_unactivated_qcow2_sidecar_blocks_release(self):
+        r=row(1)
+        for bad in (domain(r).replace('format="qcow2"','format="raw"'),
+                    domain(r).replace(".command2_VARS.fd.qcow2",
+                                      ".command2_VARS.fd")):
+            with self.subTest(bad=bad),\
+                 patch.object(g,"virsh",side_effect=lambda *args:
+                     r["libvirt_uuid_candidate"] if args[0]=="domuuid" else
+                     "shut off" if args[0]=="domstate" else bad):
+                with self.assertRaisesRegex(g.GateBlocked,"QCOW2 OVMF"):
+                    g.live_domain("win11_1",r)
 
     def test_running_vm_even_with_running_snapshot_not_ready_for_cape(self):
         r=row(1)
