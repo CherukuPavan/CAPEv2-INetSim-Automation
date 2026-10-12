@@ -52,7 +52,16 @@ class ConversionActivation(unittest.TestCase):
                                       "virtual-size":len(raw.read_bytes())})
             if args[1]=="compare":return ""
             self.fail("Unexpected command "+str(args))
-        with patch.object(a.prep,"hostname_guard"),\
+        real_stat=Path.stat
+        def mockstat(item,*args,**kwargs):
+            st=real_stat(item,*args,**kwargs)
+            if item==root:
+                fields=list(st)
+                fields[4]=0
+                return os.stat_result(fields)
+            return st
+        with patch.object(Path,"stat",mockstat),\\
+             patch.object(a.prep,"hostname_guard"),\
              patch.object(a.prep.cold,"inspect",return_value={
                  "manifest_sha256":"a"*64}),\
              patch.object(a,"inspect_witness",return_value="witnesssha"),\
@@ -115,7 +124,7 @@ class ConversionActivation(unittest.TestCase):
         with patch.object(a.sys.stdin,"isatty",return_value=False),\
              patch.object(a.os,"geteuid",return_value=0),\
              patch.object(a,"plan",side_effect=AssertionError("Must not plan")):
-            with self.assertRaisesRegex(a.ActivateBlocked,"terminal"):
+            with self.assertRaisesRegex(a.ActivateBlocked,"interactive"):
                 a.apply(HOST,VM,UID,Path("/n"),"a"*64,
                         Path("/n"),Path("/n"))
 
