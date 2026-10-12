@@ -16,6 +16,11 @@ on:
       - "scripts/test_command2_windows_guest_config.py"
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_guest_one_nic_firstboot.ps1"
+      - "scripts/command2_guest_benign_egress_probe_v2.ps1"
+      - "scripts/command2_guest_benign_egress_RUN_v2.cmd"
+      - "scripts/command2_ssl55_benign_egress_iso_v2.py"
+      - "scripts/test_command2_ssl55_benign_egress_iso_v2.py"
+      - "scripts/test_command2_guest_benign_egress_probe_v2.py"
       - "scripts/command2_guest_benign_egress_probe.ps1"
       - "scripts/command2_guest_benign_egress_RUN.cmd"
       - "scripts/command2_ssl55_benign_egress_iso.py"
@@ -129,6 +134,11 @@ on:
       - "scripts/test_command2_windows_guest_config.py"
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_guest_one_nic_firstboot.ps1"
+      - "scripts/command2_guest_benign_egress_probe_v2.ps1"
+      - "scripts/command2_guest_benign_egress_RUN_v2.cmd"
+      - "scripts/command2_ssl55_benign_egress_iso_v2.py"
+      - "scripts/test_command2_ssl55_benign_egress_iso_v2.py"
+      - "scripts/test_command2_guest_benign_egress_probe_v2.py"
       - "scripts/command2_guest_benign_egress_probe.ps1"
       - "scripts/command2_guest_benign_egress_RUN.cmd"
       - "scripts/command2_ssl55_benign_egress_iso.py"
@@ -612,7 +622,8 @@ jobs:
             'scripts/command2_guest_one_nic_firstboot.ps1',
             'scripts/command2_windows_one_nic_diagnostic.ps1',
             'scripts/command2_ssl55_win11_1_oneclick_guest_fix.ps1',
-            'scripts/command2_guest_benign_egress_probe.ps1'
+            'scripts/command2_guest_benign_egress_probe.ps1',
+            'scripts/command2_guest_benign_egress_probe_v2.ps1'
           )
           foreach ($scriptName in $scripts) {
             $tokens = $null
