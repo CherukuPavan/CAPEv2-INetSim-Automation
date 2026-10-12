@@ -37,6 +37,8 @@ PHASES={
     "cold-capture":("command2_portable_cold_bundle.py","capture","plan"),
     "cold-verify":("command2_portable_cold_bundle.py","verify","verify"),
     "cold-restore":("command2_portable_cold_bundle.py","restore","verify"),
+    "firmware-sidecar":("command2_disposable_nvram_qcow2_prepare.py","prepare","plan"),
+    "firmware-activate":("command2_disposable_nvram_qcow2_activate.py","apply","plan"),
     "snapshot-capture":("command2_running_cape_snapshot_gate.py","capture","plan"),
     "snapshot-batch":("command2_running_snapshot_batch_gate.py",None,None),
     "cape-register":("command2_cape_registration_gate.py","apply","plan"),
@@ -168,6 +170,14 @@ def choose(args):
             need(args.acknowledge_restore=="I-ACCEPT-DISPOSABLE-COLD-RESTORE-RISK",
                  "Cold restore cannot be initiated without explicit independent restore-risk acknowledgment")
             argv+=["--manifest-sha256",args.manifest_sha256 or ""]
+    elif phase in ("firmware-sidecar","firmware-activate"):
+        argv+=["--uuid",uuid,
+               "--recovery-bundle",absolute(args.recovery_bundle,"recovery_bundle"),
+               "--reviewed-manifest-sha",args.manifest_sha256 or ""]
+        if phase=="firmware-activate":
+            argv+=["--witness",absolute(args.firmware_restore_witness,
+                                         "firmware_restore_witness"),
+                   "--xml-backup-dir",absolute(args.xml_backup_dir,"xml_backup_dir")]
     elif phase=="snapshot-capture":
         argv+=["--expected-uuid",uuid,"--expected-mac",mac,
                "--guest-ip",ip,"--subnet",subnet]
@@ -203,6 +213,8 @@ def main():
     p.add_argument("--kvm-conf",type=Path)
     p.add_argument("--recovery-bundle",type=Path)
     p.add_argument("--manifest-sha256")
+    p.add_argument("--firmware-restore-witness",type=Path)
+    p.add_argument("--xml-backup-dir",type=Path)
     p.add_argument("--acknowledge-restore")
     args=p.parse_args()
     try:
