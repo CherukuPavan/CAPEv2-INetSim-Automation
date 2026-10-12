@@ -220,6 +220,14 @@ class Workflow(unittest.TestCase):
             self.assertEqual(argv[argv.index("--manifest-sha256")+1],"a"*64)
             self.assertFalse(result["master_vm_mutations_authorized"])
 
+    def test_portable_running_capture_batch_phase_is_separately_registered(self):
+        self.assertEqual(w.CAPTURE_BATCH_PHASE,"snapshot-capture-batch")
+        self.assertNotIn("snapshot-capture-batch",w.PHASES)
+        self.assertIn("--phase",Path(w.__file__).read_text())
+        self.assertIn('if args.phase==CAPTURE_BATCH_PHASE:',
+                      Path(w.__file__).read_text())
+        self.assertIn("snapshot_evidence_dir",Path(w.__file__).read_text())
+
     def test_final_batch_and_registration_use_same_guest_subnet(self):
         with TemporaryDirectory() as td:
             j,rows=self.makefixture(td)
