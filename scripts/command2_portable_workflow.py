@@ -465,8 +465,13 @@ def main():
             host=canonical_host(args.approved_host)
             need(os.geteuid()==0,"Root required for private guest journal")
             absolute(args.journal,"journal")
-            import command2_portable_agent_batch_gate as agentbatch
-            return agentbatch.main_from_workflow(host,args.journal)
+            child=Path(__file__).resolve().with_name(
+                "command2_portable_agent_batch_gate.py")
+            need(child.is_file() and not child.is_symlink(),
+                 "Pinned all-N agent gate missing")
+            return subprocess.run([sys.executable,"-B",str(child),
+                     "--approved-host",host,"--journal",str(args.journal)],
+                    check=False).returncode
         script,argv,details=choose(args)
         # The delegated helper performs a fresh live safety revalidation
         # and requires its own typed approval before EVERY mutation.
