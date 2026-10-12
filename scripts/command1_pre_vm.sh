@@ -23,6 +23,8 @@ Modes:
   plan-optionals          Inspect CAPE service-account optional dependencies.
   apply-optionals         Explicit, lockfile-gated optional dependency install.
   master-checkpoint       Read-only final Windows master/snapshot handoff (after guest setup).
+  master-export           Plan/capture/verify exact cold win11 Windows disk + OVMF + TPM golden bundle.
+  master-import           Plan/stage/verify a PRIVATE golden bundle on a separate approved host.
   host-acceptance         Consolidated read-only host + finished-master dependency report.\n  coverage                Show human-reviewed automation coverage/status documentation.
 
 Examples:
@@ -115,6 +117,13 @@ case "$MODE" in
     REPORT="${HOME:?}/cape_command1_master_checkpoint_$(date +%Y%m%d_%H%M%S)_$.json"
     exec python3 "$HERE/command1_master_checkpoint.py" --report "$REPORT" "$@"
     ;;
+  master-export)
+    exec python3 -B "$HERE/command1_export_existing_master.py" "$@"
+    ;;
+  master-import)
+    exec python3 -B "$HERE/command1_import_existing_master.py" "$@"
+    ;;
+
   coverage)
     (($# == 0)) || { usage >&2; exit 2; }
     DOC="$HERE/../docs/AUTOMATION_COVERAGE_STEPS_1_11.md"
