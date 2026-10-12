@@ -127,3 +127,52 @@ CAPE references:
 - https://github.com/kevoreilly/CAPEv2/blob/master/modules/machinery/kvm.py
 - https://github.com/kevoreilly/CAPEv2/blob/master/lib/cuckoo/common/abstracts.py
 - https://libvirt.gitlab.io/libvirt/news.html (libvirt v10.9.0 UEFI snapshot update)
+
+
+## Mandatory FINAL running snapshot gate for EVERY Command2 VM
+
+**Operator requirement (2026-10-12): CAPE must use a running guest snapshot
+at the END of Command 2, per individual clone, not one shared snapshot.**
+The snapshot phase may begin only after all that clone's identity, single
+isolated NIC, static IP, CAPE Agent, no-egress tests, firmware/TPM state,
+cold restore and network-reboot persistence gates have passed.
+
+Development implementation:
+
+- The pure `command2_portable_sequence_model.py` now has mandatory
+  `RUNNING_CAPE_SNAPSHOT_REVERT_VERIFIED` between
+  `COLD_CHECKPOINT_RESTORE_VERIFIED` and
+  `READY_FOR_APPROVED_BENIGN_ANALYSIS`. It demands a running memory/disk
+  snapshot AND at least two actual benign revert cycles with agent,
+  Windows identity/IP, isolated network, OVMF and swtpm2 state inspected.
+- New `scripts/command2_running_snapshot_batch_gate.py` reads the
+  target host's exact approved private Command2 identity reservation,
+  checks each running VM UUID/MAC/IP/network, snapshot metadata
+  `cape_ready_win11_N` with `<state>running</state>` and BOTH
+  `<memory snapshot="internal">` and one internal disk snapshot.
+  Every VM must have its own approved private operator revert witness
+  (`COMMAND2_RUNNING_SNAPSHOT_REVERT_WITNESS_V1`) including actual
+  full-state TPM+UEFI restore and repeat benign cycle findings.
+  **One passing VM never certifies the other.**
+- This read-only gate cannot create snapshots or make mutable CAPE changes,
+  does not cryptographically attest the operator witness and NEVER claims
+  a libvirt snapshot alone restores swtpm or OVMF. A successful metadata
+  and witness review still requires separate CAPE parallel-analysis
+  acceptance and immutable template evidence before production release.
+- `command2_running_cape_snapshot_gate.py` now correctly forwards
+  target-host `--subnet` to plan mode (previously hardcoded the
+  default subnet inadvertently).
+- The existing candidate running capture helper **already refuses RAW
+  pflash internal snapshots**. Avoid bypassing this guard; QEMU's ability
+  to migrate swtpm does not establish atomic libvirt snapshot/revert.
+  A dedicated disposable SECOND HOST is required for an approved
+  firmware/TPM strategy evaluation and full-state benign revert tests.
+- Standard CAPE KVM machinery expects a libvirt snapshot to revert at
+  analysis start. `command2_cape_kvm_config_plan.py` remains **proposal
+  only**: do not install or activate its configuration before the
+  machine's own running snapshot/revert gate is truly witnessed.
+
+Source guidance: [CAPE saving the VM](https://capev2.readthedocs.io/en/latest/installation/guest/saving.html),
+[libvirt virsh snapshot/revert](https://www.libvirt.org/manpages/virsh.html),
+[QEMU TPM emulator and migration](https://www.qemu.org/docs/master/specs/tpm),
+[libvirt snapshot+swtpm limitation discussion](https://lists.libvirt.org/archives/list/users%40lists.libvirt.org/message/QGU2EQQSUC6X6CGK4QPTHH2EIWMOXHOP/).
