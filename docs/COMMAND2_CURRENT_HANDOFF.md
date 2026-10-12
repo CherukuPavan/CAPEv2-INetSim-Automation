@@ -1,5 +1,18 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 07:49 UTC — COLD-BOOT CONTINUATION FOUND INACTIVE NETWORK; NO VM RESTART YET
+
+Actual file `CAPE_Command2_ColdBootContinuation_20261012_074913.txt`:
+- Current pilot `win11_1` was **SHUT OFF**.
+- Existing cold bundle metadata accepted (`COLD_BUNDLE_METADATA_VALIDATED_NO_COPY_OR_RESTORE`), 3 previously hashed-at-capture files; report did NOT rehash or restore.
+- Existing `cape-analysis-isolated` libvirt XML passed no-forward/port-isolated bridge checks.
+- Stopped at `STOP: network inactive`. The source did NOT reach VM XML checking, approval or VM start. No network or guest changes in this command. The network has autostart disabled, so no persistent active bridge expected after a manual shutdown.
+- Also discovered latent Python quoting bug in the previously generated Bash local `ssl55_cold_boot_continuation.sh`: embedded `d=r.findall("./devices/disk[@device="disk"]")` would be invalid Python. Do NOT reuse that wrapper.
+- Added `scripts/command2_ssl55_cold_boot_resume.py` (**SSL55 only**, not portable entrypoint) and `scripts/test_command2_ssl55_cold_boot_resume.py` to development CI: read-only `plan` gate for master/trial VM IDs and shutdown, exact stopped clone XML, 3-file cold bundle metadata and isolated no-forward network, previously installed nft CAPE guard structural verifier, collision-free inactive bridge IP/network; `resume` requires local TTY exact phrases to first `virsh net-start cape-analysis-isolated` (ONLY if network is inactive), validate bridge IP and firewall and no global/site IPv6, then `virsh start win11_1` and wait bounded for benign host-bound CAPE Agent HTTP GET. Exclusive root lock serializes operator session. NO `net-autostart`, default NAT network, VM creation/force shutdown/malware/snapshot/revert or backup modification. After a PASS, run existing SHA-verified `command2_ssl55_post_blockpull_acceptance.py` for QEMU master-FD checks.
+- If bridge start or VM start partially succeeds but later check fails, no automatic rollback; preserve state, inspect report, and do NOT retry blindly.
+- Other-host automation must use host-dependent collision-free subnet and interface discovery, NOT this hardcoded SSL55 pilot script. Separate second-host full acceptance remains pending.
+
+
 ## 2026-10-12 07:34 UTC — COLD BACKUP ACTUALLY CAPTURED; RESTART STATUS UNKNOWN + PORTABLE AUTO-SUBNET
 
 Actual uploaded `CAPE_Command2_ColdResume_20261012_073419.txt`:
