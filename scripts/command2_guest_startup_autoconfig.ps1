@@ -95,7 +95,7 @@ function ExactBootTask {
     if ($existing.State -eq "Disabled" -or -not $existing.Settings.Enabled) {
         Deny "Windows SYSTEM bootstrap scheduled task disabled"
     }
-    if ([string]$existing.Principal.UserId -notin @("SYSTEM","NT AUTHORITY\\SYSTEM") -or
+    if ([string]$existing.Principal.UserId -notin @("SYSTEM","NT AUTHORITY\SYSTEM") -or
         [string]$existing.Principal.RunLevel -ne "Highest" -or
         [string]$existing.Principal.LogonType -ne "ServiceAccount") {
         Deny "Bootstrap scheduled task principal differs from privileged SYSTEM"
