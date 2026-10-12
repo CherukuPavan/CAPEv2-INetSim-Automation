@@ -31,7 +31,8 @@ class NatBootBlocked(RuntimeError):pass
 def need(condition,reason):
     if not condition:raise NatBootBlocked(reason)
 
-def completed_running_clones(host,rows,requested,net,evidence):
+def completed_running_clones(host,rows,requested,net,evidence,*,
+                             requested_is_running=False):
     """Admit only EARLIER VMs with a full Windows NAT/HTTPS witness.
 
     Every running guest must already have left the template 192.168.122.125
@@ -41,6 +42,16 @@ def completed_running_clones(host,rows,requested,net,evidence):
     others=[x.strip() for x in network.virsh("list","--name").splitlines()
             if x.strip()]
     need(len(others)==len(set(others)),"Ambiguous live VM domain inventory")
+    # Called before a new VM starts, OR by the trusted Windows transport
+    # after that precise VM has started. In the latter case remove ONLY
+    # that already-verified target from the predecessor inventory.
+    if requested_is_running:
+        need(others.count(requested)==1,
+             "Selected running Windows clone missing from live inventory")
+        others.remove(requested)
+    else:
+        need(requested not in others,
+             "New clone unexpectedly running during firstboot admission")
     if not others:return []
     need(evidence is not None,"Completed prior Windows witness folder required")
     folder=transport.verified_evidence_folder(evidence)
