@@ -31,6 +31,7 @@ import command2_windows_guest_config as windows
 
 BATCH_PHASE="identity-batch"
 BOOT_BATCH_PHASE="identity-boot-batch"
+APPROVED_BOOT_BATCH_PHASE="approved-firstboot-batch"
 
 PHASES={
     "stage":("command2_portable_zero_nic_entrypoint.py","stage","plan"),
@@ -352,9 +353,80 @@ def identity_boot_batch(args):
           sort_keys=True),flush=True)
     return 0
 
+def approved_firstboot_batch(args):
+    """Count-driven all-N vetted one-NIC first boot; no fake guest proof."""
+    import command2_portable_approved_firstboot as firstboot
+    host=canonical_host(args.approved_host)
+    need(os.geteuid()==0,"Root required for exact approved VM journal")
+    need(args.vm is None,"Count-driven firstboot cannot select a single VM")
+    need(args.journal is not None and args.journal.is_absolute() and
+         args.journal.name=="command2-identity-reservation.json",
+         "Canonical root-private reserved N-clone journal missing")
+    need(args.network_receipt_dir is not None and
+         args.network_receipt_dir.is_absolute(),
+         "Absolute private network receipt directory required")
+    snapshotgate.private_evidence_folder(args.journal.parent)
+    snapshotgate.private_evidence_folder(args.network_receipt_dir)
+    if args.mode=="apply":
+        need(sys.stdin.isatty(),"Direct TTY mandatory for each actual first boot")
+    rows=snapshotgate.reservation_rows(args.journal,host)
+    need(bool(rows),"Cannot boot an empty guest reservation")
+    original=hashlib.sha256(args.journal.read_bytes()).hexdigest()
+    checked=[]
+    total_ram=0
+    available=[]
+    for row in rows:
+        vm=row["libvirt_name"]
+        receipt=args.network_receipt_dir/(vm+".firstboot-network-receipt.json")
+        info=firstboot.checked_plan(host,args.journal,vm,receipt)
+        checked.append({"vm":vm,"receipt":str(receipt),
+                        "receipt_sha256":info["host_receipt_sha256"],
+                        "snapshot_ready":False,
+                        "guest_booted":False})
+        total_ram+=info["guest_ram_mib"]
+        available.append(firstboot.bootbase.free_memory_mib())
+    # Reserve enough actual host memory for all guests to be running
+    # concurrently. Individual per-VM admissions alone are insufficient.
+    need(min(available)>=total_ram+6144,
+         "Host memory cannot safely support all requested concurrent guests")
+    print(json.dumps({"result":"COMMAND2_APPROVED_FIRSTBOOT_N_PRECHECK_ONLY",
+        "host":host,"count":len(rows),"mode":args.mode,
+        "journal_sha256":original,"ordered_guests":checked,
+        "aggregate_ram_mib":total_ram,
+        "available_ram_mib_min":min(available),
+        "all_host_and_receipt_admission_checked":True,
+        "windows_guest_name_or_static_ip_verified":False,
+        "running_snapshot_or_tpm_revert_verified":False,
+        "command2_complete":False},sort_keys=True,indent=2),flush=True)
+    if args.mode=="plan":
+        return 0
+    for item in checked:
+        vm=item["vm"]
+        need(hashlib.sha256(args.journal.read_bytes()).hexdigest()==original,
+             "Reserved N clone identities changed during boot; STOP")
+        one=argparse.Namespace(**vars(args))
+        one.vm=vm
+        one.phase="approved-firstboot"
+        one.network_receipt=Path(item["receipt"])
+        child,argv,_=choose(one)
+        proc=subprocess.run([sys.executable,"-B",str(child),*argv],check=False)
+        if proc.returncode!=0:
+            print(json.dumps({"result":"COMMAND2_APPROVED_FIRSTBOOT_N_HALTED",
+                "vm":vm,"returncode":proc.returncode,
+                "previously_started_guests_preserved":True,
+                "auto_retry_or_shutdown":False,
+                "windows_network_not_claimed_ready":True},
+                sort_keys=True),file=sys.stderr,flush=True)
+            return 2
+    print(json.dumps({"result":"COMMAND2_APPROVED_FIRSTBOOT_N_REQUESTED",
+        "guest_count":len(rows),"windows_ip_identity_verified":False,
+        "guest_tpm_uefi_snapshot_verified":False,
+        "production_ready":False},sort_keys=True),flush=True)
+    return 0
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
@@ -368,6 +440,7 @@ def main():
     p.add_argument("--subnet",default="auto",
                    help="Only staging resolves auto; other phases use canonical guest JSON")
     p.add_argument("--network-receipt",type=Path)
+    p.add_argument("--network-receipt-dir",type=Path)
     p.add_argument("--snapshot-receipt",type=Path)
     p.add_argument("--witness-dir",type=Path)
     p.add_argument("--kvm-conf",type=Path)
@@ -383,6 +456,8 @@ def main():
             return identity_batch(args)
         if args.phase==BOOT_BATCH_PHASE:
             return identity_boot_batch(args)
+        if args.phase==APPROVED_BOOT_BATCH_PHASE:
+            return approved_firstboot_batch(args)
         script,argv,details=choose(args)
         # The delegated helper performs a fresh live safety revalidation
         # and requires its own typed approval before EVERY mutation.
