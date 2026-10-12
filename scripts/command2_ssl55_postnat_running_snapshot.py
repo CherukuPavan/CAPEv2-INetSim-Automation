@@ -256,7 +256,8 @@ def capture():
              "Post-NAT capture timestamp inconsistent with old snapshot")
         return {**after,"result":"SSL55_POSTNAT_RUNNING_SNAPSHOT_CAPTURED_AND_CHECKED",
             "snapshot_capture_attempted":True,
-            "actual_running_snapshot_in_gui":True,
+            "new_snapshot_visible_in_libvirt_snapshot_list":True,
+            "virt_manager_gui_refreshed_and_visually_verified":False,
             "tpmsafe_reversion_tested":False}
     except Exception as exc:
         if attempted:
