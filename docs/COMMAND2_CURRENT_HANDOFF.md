@@ -1,5 +1,18 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 ~08:06 UTC — INDEPENDENT WIN11_1 COLD BOOT VERIFIED; NEXT BENIGN EGRESS PROBES
+
+User uploaded `CAPE_Command2_NetworkColdBoot_20261012_080646.txt`. REAL evidence:
+- Operator restarted ONLY existing win11_1 after prior cold backup; analysis network was already ACTIVE, so did not execute net-start or require first approval. `CLONE_START_REQUESTED`, result `COLD_BOOT_AGENT_VERIFIED`: CAPE agent reached via isolated bridge.
+- After actual cold boot, `SSL55_POST_BLOCKPULL_READONLY_ACCEPTED`: clone running with new QEMU PID **130846**, v0.23 CAPE Agent administrator-positive HTTP 200, master/trial both SHUT OFF. Both live/inactive disk backing chains EMPTY; source master image FDs not open by active clone QEMU; independent NVRAM and TPM model unchanged.
+- Free host storage after cold bundle **64.8GiB** (before ~94.69GiB). Clone allocated 29.87GiB. STOP any further unconstrained full 30GiB disk copies: 40GiB shared-host reserve would be at risk.
+- Cold recovery bundle created earlier still preserved (cold-b8c6f2d3b4ba4e948dc476b2a1b35c2d). Actual restore from that bundle NOT tested, running memory+disk+UEFI/swtpm snapshot/revert NOT tested, actual negative external IPv4, IPv6 and inter-guest L2 not verified. Do NOT run malware yet.
+- Official libvirt docs: RAW OVMF pflash internal snapshots cannot be assumed safe, and swtpm state is separate. Libvirt 2020 user list explicitly stated its snapshot machinery does not handle swtpm state; QEMU supports TPM migration but that alone does not prove consistent libvirt rollback. Never use generic snapshot-create/revert for this pilot without validated full-state approach. Links: https://www.libvirt.org/manpages/virsh.html ; https://www.qemu.org/docs/master/specs/tpm ; https://lists.libvirt.org/archives/list/users@lists.libvirt.org/message/ONDDG6TMLDDISRAWV7SMADP53FOCAU5L/
+- New `scripts/command2_guest_benign_egress_probe.ps1` and `scripts/command2_guest_benign_egress_RUN.cmd`: benign Windows one-click read-only NIC/IPv4/IPv6/default routes and four bounded external TCP-denial probes, writes report to Public Documents and opens Notepad. THIS CANNOT PROVE ALL NETWORK ISOLATION OR L2 lateral denial, and must not be misrepresented as such.
+- New `scripts/command2_ssl55_benign_egress_iso.py` --mode plan/apply: staged, operator-approved opt-in existing-guest optical ISO update ONLY, fixed sdb existing safe-fix media, checks exact running clone/master/trial, CAPE no-forward isolated network, structural nft firewall and bridge, one CDROM, existing backup untouched, source PS/CMD pinned by Git SHA-1 blob. No sample execution or guest/host VM disk mutations. On mismatch/failure, STOP and upload TXT; do not force media eject or blindly retry. GUI action if installed: double-click RUN_EGRESS_CHECK.cmd on Windows CD-ROM and send screenshot of C:\\Users\\Public\\Documents\\CAPE_Command2_GuestEgressProbe.txt.
+- General portable auto-subnet selection previously implemented on development only; no claim complete three-command production automation or verified second-host run.
+
+
 ## 2026-10-12 07:49 UTC — COLD-BOOT CONTINUATION FOUND INACTIVE NETWORK; NO VM RESTART YET
 
 Actual file `CAPE_Command2_ColdBootContinuation_20261012_074913.txt`:
