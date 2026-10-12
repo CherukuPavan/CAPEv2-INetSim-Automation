@@ -289,7 +289,7 @@ def main():
                              args.expected_mac,args.guest_ip,args.receipt,args.subnet)
         else:
             report = plan(args.vm,args.approved_host,args.expected_uuid,
-                          args.expected_mac,args.guest_ip,args.receipt)
+                          args.expected_mac,args.guest_ip,args.receipt,args.subnet)
         print(json.dumps(report,indent=2,sort_keys=True))
         return 0
     except (SnapshotBlocked,OSError,ValueError,ET.ParseError) as exc:
