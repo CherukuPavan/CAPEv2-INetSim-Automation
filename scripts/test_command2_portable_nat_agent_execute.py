@@ -39,6 +39,7 @@ class GuestExecute(unittest.TestCase):
         self.assertIn("-File C:/CAPE_NAT2/command2_guest_master_nat.ps1",expected)
         self.assertIn("-ConfigFile C:/CAPE_NAT2/nat-config.json",expected)
         self.assertIn("-Mode Apply -ApproveBenignNat -ApproveRename",expected)
+        self.assertIn("-ApproveLegacyMasterIpTransition",expected)
         self.assertNotIn("cmd.exe",expected)
         for wrong in ("", "x"*64,"a"*63+";"):
             with self.assertRaises(g.GuestExecuteBlocked):
