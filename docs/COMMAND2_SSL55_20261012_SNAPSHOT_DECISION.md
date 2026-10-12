@@ -30,6 +30,40 @@ This is a completed READ-ONLY inventory, not a snapshot or firmware change.
   `running_snapshot_ready_for_cape=false`,
   `host_guest_modified=false`.
 
+## Subsequent safeguarded SSL-55 clone-only code — 2026-10-12
+
+`scripts/command2_ssl55_scoped_nvram_sidecar.py` now provides a
+READ-ONLY `--mode plan` on the exact protected host and a very narrow
+`--mode prepare` that **refuses a running VM**. It requires:
+
+- canonical host `cse-ssl-55`, exact `win11_1` UUID and its single
+  isolated NIC/disk/RAW NVRAM; protected master and trial both SHUT OFF;
+- no preexisting snapshot, no existing sidecar, no writable hardlinks;
+- checksums of **all** recorded `cape-ssl55-cold-v1` manifest members
+  (saved independent disk, RAW UEFI VARS, permanent swtpm2 state);
+- actual `win11_1` state **SHUT OFF** before conversion (not paused,
+  no live NVRAM conversion); root TTY typed approval; 40 GiB protected
+  reserve plus 2 GiB margin; exact candidate QCOW2 format, virtual
+  size, disk-check and raw-vs-converted byte comparison; exclusive
+  new sidecar file + directory fsync, no replace.
+
+It creates **only** `win11_1.command2_VARS.fd.qcow2`, leaving the
+original RAW file, saved libvirt domain XML, Windows guest, TPM state,
+snapshot list, master and trial untouched. The new sidecar is **NOT**
+active, and its presence is NOT a running memory snapshot.
+This component can help the eventual scoped SSL-55 OFFLINE firmware
+transition; it does not authorize transition/boot before a reviewed
+cold recovery and TPM acceptance plan. Source/backup rehashes can take
+minutes (the saved disk is ~30 GiB); no repeated diagnostic output
+needed. It **has not** run on SSL-55.
+
+The existing production capture helper still protects SSL-55 and
+refuses generic `virsh snapshot-create-as` on its RAW running OVMF.
+No in-chat terminal or direct host execution is available; a real
+SSL-55 snapshot **cannot be claimed** until the operator actually
+executes a reviewed host-side controlled transition and captures/tests
+the snapshot.
+
 ## Verified technical constraints
 
 Libvirt v10.9 added internal live snapshots for UEFI guests with **QCOW2
