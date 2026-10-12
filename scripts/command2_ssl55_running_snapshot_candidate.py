@@ -22,6 +22,7 @@ import socket
 import stat
 import subprocess
 import sys
+import uuid
 import xml.etree.ElementTree as ET
 
 import command2_ssl55_activate_qcow2_ovmf as transition
@@ -94,13 +95,59 @@ def check_critical_live(saved,live):
         for tag in ("hostdev","filesystem","redirdev","channel","shmem","vsock"):
             need(not root.findall("./devices/"+tag),
                  "Host-connected unsafe VM device present")
-    for xpath in ("./devices/disk[@device='disk']/source","./os/nvram",
-                  "./devices/interface/mac","./devices/interface/source",
+    # libvirt changes certain READ-ONLY device attributes at VM startup:
+    # disk source gains block graph index, and a network interface source
+    # may gain bridge / portid metadata. Whitelist ONLY these known runtime
+    # fields. Never skip validation of the exact storage, OVMF, TPM,
+    # isolated network, NIC MAC, or UEFI loader in either view.
+    volatile=[]
+    for xpath in ("./devices/disk[@device='disk']/source",
+                  "./os/nvram","./devices/interface/mac",
+                  "./devices/interface/source",
                   "./devices/tpm/backend","./os/loader"):
         va=a.find(xpath);vb=b.find(xpath)
-        need(va is not None and vb is not None and
-             va.attrib==vb.attrib and (va.text or "").strip()==(vb.text or "").strip(),
-             "Critical VM device changed between saved and running views")
+        need(va is not None and vb is not None,
+             "Missing expected device in live/saved VM: "+xpath)
+        left=dict(va.attrib);right=dict(vb.attrib)
+        need((va.text or "").strip()==(vb.text or "").strip(),
+             "Critical device TEXT/path differs in live/saved VM: "+xpath)
+        if xpath=="./devices/disk[@device='disk']/source":
+            need(set(left)=={"file"} and
+                 set(right).issubset({"file","index"}) and
+                 left["file"]==right["file"]==str(transition.ref.DISK),
+                 "Unexpected live/saved disk source attributes or path")
+            if "index" in right:
+                need(right["index"].isdigit() and
+                     0<=int(right["index"])<=256,
+                     "Invalid live QEMU block graph disk index")
+                volatile.append("running.disk_source.index")
+        elif xpath=="./devices/interface/source":
+            need(left=={"network":"cape-analysis-isolated"} and
+                 right.get("network")=="cape-analysis-isolated" and
+                 set(right).issubset({"network","bridge","portid"}),
+                 "Unreviewed isolated NIC source/portgroup attributes")
+            if "bridge" in right:
+                need(right["bridge"]=="cape-lab0",
+                     "Live NIC bridge is NOT exact isolated cape-lab0")
+                volatile.append("running.nic_source.bridge")
+            if "portid" in right:
+                try:
+                    port_uuid=uuid.UUID(right["portid"])
+                except (ValueError,TypeError,AttributeError) as exc:
+                    raise SnapshotCandidateBlocked(
+                        "Live network port identifier invalid") from exc
+                need(str(port_uuid)==right["portid"].lower(),
+                     "Noncanonical network port UUID")
+                volatile.append("running.nic_source.portid")
+        elif xpath=="./devices/interface/mac":
+            need(left==right=={"address":"02:0a:30:6a:3f:50"},
+                 "Critical guest NIC MAC attributes changed")
+        else:
+            need(left==right,
+                 "Critical device attributes differ in live/saved VM: "+xpath)
+    return {"critical_devices_match":True,
+            "only_documented_runtime_xml_metadata":sorted(volatile),
+            "disk_file_nvram_file_nic_network_mac_tpm_loader_bound":True}
 
 def inspect():
     need(os.geteuid()==0 and
@@ -122,7 +169,7 @@ def inspect():
     need(sha(saved.encode())==SAVE_SHA,
          "Exact previously activated saved XML changed")
     live=virsh("dumpxml",VM)
-    check_critical_live(saved,live)
+    xml_compat=check_critical_live(saved,live)
     # The prior original RAW NVRAM is not writable by this tool and must
     # remain unchanged after the isolated QCOW2-sidecar Windows boot.
     need(prep.sha256(transition.RAW)==transition.RAW_SHA,
@@ -191,6 +238,7 @@ def inspect():
             "guest_memory_gib":round(mem/1024**3,2),
             "agent_version":agent_info["version"],
             "host_policy_readback_passed":True,
+            **xml_compat,
             **ver,
             "snapshot_created":False,
             "swtpm_consistent_restore_proven":False,
