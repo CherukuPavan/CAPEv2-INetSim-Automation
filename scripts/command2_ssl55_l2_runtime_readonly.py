@@ -159,18 +159,36 @@ def bridge_config(tap,sysfs_root=KERNEL_NET):
             "no_other_bridge_ports_at_inspection":True}
 
 def bridge_ipv6():
-    try: data=json.loads(read("ip","-j","-6","addr","show","dev",BRIDGE))
+    """ip -j -6 addr can legitimately return [] with no IPv6 addresses.
+
+    Confirm the named Linux link independently before allowing that empty
+    address inventory. Malformed/foreign interfaces or routable addresses
+    remain a hard refusal; this checks bridge metadata, not guest egress.
+    """
+    try:
+        link=json.loads(read("ip","-j","link","show","dev",BRIDGE))
+        data=json.loads(read("ip","-j","-6","addr","show","dev",BRIDGE))
     except (TypeError,ValueError) as exc:
-        raise Blocked("Cannot parse IPv6 bridge address inventory") from exc
-    need(type(data) is list and len(data)==1 and
-         data[0].get("ifname")==BRIDGE,
+        raise Blocked("Cannot parse CAPE bridge link/IPv6 inventory") from exc
+    need(type(link) is list and len(link)==1 and type(link[0]) is dict and
+         link[0].get("ifname")==BRIDGE,
+         "Expected CAPE bridge kernel link missing")
+    need(type(data) is list and len(data)<=1,
          "Unexpected CAPE bridge IPv6 interface inventory")
+    if not data:
+        return {"no_global_ipv6_address_on_bridge":True,
+                "ipv6_inventory_empty":True,
+                "kernel_bridge_link_present":True}
+    need(type(data[0]) is dict and data[0].get("ifname")==BRIDGE,
+         "Unexpected CAPE bridge IPv6 interface identity")
     addr=data[0].get("addr_info")
-    need(type(addr) is list,"Unexpected IPv6 address list")
-    need(not any(z.get("scope") in ("global","site")
-                 for z in addr if type(z) is dict),
-         "Globally/site-routable IPv6 CAPE bridge address unexpectedly present")
-    return {"no_global_ipv6_address_on_bridge":True}
+    need(type(addr) is list and all(type(z) is dict for z in addr),
+         "Unexpected CAPE bridge IPv6 address list")
+    need(not any(z.get("scope") not in ("link","host") for z in addr),
+         "Non-link-local IPv6 CAPE bridge address unexpectedly present")
+    return {"no_global_ipv6_address_on_bridge":True,
+            "ipv6_inventory_empty":False,
+            "kernel_bridge_link_present":True}
 
 def firewall_shape():
     need(read("systemctl","is-active","cape-analysis-guard.service")=="active",
