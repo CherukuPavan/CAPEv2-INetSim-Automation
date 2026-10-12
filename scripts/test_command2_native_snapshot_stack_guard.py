@@ -35,7 +35,7 @@ class NativeSnapshotStack(unittest.TestCase):
         with self.assertRaisesRegex(g.NativeBlocked,"Cannot read"):
             g.parse_versions("Using library: libvirt 12.0.0")
 
-    def fake_inspect(self,fmt="qcow2",tpm=True,actual="qcow2",varspath=VARS):
+    def fake_inspect(self,fmt="qcow2",tpm=True,actual="qcow2",varspath=VARS,*,available_gib=100,require_capture_headroom=True):
         def mockcmd(*args):
             if args[0]=="virsh" and args[-2:]==("version","--daemon"):
                 return versions()
@@ -48,8 +48,8 @@ class NativeSnapshotStack(unittest.TestCase):
              patch.object(g.Path,"is_symlink",return_value=False),\
              patch.object(g.Path,"is_file",return_value=True),\
              patch.object(g.os,"statvfs",return_value=SimpleNamespace(
-                 f_frsize=4096,f_bavail=100*g.GIB//4096)):
-            return g.inspect(VM)
+                 f_frsize=4096,f_bavail=available_gib*g.GIB//4096)):
+            return g.inspect(VM,require_capture_headroom=require_capture_headroom)
 
     def test_qcow2_nvram_and_swtpm_experiment_only(self):
         result=self.fake_inspect()
@@ -74,6 +74,21 @@ class NativeSnapshotStack(unittest.TestCase):
     def test_missing_emulator_tpm_blocked(self):
         with self.assertRaisesRegex(g.NativeBlocked,"TPM2"):
             self.fake_inspect(tpm=False)
+
+    def test_after_capture_can_verify_at_45gib_without_new_memory_reserve(self):
+        # A 4GiB guest needs >50GiB before creating a NEW running
+        # checkpoint, but after successful capture only >40GiB reserve.
+        with self.assertRaisesRegex(g.NativeBlocked,"capture"):
+            self.fake_inspect(available_gib=45)
+        verified=self.fake_inspect(available_gib=45,
+                                   require_capture_headroom=False)
+        self.assertFalse(verified["new_snapshot_capture_space_required"])
+        self.assertEqual(verified["enforced_available_bytes"],40*g.GIB)
+        with self.assertRaisesRegex(g.NativeBlocked,"verification"):
+            self.fake_inspect(available_gib=39,
+                              require_capture_headroom=False)
+        with self.assertRaisesRegex(g.NativeBlocked,"strict boolean"):
+            self.fake_inspect(require_capture_headroom=1)
 
     def test_read_only_no_capture_commands(self):
         code=Path(g.__file__).read_text()
