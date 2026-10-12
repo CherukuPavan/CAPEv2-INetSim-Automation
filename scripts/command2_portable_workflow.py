@@ -31,6 +31,7 @@ import command2_windows_guest_config as windows
 PHASES={
     "stage":("command2_portable_zero_nic_entrypoint.py","stage","plan"),
     "network-install":("command2_portable_network_install.py","install","plan"),
+    "guard-persistence":("command2_portable_guard_persistence.py","install","plan"),
     "identity-build":("command2_portable_guest_identity_iso.py","build","plan"),
     "identity-attach":("command2_portable_guest_identity_attach.py","attach","plan"),
     "nic-attach":("command2_guarded_isolated_nic.py","attach","plan"),
@@ -124,9 +125,9 @@ def choose(args):
         return script_path,argv,{"stage":"ZERO_NIC_COUNT_DRIVEN_ONLY","vm_count":args.count,
                  "guest_approval_or_boot_performed":False}
 
-    if phase in ("snapshot-batch","cape-register","network-install"):
+    if phase in ("snapshot-batch","cape-register","network-install","guard-persistence"):
         absolute(args.journal,"journal")
-        if phase!="network-install":
+        if phase not in ("network-install","guard-persistence"):
             need(args.witness_dir is not None,"Separate private revert witness folder required")
         # Validate the target subnet using the first canonical guest config,
         # never using a caller-invented subnet.
@@ -136,7 +137,7 @@ def choose(args):
         for row in rows:
             _,current,_=load_guest(args.journal,host,row["libvirt_name"])
             need(current==subnet,"Mixed guest analysis subnets refused")
-        if phase=="network-install":
+        if phase in ("network-install","guard-persistence"):
             argv=["--mode",mode,"--approved-host",host,"--journal",str(args.journal)]
         else:
             argv=["--approved-host",host,"--journal",str(args.journal),
