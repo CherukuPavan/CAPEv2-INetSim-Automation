@@ -199,7 +199,9 @@ def inspect(host,journal,vm,iso):
     need(1<=len(candidates)<=2 and
          len({x["ip"] for x in candidates})==len(candidates),
          "No unique elevated CAPE Agent reachable at target or original "
-         "template IP with EXACT guest neighbor MAC")
+         "template IP with EXACT guest neighbor MAC; "
+         "candidate_count="+str(len(candidates))+
+         " probe_count="+str(len(probes)))
     selected=next((x for x in candidates if x["ip"]==wanted),candidates[0])
     return {
        "result":"COMMAND2_EXACT_GUEST_BENIGN_AGENT_TRANSPORT_PLAN_ONLY",
