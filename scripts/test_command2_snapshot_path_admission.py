@@ -124,7 +124,10 @@ class SnapshotAdmission(unittest.TestCase):
             if a[0]=="dumpxml":
                 name=a[-1]
                 template=xml("qcow2",False)
-                return template.replace(VM,name).replace(UUID,UUID if name==VM else second)
+                return (template.replace(VM,name)
+                        .replace(UUID,UUID if name==VM else second)
+                        .replace("/private/win11_2.command2.qcow2",
+                                 "/private/win11_1.command2.qcow2"))
             raise AssertionError(a)
         with patch.object(s,"virsh",side_effect=virsh):
             with self.assertRaisesRegex(s.AdmissionBlocked,"same disk or UEFI"):
