@@ -38,6 +38,7 @@ revalidate libvirt, UUIDs, paths, networking and storage.
 | `snapshot-capture` | Explicit, one-VM running internal disk+RAM snapshot attempt after full cold-backup and stack checks | Actual TPM/OVMF rollback is NOT established by successful snapshot creation. |
 | `snapshot-revert-once` | One **destructive but explicitly approved disposable-host** `virsh snapshot-revert` back into RUNNING saved RAM/disk state; requires exact shut-off VM UUID, hashed full cold bundle, present QCOW2 OVMF, live libvirt/nft isolation and typed per-VM consent | **No** automatic guest shutdown or retry, **no** TPM/UEFI proof from the host alone; repeat with separate approval after off-guest Windows/TPM baseline comparison and clean shutdown. |
 | `snapshot-batch` | Checks all recorded `cape_ready_win11_N` snapshots captured while RUNNING, with each VM SHUT OFF for CAPE and two real witnessed benign revert cycles | Read-only gate; does NOT perform the revert tests or prove witness cryptographically. |
+| `agent-batch` | NEW: a **read-only** N-guest live CAPE HTTP/8000 admin reachability check against reserved guest IPv4, exact MAC, isolated NIC in both saved and running XML and host network policy | Any guest probe failure prevents all-N success. This is not a Windows hostname/IP or TPM snapshot witness and cannot certify analysis readiness. |
 | `cape-register` | Propose or explicitly write backed-up `kvm.conf` with one UNIQUE snapshot per VM, only if the batch snapshot gate passes | Neither CAPE service restart nor two real parallel benign jobs is automated/accepted yet. |
 
 ## First command on a suitable, prepared separate host
@@ -189,6 +190,30 @@ checked BEFORE any guest boot. `--mode apply` still requires direct
 operator TTY and a separate per-guest approval and **is not** a completed
 unattended production Command 2. Do NOT synthesize receipt booleans.
 No real other-host guest or SSL-55 VM has been booted by this change.
+
+## All-N benign CAPE Agent reachability gate
+
+After the separately approved one-NIC firstboot phase and the Windows
+bootstrap's internal rename/reboot/static-IP process, the host can verify
+that **every** reserved Windows agent responds on its unique RFC1918 IPv4.
+A single command checks the exact reservation, one isolated NIC/MAC in
+saved and running XML, same reserved guest storage, active host nft/libvirt
+containment, a shut-off Windows source master, and each CAPE Agent's
+read-only administrator HTTP response. One failure makes the total FAIL.
+
+```bash
+# On a prepared separate other host ONLY. No guest or network changes.
+sudo python3 -B scripts/command2_portable_workflow.py \
+  --phase agent-batch --mode plan \
+  --approved-host OTHERHOST \
+  --journal /absolute/private/command2-identity-reservation.json
+```
+
+This audit **does not** prove the Windows static IPv4 was assigned rather
+than leased, Windows hostname, IPv6 guest isolation, TPM/OVMF full-state
+rollback, completed running snapshots or two concurrent CAPE analyses.
+Those remain independent release gates; no other host was actually
+tested by this addition.
 
 ## Guarded first zero-NIC identity boot
 
