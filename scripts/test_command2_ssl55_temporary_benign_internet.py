@@ -160,6 +160,44 @@ class TrustedSetup(unittest.TestCase):
                     b.setup_session(90)
             cleanup.assert_called_once()
 
+    def test_abandoned_live_nat_can_be_cleaned_up_idempotently(self):
+        with tempfile.TemporaryDirectory() as td:
+            fs=types.SimpleNamespace(st_mode=stat.S_IFREG|0o600,
+                                      st_uid=0,st_nlink=1)
+            original={"network":b.ANALYSIS,"mac":b.SAVED_MAC,"model":"e1000e"}
+            ops=[]
+            with patch.object(b,"LOCK",Path(td)/"lock"),\
+                 patch.object(b.os,"fstat",return_value=fs),\
+                 patch.object(b,"guard_exact",return_value=True),\
+                 patch.object(b,"virsh",side_effect=lambda *a:(
+                     DOMAIN if a==("dumpxml","--inactive",b.VM) else
+                     (_ for _ in ()).throw(AssertionError(a)))),\
+                 patch.object(b,"detach_live",return_value={
+                     "temporary_nic_disconnected":True}) as detach,\
+                 patch.object(b,"check_domain_views",return_value={
+                     "saved_has_only_isolated_nic":True}) as views:
+                output=b.cleanup_abandoned()
+            self.assertEqual(output["result"],
+                  "SSL55_TRUSTED_SETUP_NAT_CLEANUP_VERIFIED")
+            self.assertTrue(output["temporary_nic_disconnected"])
+            self.assertFalse(output["safe_for_malware_analysis_proven"])
+            detach.assert_called_once()
+            views.assert_called_once_with(False)
+
+    def test_abandoned_cleanup_refuses_changed_persistent_nic(self):
+        with tempfile.TemporaryDirectory() as td:
+            fs=types.SimpleNamespace(st_mode=stat.S_IFREG|0o600,
+                                      st_uid=0,st_nlink=1)
+            wrong=DOMAIN.replace(b.SAVED_MAC,"02:ff:ff:ff:ff:ff")
+            with patch.object(b,"LOCK",Path(td)/"lock"),\
+                 patch.object(b.os,"fstat",return_value=fs),\
+                 patch.object(b,"guard_exact",return_value=True),\
+                 patch.object(b,"virsh",return_value=wrong),\
+                 patch.object(b,"detach_live") as detach:
+                with self.assertRaisesRegex(b.SessionBlocked,"drift"):
+                    b.cleanup_abandoned()
+                detach.assert_not_called()
+
     def test_read_only_plan_and_no_mutations_of_snapshots_protected_domains(self):
         source=Path(b.__file__).read_text()
         for token in ('virsh("snapshot-create"','virsh("snapshot-revert"',
