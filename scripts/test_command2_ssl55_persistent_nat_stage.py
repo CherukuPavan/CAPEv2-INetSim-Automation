@@ -49,7 +49,7 @@ def virsh(online=False):
                         mac="52:54:00:62:a0:04")
         if args==("net-dumpxml",g.DEFAULT):return NAT
         if args==("net-dumpxml",g.ISOLATED):return ISO
-        if args==("net-info",g.DEFAULT):return "Name: default\nActive: yes\nBridge: virbr0"
+        if args==("net-info",g.DEFAULT):return "Name:           default\nActive:          yes\nAutostart:       yes\nBridge:          virbr0"
         raise AssertionError(args)
     return run
 
@@ -130,6 +130,26 @@ class Stage(unittest.TestCase):
                     g.stage()
             self.assertFalse(any(x[0] in ("detach-interface","destroy",
                                            "snapshot-revert") for x in queried))
+
+    def test_real_virsh_column_spacing_and_inactive_status(self):
+        # Actual libvirt CLI aligns the values, it does NOT print
+        # "Active: yes" with exactly one space.
+        with patch.object(g,"virsh",side_effect=virsh(False)):
+            self.assertTrue(g.check_online()["dhcp_network_present"])
+        for wrong,reason in (
+            ("Name: default\nActive: no\nBridge: virbr0",
+             "ACTIVE"),
+            ("Name: default\nActive: yes\nBridge: virbr1",
+             "ACTIVE"),
+            ("Name: default\nActive: yes\nBridge: virbr0\nActive: yes",
+             "Duplicate"),
+        ):
+            def mock(*args,**kwargs):
+                if args==("net-info",g.DEFAULT):return wrong
+                return virsh(False)(*args,**kwargs)
+            with self.subTest(wrong=wrong),patch.object(g,"virsh",side_effect=mock),\
+                 self.assertRaisesRegex(g.StagingBlocked,reason):
+                g.check_online()
 
     def test_no_master_or_snapshot_mutators(self):
         source=Path(g.__file__).read_text(encoding="utf-8")
