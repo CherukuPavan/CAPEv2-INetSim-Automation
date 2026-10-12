@@ -61,10 +61,9 @@ class ProtectedSnapshot(unittest.TestCase):
              patch.object(a,"virsh",side_effect=vs), \
              patch.object(a,"cmd",side_effect=query), \
              patch.object(a,"fileinfo",return_value={"size_bytes":100}), \
-             patch.object(a.TPM,"is_dir",return_value=True), \
-             patch.object(a.TPM,"is_symlink",return_value=False), \
-             patch.object(a.TPM,"iterdir",return_value=[
-                Path("/tmp/tpm2-00.permall")]), \
+             patch.object(a,"TPM",SimpleNamespace(
+                 is_dir=lambda:True,is_symlink=lambda:False,
+                 iterdir=lambda:[Path("/tmp/tpm2-00.permall")])), \
              patch.object(a.os,"statvfs",return_value=SimpleNamespace(
                 f_frsize=4096,f_bavail=64*a.GIB//4096)):
             outcome=a.perform()
