@@ -13,6 +13,15 @@ class TestSnapshotWitness(unittest.TestCase):
         self.assertIn("[System.IO.FileMode]::CreateNew",src)
         self.assertIn("DISK_MARKER_ABSENT_AFTER_REVERT",src)
 
+    def test_tpm_ek_public_sha_is_read_only_additional_identity_witness(self):
+        src=FILE.read_text(encoding="utf-8")
+        self.assertIn("TPM_EK_PUBLIC_SHA256",src)
+        self.assertIn("Get-TpmEndorsementKeyInfo -HashAlgorithm Sha256",src)
+        self.assertIn("^[0-9a-fA-F]{64}$",src)
+        self.assertIn("INCONCLUSIVE_OR_NOT_PRESENT",src)
+        self.assertNotIn("Clear-Tpm",src)
+        self.assertNotIn("Export-Tpm",src)
+
     def test_witness_does_not_claim_full_tpm_uefi_revert(self):
         src=FILE.read_text(encoding="utf-8")
         self.assertIn("TPM_UEFI_FULL_STATE_ROLLBACK_PROVEN' 'FALSE",src)
