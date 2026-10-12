@@ -54,7 +54,7 @@ def authorized_stage(host,journal,vm,nat_iso,evidence_dir):
     folder=transport.verified_evidence_folder(evidence_dir)
     stage=folder/(vm+transport.STAGE_SUFFIX)
     data=trusted_stage_json(stage)
-    before=transport.inspect(host,journal,vm,nat_iso)
+    before=transport.inspect(host,journal,vm,nat_iso,evidence_dir)
     need(data.get("format")==
          "COMMAND2_TRUSTED_WINDOWS_NAT_UPLOAD_ONLY_V1" and
          data.get("approved_host")==host and
