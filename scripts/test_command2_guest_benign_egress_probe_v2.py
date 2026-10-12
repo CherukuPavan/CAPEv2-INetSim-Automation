@@ -30,7 +30,7 @@ class TestEgressProbeV2(unittest.TestCase):
         source=FILE.read_text()
         self.assertIn("WaitOne(2500,$false)",source)
         self.assertIn("[System.Net.Sockets.TcpClient]::new($ip.AddressFamily)",source)
-        self.assertEqual(source.count("SOCKET_FAILED_"),2)
+        self.assertEqual(source.count("SOCKET_FAILED_"),3)
         self.assertEqual(source.count("CONNECTED_UNSAFE"),2)
         self.assertEqual(source.count("IP='"),4)
 
