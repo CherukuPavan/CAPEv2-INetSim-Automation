@@ -16,6 +16,9 @@ class IsolatedXMLTests(unittest.TestCase):
         self.assertEqual(root.findtext("name"),"cape-analysis-isolated")
         self.assertEqual(root.find("bridge").get("name"),"cape-lab0")
         self.assertEqual(root.find("dns").get("enable"),"no")
+        self.assertEqual(root.find("port").get("isolated"),"yes")
+        self.assertTrue(out["all_future_guest_tap_ports_must_be_kernel_isolated"])
+        self.assertFalse(out["l2_actual_peer_packet_tested"])
         self.assertEqual(root.find("ip").get("address"),"192.168.240.1")
         for field in ("guest_ipv6_disabled_or_blocked_verified",
                       "nftables_guard_installed",
