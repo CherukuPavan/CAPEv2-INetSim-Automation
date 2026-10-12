@@ -40,6 +40,44 @@ class SnapshotAdmission(unittest.TestCase):
         with patch.object(s,"virsh",return_value=UUID):
             with self.assertRaisesRegex(s.AdmissionBlocked,"invalid or duplicated"):
                 s.inventory([(VM,UUID),(VM,UUID)])
+    def test_reserved_journal_is_strictly_bound_to_host_and_count(self):
+        import json
+        import os
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as td:
+            root=Path(td);root.chmod(0o700)
+            p=root/"command2-identity-reservation.json"
+            def write(entries,host="spare-kvm"):
+                p.write_text(json.dumps({
+                    "format":"CAPE_COMMAND2_GUEST_IDENTITY_RESERVATION",
+                    "version":1,"host":host,"guest_count":len(entries),
+                    "host_network_modified":False,"entries":entries}))
+                p.chmod(0o600)
+            entries=[{"libvirt_name":"win11_1",
+                      "libvirt_uuid_candidate":UUID}]
+            write(entries)
+            realstat=Path.stat
+            def root_owned(obj,*args,**kwargs):
+                info=realstat(obj,*args,**kwargs)
+                data=list(info);data[4]=0
+                return os.stat_result(data)
+            with patch.object(Path,"stat",root_owned):
+                self.assertEqual(s.rows_from_reserved_journal(p,"spare-kvm"),
+                                 [(VM,UUID)])
+                with self.assertRaisesRegex(s.AdmissionBlocked,"host mismatch"):
+                    s.rows_from_reserved_journal(p,"other-kvm")
+                write([{"libvirt_name":"win11_2",
+                        "libvirt_uuid_candidate":UUID}])
+                with self.assertRaisesRegex(s.AdmissionBlocked,"ordered"):
+                    s.rows_from_reserved_journal(p,"spare-kvm")
+
+    def test_renamed_reference_cannot_use_other_host_journal(self):
+        with patch.object(s.socket,"gethostname",return_value="CSE-SSL-55"),\
+             patch.object(s.sys,"argv",["tool","--journal","/tmp/bogus"]),\
+             patch.object(s.os,"geteuid",return_value=0):
+            self.assertEqual(s.main(),2)
+
     def test_no_vm_mutators_in_lifecycle(self):
         from pathlib import Path
         code=Path(s.__file__).read_text()
