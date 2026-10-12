@@ -56,6 +56,53 @@ class NatFirstBoot(unittest.TestCase):
         self.assertEqual(result["expected_reserved_ip"],"192.168.122.201")
         self.assertFalse(result["windows_actual_boot_verified"])
         self.assertFalse(result["malware_analysis_authorized"])
+    def test_second_guest_may_boot_only_after_prior_running_windows_verified(self):
+        import ipaddress
+        current="win11_2"
+        oldrow={**ROW}
+        net={"ipv4":{"subnet":"192.168.122.0/24",
+                      "gateway":"192.168.122.1"}}
+        cert={"format":"COMMAND2_WINDOWS_NAT_INDEPENDENT_ACCEPTANCE_V1",
+              "host":"lab02","vm":VM,"uuid":UUID,"mac":MAC,
+              "target_nat_ip":"192.168.122.201",
+              "malware_analysis_authorized":False,
+              "swtpm_consistent_revert_proven":False,
+              **{x:True for x in (
+                  "guest_hostname_effective","guest_only_expected_mac",
+                  "guest_dhcp_exact_reserved_ipv4",
+                  "guest_default_nat_gateway_and_dns",
+                  "real_guest_https_from_nat_ipv4",
+                  "guest_script_ran_in_verify_readonly_mode",
+                  "CAPE_agent_through_new_nat_and_L2_mac_verified")}}
+        def prior(*args,**kw):
+            if args==("list","--name"):return VM
+            if args==("domuuid",VM):return UUID
+            if args==("domstate",VM):return "running"
+            if args[0]=="dumpxml":return XML
+            raise AssertionError(args)
+        with patch.object(m.network,"virsh",side_effect=prior),\
+             patch.object(m.transport,"verified_evidence_folder",
+                          return_value=Path("/root/evidence")),\
+             patch.object(m.acceptance.approved,"trusted_stage_json",
+                          return_value=cert),\
+             patch.object(m.agent_batch,"nic_xml",return_value=True),\
+             patch.object(m.agent_batch,"route",
+                          return_value={"dev":"virbr0",
+                                        "prefsrc":"192.168.122.1"}),\
+             patch.object(m.agent_batch,"agent",return_value={"valid":True}),\
+             patch.object(m.transport,"mac_of_neighbor",return_value=MAC):
+            found=m.completed_running_clones("lab02",[oldrow],current,net,
+                Path("/root/evidence"))
+            self.assertEqual(found[0]["reserved_ip"],"192.168.122.201")
+            cert["real_guest_https_from_nat_ipv4"]=False
+            with self.assertRaisesRegex(m.NatBootBlocked,"lacks exact"):
+                m.completed_running_clones("lab02",[oldrow],current,net,
+                     Path("/root/evidence"))
+            cert["real_guest_https_from_nat_ipv4"]=True
+            with self.assertRaisesRegex(m.NatBootBlocked,"not-yet-personalized"):
+                m.completed_running_clones("lab02",[oldrow],"win11_1",net,
+                     Path("/root/evidence"))
+
     def test_live_mac_must_be_exact(self):
         with patch.object(m.network,"virsh",return_value=XML):
             self.assertTrue(m.live_identity(VM,BASE))
