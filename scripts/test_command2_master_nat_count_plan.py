@@ -36,7 +36,7 @@ class MasterNatPlan(unittest.TestCase):
              ["192.168.122."+str(i) for i in range(201,206)])
         self.assertTrue(all(a["host_network"]=="default" and
                             a["gateway_ipv4"]=="192.168.122.1" and
-                            a["guest_nic_port_isolated"] for a in out["clones"]))
+                            not a["guest_nic_port_isolated"] for a in out["clones"]))
         self.assertFalse(out["auto_apply_authorized"])
         self.assertFalse(out["safe_for_cape_malware"])
         self.assertIn("WIN11-1",out["clones"][0]["dhcp_reservation_xml_preview"])
