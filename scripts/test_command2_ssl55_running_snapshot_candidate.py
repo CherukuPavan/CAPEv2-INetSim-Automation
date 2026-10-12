@@ -43,7 +43,9 @@ def plan():
 
 class Candidate(unittest.TestCase):
     def test_exact_host_domain_and_ovmf_first_boot(self):
-        self.assertIsNone(s.check_critical_live(XML,XML))
+        self.assertTrue(s.check_critical_live(XML,XML)["critical_devices_match"])
+        self.assertEqual(
+            s.check_critical_live(XML,XML)["only_documented_runtime_xml_metadata"],[])
         tests=(
           XML.replace('nvram format="qcow2"','nvram format="raw"'),
           XML.replace(str(s.transition.SIDE),str(s.transition.RAW)),
@@ -56,6 +58,52 @@ class Candidate(unittest.TestCase):
             with self.subTest(changed=changed),self.assertRaises(
                  s.SnapshotCandidateBlocked):
                 s.check_critical_live(XML,changed)
+
+    def test_running_libvirt_runtime_index_port_and_bridge_are_safe_metadata(self):
+        # libvirt may add block-source index and network portid/bridge only
+        # while the VM is running; they do NOT represent device substitution.
+        live=XML.replace(
+            'file="'+str(s.transition.ref.DISK)+'"',
+            'file="'+str(s.transition.ref.DISK)+'" index="1"')
+        live=live.replace(
+            '<source network="cape-analysis-isolated"/>',
+            '<source network="cape-analysis-isolated" bridge="cape-lab0" '
+            'portid="3c0af211-9a41-43c9-a6a2-44c33c09f483"/>')
+        answer=s.check_critical_live(XML,live)
+        self.assertTrue(answer["critical_devices_match"])
+        self.assertEqual(answer["only_documented_runtime_xml_metadata"],
+            ["running.disk_source.index","running.nic_source.bridge",
+             "running.nic_source.portid"])
+
+    def test_running_xml_normalization_cannot_hide_unsafe_device_drift(self):
+        expected='<source network="cape-analysis-isolated"/>'
+        for unsafe,reason in (
+           ('<source network="cape-analysis-isolated" bridge="virbr0"/>',
+            "NOT exact isolated"),
+           ('<source network="cape-analysis-isolated" portgroup="uplink"/>',
+            "Unreviewed isolated"),
+           ('<source network="cape-analysis-isolated" portid="bogus"/>',
+            "port identifier invalid"),
+           ('<source network="cape-analysis-isolated" '
+            'portid="3c0af211-9a41-43c9-a6a2-44c33c09f483" '
+            'bridge="cape-lab0" portgroup="x"/>',
+            "Unreviewed isolated"),
+        ):
+            with self.subTest(unsafe=unsafe),self.assertRaisesRegex(
+                s.SnapshotCandidateBlocked,reason):
+                s.check_critical_live(XML,XML.replace(expected,unsafe))
+        original='file="'+str(s.transition.ref.DISK)+'"'
+        for bad in ('index="notnumber"','index="-1"',
+                    'index="300"','cache="unsafe"'):
+            with self.subTest(bad=bad),self.assertRaises(
+                s.SnapshotCandidateBlocked):
+                s.check_critical_live(XML,XML.replace(original,
+                                                original+' '+bad))
+        with self.assertRaisesRegex(s.SnapshotCandidateBlocked,
+                                   "attributes differ"):
+            s.check_critical_live(XML,XML.replace(
+                '<loader readonly="yes" type="pflash">',
+                '<loader readonly="no" type="pflash">'))
 
     def test_no_write_plan_has_all_real_safety_admissions(self):
         with TemporaryDirectory() as td:
