@@ -75,8 +75,7 @@ class BenignRevert(unittest.TestCase):
 
     def test_invalid_manifest_hash_refuses_revert(self):
         with self.assertRaisesRegex(r.RevertBlocked,"manifest"):
-            self.make_plan.__wrapped__() if hasattr(self.make_plan,"__wrapped__") else (
-                self.invoke_wrong_hash())
+            self.invoke_wrong_hash()
 
     def invoke_wrong_hash(self):
         with patch.object(r.flow,"canonical_host",return_value=HOST),\
