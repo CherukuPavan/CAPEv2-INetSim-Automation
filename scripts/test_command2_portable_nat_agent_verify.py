@@ -73,7 +73,9 @@ class GuestNatWitness(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
             stage=root/(V+g.transport.STAGE_SUFFIX)
-            stage.write_bytes(b'{"vm":"win11_1"}')
+            stage.write_text(json.dumps({
+                "vm":V,"json_sha256":BASE["json_sha256"],
+                "script_sha256":BASE["script_sha256"]}))
             intent=root/(V+g.transport.INTENT_SUFFIX)
             approved={"format":g.approved.INTENT_FORMAT,"vm":V,
                "host":"lab02","uuid":BASE["uuid"],"mac":BASE["mac"],
