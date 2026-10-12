@@ -81,11 +81,13 @@ def render(original,guests):
             f"\n[{name}]\nlabel = {name}\nplatform = windows\n"
             f"ip = {ip_obj}\narch = x64\ntags = win11\n"
             f"snapshot = {snap}\ninterface = virbr0\n")
-    oldline=options[0].group(0)
+    # Keep whitespace BEFORE any trailing inline comment; swallowing it
+    # breaks some CAPE config comments and violates the preservation gate.
+    trailing_ws=options[0].group(2)[len(options[0].group(2).rstrip()):]
     newvalues=",".join(old+names)
     newbody=(body[:options[0].start()]+
-             options[0].group(1)+newvalues+options[0].group(3)+
-             body[options[0].end():])
+             options[0].group(1)+newvalues+trailing_ws+
+             options[0].group(3)+body[options[0].end():])
     future=(original[:region_start]+newbody+original[region_end:]+
             "".join(extra))
     need(future.count("[cuckoo1]")==original.count("[cuckoo1]"),
