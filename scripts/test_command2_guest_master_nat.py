@@ -38,7 +38,14 @@ class WindowsMasterNAT(unittest.TestCase):
                  "guest_changes_made=$false",
                  "this_command_modified_guest=$false"):
             self.assertIn(must,self.src)
-        for prohibited in ("Remove-NetIPAddress","Remove-NetRoute",
+        # An exact cloned golden master may still hold its inherited
+        # 192.168.122.125 source IP. Removal is permitted ONLY under the
+        # separately approved, exact-MAC/UUID, SHA-pinned conversion path.
+        self.assertIn("[switch]$ApproveLegacyMasterIpTransition",self.src)
+        self.assertIn("if ($legacyPresent -and -not $ApproveLegacyMasterIpTransition)",self.src)
+        self.assertIn("Remove-NetIPAddress -InterfaceIndex $index -IPAddress ([string]$conf.exact_golden_windows_bootstrap_ip)",self.src)
+        self.assertIn("if ($unapproved.Count -gt 0 -and -not $legacyPresent)",self.src)
+        for prohibited in ("Remove-NetRoute",
                "Set-MpPreference","DisableRealtimeMonitoring",
                "New-NetFirewallRule","Stop-Service","Restart-Computer",
                "Invoke-Expression","powershell -EncodedCommand"):
