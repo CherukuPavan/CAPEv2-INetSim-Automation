@@ -15,6 +15,7 @@ and two concurrent CAPE benign analyses require separate verification.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import ipaddress
 import json
 import os
@@ -27,6 +28,8 @@ import sys
 import command2_running_snapshot_batch_gate as snapshotgate
 import command2_portable_guest_identity_iso as identity
 import command2_windows_guest_config as windows
+
+BATCH_PHASE="identity-batch"
 
 PHASES={
     "stage":("command2_portable_zero_nic_entrypoint.py","stage","plan"),
@@ -206,9 +209,80 @@ def choose(args):
                               "mac":mac,"guest_ip":ip,"subnet":subnet,
                               "master_vm_mutations_authorized":False}
 
+def identity_batch(args):
+    """Ordered batch identity-only optical preparation, not guest provisioning.
+
+    A pure plan preflights ALL guests before the first potential mutation.
+    Apply delegates to the existing individually approved ISO build and attach
+    helpers through a real interactive TTY. On first failure, STOP without
+    continuing or deleting any partial media/VM state.
+    """
+    host=canonical_host(args.approved_host)
+    need(os.geteuid()==0,"Root needed for count-driven identity journal")
+    need(args.vm is None,"Batch identity phase must not select one VM")
+    need(args.journal is not None and args.journal.is_absolute() and
+         args.journal.name=="command2-identity-reservation.json",
+         "Exact absolute existing private reservation required")
+    if args.mode=="apply":
+        need(sys.stdin.isatty(),
+             "Direct terminal required for individually approved identity operations")
+    snapshotgate.private_evidence_folder(args.journal.parent)
+    rows=snapshotgate.reservation_rows(args.journal,host)
+    need(bool(rows),"Empty ordered reservation")
+    original=hashlib.sha256(args.journal.read_bytes()).hexdigest()
+    preflight=[]
+    for row in rows:
+        vm=row["libvirt_name"]
+        _,_,config=load_guest(args.journal,host,vm)
+        dest=args.journal.parent/(vm+".command2_identity.iso")
+        inspection=identity.plan(host=host,vm=vm,journal=args.journal,
+                                 config=config,dest=dest)
+        preflight.append({"vm":vm,"uuid":row["libvirt_uuid_candidate"],
+                          "planned_iso":str(dest),
+                          "iso_ready":False,
+                          "host_preflight":inspection["result"]})
+    report={"result":"COMMAND2_BATCH_IDENTITY_PRECHECK_ONLY",
+            "host":host,"vm_count":len(rows),"journal_sha256":original,
+            "ordered_guests":preflight,"operation_mode":args.mode,
+            "all_zero_nic_and_shut_off_at_preflight":True,
+            "windows_bootstrap_task_verified":False,
+            "windows_personalization_verified":False,
+            "nics_or_network_changed":False,
+            "guest_boots_or_snapshots_created":False,
+            "command2_fully_complete":False}
+    print(json.dumps(report,sort_keys=True,indent=2),flush=True)
+    if args.mode=="plan":
+        return 0
+    for row in rows:
+        vm=row["libvirt_name"]
+        need(hashlib.sha256(args.journal.read_bytes()).hexdigest()==original,
+             "Reservation journal changed during identity batch; STOP")
+        for phase in ("identity-build","identity-attach"):
+            one=argparse.Namespace(**vars(args))
+            one.phase=phase
+            one.vm=vm
+            child,argv,details=choose(one)
+            print(json.dumps({"result":"COMMAND2_BATCH_IDENTITY_STEP",
+                  "vm":vm,"phase":phase,"requires_per_vm_typed_approval":True,
+                  "details":details},sort_keys=True),flush=True)
+            proc=subprocess.run([sys.executable,"-B",str(child),*argv],
+                                check=False)
+            if proc.returncode!=0:
+                print(json.dumps({"result":"COMMAND2_IDENTITY_BATCH_HALTED",
+                      "at_vm":vm,"at_phase":phase,"returncode":proc.returncode,
+                      "partial_outputs_preserved_for_review":True,
+                      "no_automatic_retry":True},sort_keys=True),
+                      file=sys.stderr,flush=True)
+                return 2
+    print(json.dumps({"result":"COMMAND2_BATCH_IDENTITY_MEDIA_ATTACHED_ONLY",
+          "vm_count":len(rows),"guest_booted":False,"static_ip_applied":False,
+          "running_snapshots_created":False,"command2_complete":False},
+          sort_keys=True),flush=True)
+    return 0
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=tuple(PHASES))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
@@ -233,6 +307,8 @@ def main():
     p.add_argument("--acknowledge-revert")
     args=p.parse_args()
     try:
+        if args.phase==BATCH_PHASE:
+            return identity_batch(args)
         script,argv,details=choose(args)
         # The delegated helper performs a fresh live safety revalidation
         # and requires its own typed approval before EVERY mutation.
