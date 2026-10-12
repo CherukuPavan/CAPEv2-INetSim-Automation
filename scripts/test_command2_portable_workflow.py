@@ -214,12 +214,12 @@ class Workflow(unittest.TestCase):
             def validate(**kwargs):
                 checked.append(kwargs["vm"])
                 return {"result":"COMMAND2_IDENTITY_OPTICAL_PLAN_ONLY"}
-            with patch.object(w,"canonical_host",return_value=HOST),\\
-                 patch.object(w.os,"geteuid",return_value=0),\\
-                 patch.object(w.snapshotgate,"private_evidence_folder"),\\
-                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\\
-                 patch.object(w.identity,"guarded_regular"),\\
-                 patch.object(w.identity,"plan",side_effect=validate),\\
+            with patch.object(w,"canonical_host",return_value=HOST),\
+                 patch.object(w.os,"geteuid",return_value=0),\
+                 patch.object(w.snapshotgate,"private_evidence_folder"),\
+                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\
+                 patch.object(w.identity,"guarded_regular"),\
+                 patch.object(w.identity,"plan",side_effect=validate),\
                  patch.object(w.subprocess,"run") as run:
                 code=w.identity_batch(args("identity-batch",journal=j,vm=None))
             self.assertEqual(code,0)
@@ -233,14 +233,14 @@ class Workflow(unittest.TestCase):
             def runner(argv,check=False):
                 called.append([x for x in argv if isinstance(x,str)])
                 return type("Result",(),{"returncode":3 if len(called)==2 else 0})()
-            with patch.object(w,"canonical_host",return_value=HOST),\\
-                 patch.object(w.os,"geteuid",return_value=0),\\
-                 patch.object(w.sys.stdin,"isatty",return_value=True),\\
-                 patch.object(w.snapshotgate,"private_evidence_folder"),\\
-                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\\
-                 patch.object(w.identity,"guarded_regular"),\\
+            with patch.object(w,"canonical_host",return_value=HOST),\
+                 patch.object(w.os,"geteuid",return_value=0),\
+                 patch.object(w.sys.stdin,"isatty",return_value=True),\
+                 patch.object(w.snapshotgate,"private_evidence_folder"),\
+                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\
+                 patch.object(w.identity,"guarded_regular"),\
                  patch.object(w.identity,"plan",
-                              return_value={"result":"COMMAND2_IDENTITY_OPTICAL_PLAN_ONLY"}),\\
+                              return_value={"result":"COMMAND2_IDENTITY_OPTICAL_PLAN_ONLY"}),\
                  patch.object(w.subprocess,"run",side_effect=runner):
                 code=w.identity_batch(args("identity-batch","apply",journal=j,vm=None))
             self.assertEqual(code,2)
@@ -252,14 +252,15 @@ class Workflow(unittest.TestCase):
     def test_identity_batch_not_allowed_to_select_one_vm_or_skip_preflight(self):
         with TemporaryDirectory() as td:
             j,rows=self.makefixture(td,n=2)
-            with patch.object(w,"canonical_host",return_value=HOST),\\
-                 patch.object(w.os,"geteuid",return_value=0),\\
-                 patch.object(w.snapshotgate,"private_evidence_folder"),\\
-                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\\
-                 patch.object(w.identity,"guarded_regular"),\\
+            with patch.object(w,"canonical_host",return_value=HOST),\
+                 patch.object(w.os,"geteuid",return_value=0),\
+                 patch.object(w.sys.stdin,"isatty",return_value=True),\
+                 patch.object(w.snapshotgate,"private_evidence_folder"),\
+                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\
+                 patch.object(w.identity,"guarded_regular"),\
                  patch.object(w.identity,"plan",side_effect=[
                      {"result":"COMMAND2_IDENTITY_OPTICAL_PLAN_ONLY"},
-                     w.identity.MediaBlocked("second VM not safe")]),\\
+                     w.identity.MediaBlocked("second VM not safe")]),\
                  patch.object(w.subprocess,"run") as run:
                 with self.assertRaisesRegex(w.WorkflowBlocked,"must not select"):
                     w.identity_batch(args("identity-batch",journal=j,vm="win11_1"))
