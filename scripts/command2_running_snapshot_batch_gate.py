@@ -142,7 +142,8 @@ def live_domain(name,row):
     need(not root.findall("./devices/hostdev") and
          not root.findall("./devices/filesystem"),
          "Unexpected host passthrough")
-    return {"shut_off_for_cape":True,"snapshot_capture_was_running_required":True,\n            "isolated_nic":True,
+    return {"shut_off_for_cape":True,"snapshot_capture_was_running_required":True,
+            "isolated_nic":True,
             "single_qcow2_disk":True,"swtpm2_present":True,
             "nvram_format":firmware.get("format","raw")}
 
