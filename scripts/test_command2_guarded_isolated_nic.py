@@ -12,7 +12,7 @@ UUID="c84db20f-19b6-4a32-9609-a334ca4c37ad"
 MAC="02:10:20:30:40:50"
 SUBNET="192.168.240.0/24"
 NETWORKXML=('<network><name>cape-analysis-isolated</name>'
-            '<bridge name="cape-lab0"/><dns enable="no"/>'
+            '<bridge name="cape-lab0"/><port isolated="yes"/><dns enable="no"/>'
             '<ip address="192.168.240.1" netmask="255.255.255.0"/>'
             '</network>')
 NFT='''table inet cape_analysis_cmd2_guard {
@@ -91,6 +91,16 @@ class AttachTests(unittest.TestCase):
                 "Active: no\nPersistent: yes" if a[0]=="net-info" else faux_virsh(*a)):
             with self.assertRaisesRegex(n.NicBlocked,"inactive"):
                 n.verify_network_live(SUBNET,"192.168.240.1")
+
+    def test_missing_or_disabled_linux_port_isolation_blocks_attach(self):
+        for unsafe in (
+            NETWORKXML.replace('<port isolated="yes"/>',''),
+            NETWORKXML.replace('<port isolated="yes"/>','<port isolated="no"/>')):
+            with patch.object(n,"virsh",side_effect=lambda *a:
+                 unsafe if a[0]=="net-dumpxml" else faux_virsh(*a)), \
+                 patch.object(n,"cmd",return_value=NFT):
+                with self.assertRaisesRegex(n.NicBlocked,"port isolation"):
+                    n.verify_network_live(SUBNET,"192.168.240.1")
 
     def test_guard_rules_must_include_input_ipv6_and_ipv4(self):
         for bad in (NFT.replace("meta nfproto ipv6","meta nfproto ip"),
