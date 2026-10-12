@@ -495,7 +495,7 @@ def graceful_shutdown_batch(args):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan","master-nat-attach","master-nat-media"))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan","master-nat-attach","master-nat-media","master-nat-agents"))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
@@ -533,6 +533,19 @@ def main():
             return approved_firstboot_batch(args)
         if args.phase==SHUTDOWN_BATCH_PHASE:
             return graceful_shutdown_batch(args)
+        if args.phase=="master-nat-agents":
+            need(args.mode=="plan","Master NAT Agent acceptance is read-only")
+            host=canonical_host(args.approved_host)
+            need(os.geteuid()==0,
+                 "Root required for private guest reservations/host routing")
+            absolute(args.journal,"journal")
+            child=Path(__file__).resolve().with_name(
+                "command2_portable_master_nat_agent_batch.py")
+            need(child.is_file() and not child.is_symlink(),
+                 "Required guarded all-N NAT Agent check missing")
+            return subprocess.run([sys.executable,"-B",str(child),
+                   "--approved-host",host,
+                   "--journal",str(args.journal)],check=False).returncode
         if args.phase=="master-nat-media":
             host=canonical_host(args.approved_host)
             need(os.geteuid()==0,
