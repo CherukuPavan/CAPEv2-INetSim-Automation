@@ -29,7 +29,8 @@ def args(phase,mode="plan",**overrides):
                  network_receipt=None,snapshot_receipt=None,
                  witness_dir=None,kvm_conf=None,recovery_bundle=None,
                  manifest_sha256=None,acknowledge_restore=None,
-                 firmware_restore_witness=None,xml_backup_dir=None)
+                 firmware_restore_witness=None,xml_backup_dir=None,
+                 acknowledge_revert=None)
     default.update(overrides)
     return argparse.Namespace(**default)
 
@@ -168,6 +169,22 @@ class Workflow(unittest.TestCase):
                              rows[0]["libvirt_uuid_candidate"])
             self.assertIn("--reviewed-manifest-sha",argv)
             self.assertEqual(meta["guest_ip"],"192.168.241.101")
+
+    def test_disposable_snapshot_revert_needs_risk_ack_and_exact_vm(self):
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td)
+            with self.assertRaisesRegex(w.WorkflowBlocked,"revert risk"):
+                self.choose_fixture(j,rows,"snapshot-revert-once","apply",
+                  recovery_bundle=Path("/private/cold"),
+                  manifest_sha256="a"*64)
+            script,argv,result=self.choose_fixture(j,rows,"snapshot-revert-once","apply",
+                  recovery_bundle=Path("/private/cold"),manifest_sha256="a"*64,
+                  acknowledge_revert="I-ACCEPT-DISPOSABLE-REVERT-RISK")
+            self.assertEqual(script.name,"command2_disposable_snapshot_revert_probe.py")
+            self.assertEqual(argv[argv.index("--mode")+1],"revert-once")
+            self.assertEqual(argv[argv.index("--vm")+1],"win11_1")
+            self.assertEqual(argv[argv.index("--manifest-sha256")+1],"a"*64)
+            self.assertFalse(result["master_vm_mutations_authorized"])
 
     def test_final_batch_and_registration_use_same_guest_subnet(self):
         with TemporaryDirectory() as td:
