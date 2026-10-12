@@ -32,6 +32,7 @@ STATES = (
     "STATIC_IP_VERIFIED",
     "CAPE_CONNECTION_VERIFIED",
     "COLD_CHECKPOINT_RESTORE_VERIFIED",
+    "RUNNING_CAPE_SNAPSHOT_REVERT_VERIFIED",
     "READY_FOR_APPROVED_BENIGN_ANALYSIS",
 )
 REVIEW = "STOPPED_MANUAL_REVIEW"
@@ -66,6 +67,17 @@ REQUIREMENTS = {
         "clone_disk_nvram_tpm_cold_restore_tested",
         "guest_boot_identity_after_restore_verified",
         "network_containment_still_verified_after_restore",
+    ),
+    "RUNNING_CAPE_SNAPSHOT_REVERT_VERIFIED": (
+        "cape_agent_administrator_http_verified_pre_capture",
+        "snapshot_created_when_guest_running",
+        "snapshot_internal_memory_and_disk_verified",
+        "snapshot_revert_real_guest_tested_twice",
+        "snapshot_revert_post_agent_positive",
+        "swtpm2_state_post_revert_consistency_verified",
+        "ovmf_nvram_post_revert_consistency_verified",
+        "network_ipv4_ipv6_l2_retained_after_revert",
+        "no_samples_used_in_validation",
     ),
     "READY_FOR_APPROVED_BENIGN_ANALYSIS": (
         "operator_benign_test_approval", "host_capacity_rechecked",
