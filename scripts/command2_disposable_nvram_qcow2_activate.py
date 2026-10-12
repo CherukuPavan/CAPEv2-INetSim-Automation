@@ -190,6 +190,10 @@ def apply(host,vm,uuid,bundle,manifest_sha,witness,backup_dir):
         with os.fdopen(fd_backup,"wb") as stream:
             stream.write(original_xml.encode())
             stream.flush();os.fsync(stream.fileno())
+        # Durably persist the recovery XML directory entry BEFORE changing libvirt.
+        backup_dir_fd=os.open(backup.parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+        try:os.fsync(backup_dir_fd)
+        finally:os.close(backup_dir_fd)
         with tempfile.NamedTemporaryFile(mode="wb",dir="/run",prefix="cape-disposable-nvram-",
                                          suffix=".xml",delete=False) as out:
             fname=Path(out.name)
@@ -197,18 +201,29 @@ def apply(host,vm,uuid,bundle,manifest_sha,witness,backup_dir):
             out.write(rendered);out.flush();os.fsync(out.fileno())
         try:
             # Saved DOMAIN CONFIG only. VM must stay off. No TPM/device/OS changes.
-            virsh("define",str(fname))
+            virsh("define",str(fname),"--validate")
         except ActivateBlocked as e:
             raise ActivateBlocked("Saved XML backup preserved; libvirt rejected "
                                   "transition. Inspect before any retry") from e
         finally:fname.unlink(missing_ok=True)
         updated=ET.fromstring(virsh("dumpxml","--inactive",vm))
         currentnv=updated.find("./os/nvram")
+        nics=updated.findall("./devices/interface")
+        disks=updated.findall("./devices/disk[@device='disk']")
+        tpm=updated.find("./devices/tpm/backend")
         need(currentnv is not None and currentnv.text==pre["new_nvram_path"] and
              currentnv.get("format")=="qcow2" and
              updated.findtext("uuid")==uuid and
+             len(nics)==1 and nics[0].find("source") is not None and
+             nics[0].find("source").get("network")=="cape-analysis-isolated" and
+             len(disks)==1 and disks[0].find("source") is not None and
+             disks[0].find("source").get("file","").endswith(
+                "/"+vm+".command2.qcow2") and
+             tpm is not None and tpm.get("type")=="emulator" and
+             tpm.get("version")=="2.0" and
+             not virsh("snapshot-list",vm,"--name").strip() and
              virsh("domstate",vm).lower()=="shut off",
-             "Saved XML post-transition failed or VM unexpectedly started")
+             "Saved XML post-transition changed protected NIC/disk/TPM or VM started")
         need(prep.sha256(Path(pre["old_nvram_path"]))==
              pre["original_nvram_sha256"],
              "Original RAW NVRAM changed after switching saved XML")
