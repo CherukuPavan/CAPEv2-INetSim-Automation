@@ -102,7 +102,8 @@ def guard_host(approved_host, mode):
 def proposal(*,count,approved_host,disk_dir,nvram_dir,template,subnet):
     guard_host(approved_host,"plan")
     facts=audit.collect(str(disk_dir),str(nvram_dir),str(template),count)
-    report=audit.evaluate(facts,count,str(disk_dir),str(nvram_dir),subnet)
+    chosen_subnet=audit.select_analysis_subnet(facts,subnet)
+    report=audit.evaluate(facts,count,str(disk_dir),str(nvram_dir),chosen_subnet)
     require(report["preflight_pass"],
             "Target-host read-only preflight blocks provisioning: "+
             ",".join(report["errors"]))
@@ -119,7 +120,7 @@ def proposal(*,count,approved_host,disk_dir,nvram_dir,template,subnet):
     # verified Windows ANALYSIS guest + 1 semantics. This frontend is
     # FRESH host only; an existing guest requires a separate proven
     # Windows guest readback, never inferred from the master NAT NIC.
-    sequential=sequential_ip.allocate(count,subnet)
+    sequential=sequential_ip.allocate(count,chosen_subnet)
     need=len(candidate["candidates"]) == len(sequential["new_guests"])
     require(need,"Candidate count differs from sequential IP allocation")
     for planned,assigned in zip(candidate["candidates"],sequential["new_guests"]):
@@ -128,16 +129,18 @@ def proposal(*,count,approved_host,disk_dir,nvram_dir,template,subnet):
                 "Reserved Windows IP conflicts with independently checked +1 allocation")
     # Validate all per-guest Windows config schemas while still read-only.
     for row in candidate["candidates"]:
-        guestconfig.make_guest_config(row,subnet)
+        guestconfig.make_guest_config(row,chosen_subnet)
     network_plan=netdesign.plan("cape-analysis-isolated","cape-lab0",
-                                subnet,[r["guest_static_ipv4_target"]
+                                chosen_subnet,[r["guest_static_ipv4_target"]
                                         for r in candidate["candidates"]])
-    egress_plan=nftplan.render_cape_egress_guard(subnet)
+    egress_plan=nftplan.render_cape_egress_guard(chosen_subnet)
     # The reservation payload builder is PURE; a future durable journal
     # is separately recorded before any VM definitions are written.
     cape_conf=capeplan.create_cape_kvm_conf(
-        reserve.payload(candidate, approved_host), subnet)
-    return candidate,{"actual_master_memory_mib":guest_ram_mib,
+        reserve.payload(candidate, approved_host), chosen_subnet)
+    return candidate,{"analysis_subnet":chosen_subnet,
+                      "auto_subnet_chosen_during_readonly_preflight":subnet=="auto",
+                      "actual_master_memory_mib":guest_ram_mib,
                       "available_ram_mib":facts["available_ram_mib"],
                       "required_total_gib":report["storage_required_gib"],
                       "isolated_network_design_only":network_plan,
@@ -169,6 +172,8 @@ def execute(*, count,approved_host,disk_dir,nvram_dir,template,
     candidates,resources=proposal(
         count=count,approved_host=approved_host,disk_dir=disk_dir,
         nvram_dir=nvram_dir,template=template,subnet=subnet)
+    effective_subnet=resources.get("analysis_subnet",subnet)
+    require(effective_subnet!="auto","Auto subnet was not resolved")
     report={"result":"COMMAND2_ZERO_NIC_GROUP_PLAN_ONLY",
             "requested_total":count,
             "names":[r["libvirt_name"] for r in candidates["candidates"]],
@@ -200,7 +205,7 @@ def execute(*, count,approved_host,disk_dir,nvram_dir,template,
     # channel is installed and host network containment has been accepted.
     configs=[]
     for row in candidates["candidates"]:
-        config=guestconfig.make_guest_config(row,subnet)
+        config=guestconfig.make_guest_config(row,effective_subnet)
         filename="command2-guest-config-"+row["libvirt_name"]+".json"
         stager.atomic_note(folder,filename,config)
         checksum=hashlib.sha256((json.dumps(config,sort_keys=True,
@@ -212,7 +217,7 @@ def execute(*, count,approved_host,disk_dir,nvram_dir,template,
     stage_report=stager.execute(
         mode="stage",approved_host=approved_host,journal_dir=folder,
         template=Path(template),template_sha256=template_sha256,
-        master_nvram=master_nvram,master_uuid=master_uuid,subnet=subnet)
+        master_nvram=master_nvram,master_uuid=master_uuid,subnet=effective_subnet)
     return {"result":"COMMAND2_ZERO_NIC_GROUP_STAGE_RETURNED",
             "reservation_status":recorded["status"],
             "staging":stage_report,
@@ -231,7 +236,8 @@ def main():
     ap.add_argument("--nvram-dir",type=Path,required=True)
     ap.add_argument("--template",type=Path,required=True)
     ap.add_argument("--template-sha256",required=True)
-    ap.add_argument("--subnet",default="192.168.240.0/24")
+    ap.add_argument("--subnet",default="auto",
+                    help="auto selects a nonoverlapping private /24 from host inventories")
     ap.add_argument("--journal-dir",type=Path,required=True)
     args=ap.parse_args()
     try:
