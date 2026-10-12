@@ -252,6 +252,18 @@ if ($proof.format -cne "COMMAND2_HOST_NETWORK_APPROVAL_V1" -or
 # The host-issued approval must ONLY be created after independent
 # isolation testing. The guest cannot cryptographically attest the
 # host and does not alter the VM NIC or firewall itself.
+# Support ONE securely pre-attached isolated NIC with no extra manual
+# zero-NIC boot: rename/reboot first; the same SYSTEM task runs again
+# on next startup to apply and verify the reserved static IPv4 address.
+if ([Environment]::MachineName -ine [string]$config.hostname) {
+    CallPersonalizer "Identity" $conf $digest $true
+    [pscustomobject]@{result="COMMAND2_ONE_NIC_IDENTITY_RENAME_REQUESTED"
+        guest=$config.guest_name;hostname=$config.hostname
+        expected_mac=$config.nic_mac
+        static_ipv4_applied=$false
+        host_side_egress_independently_proven_here=$false} | ConvertTo-Json -Compress
+    exit 0
+}
 CallPersonalizer "Network" $conf $digest $true
 [pscustomobject]@{result="COMMAND2_GUEST_AUTOMATIC_STATIC_IPV4_REQUESTED"
     guest=$config.guest_name;ip=$config.ipv4
