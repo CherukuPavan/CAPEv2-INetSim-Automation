@@ -1,5 +1,16 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 — LIVE WIN11_1 BLOCKPULL ACTUALLY SUCCEEDED; POST-ACCEPTANCE NEXT
+
+User uploaded `CAPE_Command2_Blockpull_Apply_20261012_064653.txt`. All facts below refer to REAL SSL55 host output.
+- Root/operator approved phrase `FLATTEN-WIN11_1-CLONE-ONLY` and `virsh blockpull win11_1 sda --wait --verbose` completed to 100%, `Pull complete`.
+- Exact result `CLONE_LIVE_BLOCKPULL_COMPLETED_XML_CHAIN_EMPTY`. Both LIVE and INACTIVE (saved) domain XML backing chains empty; protected original-master disk metadata unchanged; win11_1 remains RUNNING. No reboot, snapshot, revert, negative egress or cold checkpoint tests performed.
+- This is credible completion of in-place disk flattening; independent cold boot and running-memory+disk+swtpm+UEFI revert still UNPROVEN, and previous 192.168.240.101 static IP/CAPE agent positive test precedes blockpull.
+- Added `scripts/command2_ssl55_post_blockpull_acceptance.py` and synthetic tests, registered offline CI. The new standalone read-only acceptance checks exact saved/live XML emptiness, clone QCOW2 metadata, original-master image FD closure in the exact QEMU PID, clone disk/NVRAM open handles, master/trial untouched, one benign GET to isolated CAPE agent port 8000, and storage/free capacity. This does NOT write or alter any guest, network, host VM definitions or disks. No QMP command or internal snapshot.
+- NEXT: Run one SHA-pinned verified read-only post-blockpull acceptance on SSL55, upload TXT. If PASS, design/execute a separately approved safe recovery/checkpoint strategy and benign network negative egress tests. Do not shut down or restart pilot until cold recovery storage and TPM/UEFI plan is verified. Do not revert generic internal RAW pflash snapshots. Do not run malware.
+- Note libvirt blockpull without base is intended to flatten entire backing chain; confirmed by virsh official man page. The no-backing original header alone was not enough, so compare live QEMU FDs too.
+
+
 ## 2026-10-12 — BLOCKPULL REPORT: PASS PLAN; APPLY NOT STARTED (STDIN WRAPPER ERROR)
 
 Uploaded `CAPE_Command2_Blockpull_20261012_064231.txt`:
