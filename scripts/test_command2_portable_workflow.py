@@ -83,6 +83,18 @@ class Workflow(unittest.TestCase):
             self.assertEqual(meta["stage"],"ZERO_NIC_COUNT_DRIVEN_ONLY")
             self.assertFalse(meta["guest_approval_or_boot_performed"])
 
+    def test_network_install_uses_exact_reserved_subnet_not_user_override(self):
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td)
+            script,argv,result=self.choose_fixture(j,rows,"network-install","apply",
+                                                  subnet="10.255.255.0/24")
+            self.assertEqual(script.name,"command2_portable_network_install.py")
+            self.assertEqual(argv[argv.index("--mode")+1],"install")
+            self.assertEqual(argv[argv.index("--journal")+1],str(j))
+            self.assertEqual(result["subnet"],SUBNET)
+            self.assertNotIn("10.255.255.0/24",argv)
+            self.assertTrue(result["not_production_release"])
+
     def test_network_receipt_is_mandatory_before_host_media_change(self):
         with TemporaryDirectory() as td:
             j,rows=self.makefixture(td)
