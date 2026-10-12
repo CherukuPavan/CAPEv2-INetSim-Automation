@@ -97,14 +97,26 @@ def plan(powershell,launcher):
          "Analysis network not active")
     network=ET.fromstring(virsh("net-dumpxml",NET))
     port=network.find("port");bridge=network.find("bridge")
+    dns=network.find("dns")
+    ips=network.findall("ip")
     need(network.find("forward") is None and
          port is not None and port.get("isolated")=="yes" and
-         bridge is not None and bridge.get("name")=="cape-lab0",
-         "Network may forward or lacks isolation")
+         bridge is not None and bridge.get("name")=="cape-lab0" and
+         dns is not None and dns.get("enable")=="no" and
+         not network.findall(".//dhcp") and not network.findall(".//route") and
+         len(ips)==1 and ips[0].get("address")=="192.168.240.1" and
+         ips[0].get("netmask")=="255.255.255.0",
+         "Network may forward, serve DHCP or lacks expected isolation")
     need(command("systemctl","is-active","cape-analysis-guard.service")=="active",
          "CAPE host containment guard inactive")
-    need("cape-lab0" in command("nft","list","table","inet","cape_analysis_guard"),
-         "CAPE guard bridge scope missing")
+    sys.path.insert(0,"/usr/local/libexec/cape-command2")
+    try:
+        import command2_ssl55_existing_guard_readonly as guard
+    except ImportError as exc:
+        raise Blocked("Installed CAPE firewall verifier unavailable") from exc
+    guard.guard_policy_structure(
+        command("nft","-j","list","table","inet","cape_analysis_guard"),
+        command("nft","list","table","inet","cape_analysis_guard"))
     need(DIR.is_dir() and not DIR.is_symlink() and
          not NEW.exists() and not NEW.is_symlink() and
          OLD.is_file() and not OLD.is_symlink(),
