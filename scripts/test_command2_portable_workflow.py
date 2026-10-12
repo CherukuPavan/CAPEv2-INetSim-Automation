@@ -28,7 +28,8 @@ def args(phase,mode="plan",**overrides):
                  template=None,template_sha256=None,subnet="auto",
                  network_receipt=None,snapshot_receipt=None,
                  witness_dir=None,kvm_conf=None,recovery_bundle=None,
-                 manifest_sha256=None,acknowledge_restore=None)
+                 manifest_sha256=None,acknowledge_restore=None,
+                 firmware_restore_witness=None,xml_backup_dir=None)
     default.update(overrides)
     return argparse.Namespace(**default)
 
