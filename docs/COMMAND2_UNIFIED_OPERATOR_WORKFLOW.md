@@ -25,6 +25,7 @@ revalidate libvirt, UUIDs, paths, networking and storage.
 | `identity-batch` | NEW: one count-driven, all-guest zero-NIC identity ISO preflight, followed in apply mode by ordered per-VM identity ISO build + attach using existing safeguards | All VMs must be SHUT OFF and zero-NIC; each actual step keeps independent typed approval; **does not** install Windows task, boot Windows, set IP, attach NIC, snapshot, or complete Command 2. If any step fails, retain artifacts and stop without blind retry. |
 | `identity-build` | One SHA-verified, UUID-bound per-guest read-only optical configuration ISO | Windows SYSTEM startup bootstrap must be installed beforehand. |
 | `identity-attach` | Inserts the ISO into exactly one previously empty CD-ROM on a shut-off zero-NIC clone | Operator separately boots guest to perform hostname personalization and verifies identity; no automatic guest start. |
+| `identity-boot-batch` | NEW: one count-driven **all-VM** preflight of already attached zero-NIC identity media, then orderly guarded per-VM paused boots with separate typed approval | Stops on first error and preserves any running/paused guest; does NOT verify Windows rename, shut down guests, attach NICs, assign IPs or create snapshots. Requires adequate RAM for each actual boot. |
 | `identity-boot` | NEW: explicit separate-host **one-VM** zero-NIC first Windows boot, starting PAUSED, checking live clone disk/UEFI/TPM/CD-ROM and no NIC/passthrough, then resuming | Requires the source golden Windows SYSTEM startup task already installed and reviewed. May trigger Windows hostname rename/reboot but cannot independently attest it. The guest must be safely shut off and its changed identity verified before later NIC phases. Never starts SSL-55's clone. |
 | `nic-attach` | Adds exactly one isolated network NIC in saved XML, after root-private network acceptance receipt | The real packet-isolation/reboot evidence is operator-witnessed; the receipt cannot be invented by the software. |
 | `network-approve` | A second ISO containing host-approved NIC/network JSON+hash replaces the first media in saved guest XML | Separate Windows boot needed to apply unique static IPv4 and prove agent/network, no gateway. |
@@ -107,6 +108,30 @@ source Windows master must have been prepared beforehand.
 
 **Do not run apply on SSL-55.** This code is offline CI tested only. No
 separate-host physical deployment or end-to-end Windows integration is certified.
+
+## Count-driven first zero-NIC boot bridge
+
+The new `--phase identity-boot-batch` accepts the SAME private N-clone
+reservation already used by `identity-batch`. It checks that **every**
+Windows VM is an independent, shut-off zero-NIC guest with its exact
+previously attached identity media BEFORE it attempts to start any.
+`--mode plan` is read-only. On `--mode apply` each VM starts through
+the individually protected paused-boot helper, requiring its own typed
+approval, and the parent stops immediately on failure (without force
+shutdown or retry). The guest's static IPv4 is **not** yet set.
+
+```bash
+# Other prepared/approved host ONLY: read-only preflight of N ready clones
+sudo python3 -B scripts/command2_portable_workflow.py \
+  --phase identity-boot-batch --mode plan \
+  --approved-host OTHERHOST \
+  --journal /absolute/private/command2-identity-reservation.json
+```
+
+Do not run `apply` on SSL-55. This is NOT unattended two-command
+completion: Windows guest identity must be independently verified, each
+guest later safely shut off and pass network isolation before NIC
+attachment. No real physical N-clone Windows boots are yet accepted.
 
 ## Guarded first zero-NIC identity boot
 
