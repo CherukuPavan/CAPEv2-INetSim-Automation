@@ -82,7 +82,7 @@ def render_config(original: str, clones: list[dict], *,
     for i in range(1,len(sections),2):
         rebuilt+="["+sections[i]+"]"+sections[i+1]
     for entry in clones:
-        rebuilt+=new_entry(entry["name"],entry["ip"],snapshot,interface)
+        # Per-VM snapshots are mandatory for Command 2; do not reuse one\n        # global snapshot for all clones when individual names are provided.\n        snap=entry.get("snapshot",snapshot)\n        rebuilt+=new_entry(entry["name"],entry["ip"],snap,interface)
     return rebuilt
 
 
