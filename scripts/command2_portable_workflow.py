@@ -37,6 +37,7 @@ PHASES={
     "guard-persistence":("command2_portable_guard_persistence.py","install","plan"),
     "identity-build":("command2_portable_guest_identity_iso.py","build","plan"),
     "identity-attach":("command2_portable_guest_identity_attach.py","attach","plan"),
+    "identity-boot":("command2_portable_identity_boot.py","boot","plan"),
     "nic-attach":("command2_guarded_isolated_nic.py","attach","plan"),
     "network-approve":("command2_portable_network_approval_iso.py","apply","plan"),
     "cold-capture":("command2_portable_cold_bundle.py","capture","plan"),
@@ -167,6 +168,8 @@ def choose(args):
         argv+=["--journal",str(args.journal)]
         if phase=="network-approve":
             argv+=["--receipt",absolute(args.network_receipt,"network_receipt")]
+    elif phase=="identity-boot":
+        argv+=["--journal",str(args.journal)]
     elif phase=="nic-attach":
         argv+=["--uuid",uuid,"--mac",mac,"--subnet",subnet]
         if args.mode=="apply":
