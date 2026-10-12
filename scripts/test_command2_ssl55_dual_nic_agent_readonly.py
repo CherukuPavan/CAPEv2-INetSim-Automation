@@ -18,7 +18,9 @@ XML=(
 SNAP=('<domainsnapshot><name>'+g.SNAP+'</name><state>running</state>'
       '<memory snapshot="internal"/>'
       '<disks><disk name="sda" snapshot="internal"/>'
-      '<disk name="sdb" snapshot="no"/></disks></domainsnapshot>')
+      '<disk name="sdb" snapshot="no"/></disks>'
+      '<domain type="kvm"><name>'+VM+'</name><uuid>'+UUID+
+      '</uuid></domain></domainsnapshot>')
 ISO=('<network><name>cape-analysis-isolated</name><bridge name="cape-lab0"/>'
      '<port isolated="yes"/><dns enable="no"/></network>')
 NAT=('<network><name>default</name><bridge name="virbr0"/>'
@@ -85,6 +87,51 @@ class DualAgent(unittest.TestCase):
         self.assertFalse(result["old_adapter_detached"])
         self.assertFalse(result["cape_ip_registration_changed"])
         self.assertFalse(result["malware_analysis_allowed"])
+
+    def test_second_snapshot_only_accepted_if_old_and_new_on_both_qcow_images(self):
+        import json
+        from unittest.mock import patch
+        from pathlib import Path
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            disk=Path(td)/"disk.qcow2"
+            uefi=Path(td)/"vars.qcow2"
+            disk.write_bytes(b"synthetic")
+            uefi.write_bytes(b"synthetic")
+            def vm(*a):
+                if a==("snapshot-list",VM,"--name"):
+                    return g.SNAP+"\n"+g.POSTNAT
+                if a==("snapshot-dumpxml",VM,g.POSTNAT):
+                    return SNAP.replace(g.SNAP,g.POSTNAT)
+                return fake_virsh(*a)
+            def info(*a,**kw):
+                if a[0]=="qemu-img":
+                    return json.dumps({"format":"qcow2","snapshots":[
+                        {"name":g.SNAP},{"name":g.POSTNAT}]})
+                return route(*a,**kw)
+            with patch.object(g.os,"geteuid",return_value=0),\
+                 patch.object(g.socket,"gethostname",return_value="CSE-SSL-55"),\
+                 patch.object(g,"POSTNAT_IMAGES",(str(disk),str(uefi))),\
+                 patch.object(g,"virsh",side_effect=vm),\
+                 patch.object(g,"cmd",side_effect=info),\
+                 patch.object(g,"probe",return_value={
+                     "reachable_and_identified":True,
+                     "outcome":"cape_agent_verified","agent_version":"0.23"}):
+                out=g.assess()
+            self.assertTrue(out["postnat_running_snapshot_verified"])
+            self.assertEqual(len(out["expected_running_snapshot_names"]),2)
+            def failinfo(*a,**kw):
+                if a[0]=="qemu-img":
+                    return json.dumps({"format":"qcow2","snapshots":[
+                        {"name":g.SNAP}]})
+                return route(*a,**kw)
+            with patch.object(g.os,"geteuid",return_value=0),\
+                 patch.object(g.socket,"gethostname",return_value="CSE-SSL-55"),\
+                 patch.object(g,"POSTNAT_IMAGES",(str(disk),str(uefi))),\
+                 patch.object(g,"virsh",side_effect=vm),\
+                 patch.object(g,"cmd",side_effect=failinfo),\
+                 self.assertRaisesRegex(g.ReaddressBlocked,"checkpoint"):
+                g.assess()
 
     def test_unknown_lease_is_not_interpreted_as_no_internet(self):
         with patch.object(g,"virsh",return_value=""):
