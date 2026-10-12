@@ -1,5 +1,17 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 09:28+ — REAL SSL55 HOST L2 CONFIGURATION AUDIT PASS, PORTABILITY CODE ADVANCED
+
+Uploaded `CAPE_Command2_HostBridgeL2_Fixed_20261012_092812.txt` ACTUAL host report returned `SSL55_RUNTIME_ISOLATED_BRIDGE_POLICY_OBSERVED`: win11_1 running, only `vnet1` attached to `cape-lab0`, Linux kernel per-port bridge isolation flag = 1, no other bridge TAP, expected libvirt no-forward/no-DHCP port isolation XML, CAPE guard nft chain shape accepted and service active; IPv6 bridge inventory empty + kernel bridge exists. 64.77 GiB free. `guest_firewall_packet_path_negative_tested=false` and `real_guest_to_guest_l2_negative_probe=false`; `safe_for_malware_execution=false`. This is **valid full read-only host policy-shape acceptance**, not a packet test. DO NOT repeat already passed blockpull, cold-copy, independent boot, CAPE Agent, benign Windows V2 negative egress or L2 bridge check.
+
+The user explicitly requests fully completed portable count-driven Command 2 as quickly as possible. On GitHub `development` implemented:
+- `scripts/command2_portable_guest_identity_iso.py`: guarded **OTHER HOST ONLY**, `--mode plan/build`, verifies exact root-private reserved ordered identity journal, generated per-guest config JSON matching `command2_windows_guest_config.make_guest_config`, guest UUID/name, shut-off **zero NIC**, root-owned output and storage reserve, creates new exclusively named `CAPE_CMD2` ISO containing `guest-config.json` and SHA256 file expected by Windows `command2_guest_startup_autoconfig.ps1`. It creates files only; does not attach media, boot, network-approve, or confirm Windows startup-task installation. Tests added and CI passing. Build is currently per-guest operator approval; no batch/auto optical attachment yet.
+- `scripts/command2_isolated_network_xml_plan.py`: generated no-NAT/no-DHCP network includes `<port isolated="yes"/>` for intended L2 TAP separation. `scripts/command2_guarded_isolated_nic.py` now **refuses** actual network lacking enabled port isolation before adding a guest NIC. Synthetic tests adjusted. CI run 38231517392 PASS.
+- Additional formal overview `docs/COMMAND2_20261012_IMPLEMENTATION_AND_RELEASE_GATES.md` documents completed real pilot versus required tests. The original master and trial remain **protected**. No new SSL55 cloning or additional VM/disk snapshots authorized: free 64.77 GiB and 40GiB host reserve, additional full ~30GiB clone would breach reserve.
+- Full Command2 remains INCOMPLETE: trusted SYSTEM startup bootstrap in golden Windows not physically demonstrated, bulk identity media attach+delivery, second approved capable host for 2 concurrently running unique-ID guests, complete host/external/L2 negative packet tests and persistence on that host, live CAPE/INetSim machinery registration and benign parallel analyses, safe disk+UEFI+swtpm **restore** test, and coherent running snapshot revert (RAW OVMF pflash and swtpm unsupported/unproven). Do NOT mark Command 3 ready or run malware.
+- Research: libvirt 2024 pflash snapshot support requires QCOW2 NVRAM, and libvirt historic snapshot handling does not atomically restore swtpm; QEMU swtpm migration protocol support alone is not a working CAPE cycle. No unsupported workarounds.
+
+
 ## 2026-10-12 09:24 — HOST BRIDGE AUDIT BLOCKED ONLY ON EMPTY IPV6 INVENTORY (READ-ONLY)
 
 Actual uploaded `CAPE_Command2_HostBridgeL2_20261012_092420.txt`:
