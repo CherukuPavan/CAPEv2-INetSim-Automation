@@ -194,6 +194,67 @@ operator TTY and a separate per-guest approval and **is not** a completed
 unattended production Command 2. Do NOT synthesize receipt booleans.
 No real other-host guest or SSL-55 VM has been booted by this change.
 
+## Real Internet requested in win11_1: trusted setup versus malware-analysis network
+
+On 2026-10-12 the SSL-55 operator explicitly requested working REAL Internet
+in `win11_1` before taking a FINAL running snapshot. No browser or Windows
+DNS failure should be diagnosed merely from the guest reporting offline:
+the **actual host configuration intentionally forbids public egress**.
+`cape-analysis-isolated` / `cape-lab0` has NO libvirt `<forward>`,
+NO DHCP or DNS, and `inet cape_analysis_guard` drops forwarded
+traffic. Windows setup JSON also has `default_gateway=None`. The
+host may itself have working Internet, but this guest cannot route to it.
+Libvirt's [official network XML](https://libvirt.org/formatnetwork.html)
+confirms an omitted `<forward>` is an isolated VM network. A guest
+default NAT NIC would provide outbound connectivity, but would also
+create an unrestricted route unsafe for live malware analysis.
+
+**No LIVE Internet change is currently authorized, installed or tested
+on SSL-55.** Existing running `cape_candidate_win11_1`, which still
+contains only offline guest connectivity, must be preserved pending
+a verified independent TPM restore plan.
+
+The new `command2_connectivity_phase_contract.py` models the required
+two networking profiles for future Command2 automation:
+
+- **`trusted_setup`**: benign Windows provisioning ONLY, no CAPE samples
+  running, requires explicit approval and a separate TEMPORARY NAT+DHCP
+  provisioning NIC. Must verify DNS/HTTPS from Windows; neither the
+  isolated analysis bridge nor its persistent nft guard is weakened.
+  This is NOT a snapshot-eligible state.
+- **`analysis_isolated`**: the temporary NAT NIC must be DETACHED,
+  no public Windows gateway, independently witnessed guest IPv4+IPv6
+  external-egress negatives; the CAPE/INetSim host paths remain usable.
+- **`final_snapshot`**: adds CAPE Agent and INetSim positive proof to
+  isolation; only then may running disk+RAM+OVMF snapshot be considered
+  for later independently proven TPM-consistent restoration.
+
+The **actual** portable `command2_running_cape_snapshot_gate.py` now
+requires a fresh `virsh net-dumpxml` of `cape-analysis-isolated` to
+prove no `<forward>`, DNS, DHCP, routes or unisolated bridge ports,
+rather than trusting the network NAME alone. Its independent preexisting
+signed host/guest acceptance receipt must still prove IPv4+IPv6 negatives.
+Consequently a forgotten online/NAT mode cannot silently pass the FINAL
+snapshot preflight. This guard is covered by offline regression tests.
+
+`command2_ssl55_connectivity_readonly.py` is an EXACT-UUID root-only
+host AUDIT, not a fix that pretends Internet already works. It
+confirms the existing snapshot, live/saved single NIC, protected
+master/trial OFF, isolated libvirt XML, nft CAPE table, host route,
+and inventories an existing `default` NAT network as a potential
+**unapproved** benign setup bridge. It does NOT hotplug NIC, restart
+the VM, change Windows routing, NAT, nft, DHCP, DNS, libvirt XML, or
+capture/revert a snapshot. If the approved host lacks a usable NAT
+bridge, create-only provisioning network setup needs separate review
+and capacity/route checks before any actual host change.
+
+**Snapshot capture/revert state:** The user-uploaded
+`CAPE_SSL55_TPM_Sync_Audit_20261012_173741.txt` confirms live swtpm
+persistent file modification time **AFTER** the existing running
+`cape_candidate_win11_1` snapshot, NO capture-epoch synchronized
+swtpm checkpoint, and no two benign verified restores. That candidate
+must NOT be presented as a final CAPE snapshot even if GUI displays it.
+
 ## SSL55 UI visible; PORTABLE all-N QCOW2 image-level release validation
 
 The operator confirmed that the saved `cape_candidate_win11_1` appears
