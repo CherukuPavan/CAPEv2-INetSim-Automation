@@ -113,6 +113,14 @@ def inspect(host,journal):
     need([r["libvirt_name"] for r in rows]==required,
          "Journal VM rows are not exact count-driven win11_N identities")
     master=check_master()
+    # Existing trial is protected when present; unlike the SSL55-only
+    # reference, a fresh host may not have a trial domain at all.
+    names=[n.strip() for n in
+           virsh("list","--all","--name").splitlines() if n.strip()]
+    need(len(names)==len(set(names)),"Duplicate libvirt domain names")
+    if "win11_trial_1" in names:
+        need(virsh("domstate","win11_trial_1").lower()=="shut off",
+             "Trial domain must remain powered off")
     net=check_active_nat()
     proof=assemble_reference(host,len(rows),net)
     candidates=[{"libvirt_name":x["libvirt_name"],
