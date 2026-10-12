@@ -51,7 +51,7 @@ def completed_running_clones(host,rows,requested,net,evidence,*,
         others.remove(requested)
     else:
         need(requested not in others,
-             "New clone unexpectedly running during firstboot admission")
+             "Unreviewed or not-yet-personalized selected clone already running during firstboot admission")
     if not others:return []
     need(evidence is not None,"Completed prior Windows witness folder required")
     folder=transport.verified_evidence_folder(evidence)
