@@ -38,7 +38,8 @@ def script_command(sha):
         "-File C:/CAPE_NAT2/command2_guest_master_nat.ps1 "
         "-ConfigFile C:/CAPE_NAT2/nat-config.json "
         "-ExpectedSha256 "+sha+
-        " -Mode Apply -ApproveBenignNat -ApproveRename")
+        " -Mode Apply -ApproveBenignNat -ApproveRename "
+        "-ApproveLegacyMasterIpTransition")
 
 def trusted_stage_json(stage):
     """Admit exact private receipt file, including real ownership."""
