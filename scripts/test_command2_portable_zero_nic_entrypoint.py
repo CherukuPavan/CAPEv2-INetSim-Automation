@@ -86,6 +86,7 @@ class ControllerTests(unittest.TestCase):
                  patch.object(c.os,"geteuid",return_value=0), \
                  patch.object(c.sys.stdin,"isatty",return_value=True), \
                  patch("builtins.input",return_value="APPROVE_COMMAND2_ZERO_NIC_APPROVED"), \
+                 patch.object(c,"revalidate_before_reservation",return_value={"stage_resource_rechecked":True}), \
                  patch.object(c,"staging_dir",return_value=state), \
                  patch.object(c.reserve,"reserve",return_value={
                      "guest_count":2,"guest_vm_created":False,
@@ -130,6 +131,64 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(len(ids),1)
         self.assertIn("52:54:00:00:00:01",macs)
         self.assertIn("00:16:3e:ab:cd:ef",macs)
+
+
+class StagingDriftTests(unittest.TestCase):
+    def test_new_route_collision_before_reservation_is_blocked(self):
+        facts={"available_ram_mib":60000}
+        report={"preflight_pass":False,
+                "errors":["ANALYSIS_SUBNET_OVERLAPS_ROUTES"],
+                "detected_outbound_interface":"eno1"}
+        with patch.object(c,"guard_host"), \
+             patch.object(c.audit,"collect",return_value=facts), \
+             patch.object(c.audit,"evaluate",return_value=report), \
+             patch.object(c,"read_inventory",side_effect=AssertionError(
+                 "Never reserve identities after failed recheck")):
+            with self.assertRaisesRegex(c.Command2Blocked,"Pre-stage"):
+                c.revalidate_before_reservation(
+                    count=2,approved_host="approved",
+                    disk_dir=Path("/images"),nvram_dir=Path("/nvram"),
+                    template=Path("/base.qcow2"),
+                    effective_subnet="192.168.241.0/24",
+                    resources={"detected_outbound_interface":"eno1",
+                               "actual_master_memory_mib":4096},
+                    candidates=sample_blueprint())
+
+    def test_outbound_interface_changed_refused(self):
+        facts={"available_ram_mib":60000}
+        report={"preflight_pass":True,"errors":[],
+                "detected_outbound_interface":"enp7s0"}
+        with patch.object(c,"guard_host"), \
+             patch.object(c.audit,"collect",return_value=facts), \
+             patch.object(c.audit,"evaluate",return_value=report):
+            with self.assertRaisesRegex(c.Command2Blocked,"Outbound interface"):
+                c.revalidate_before_reservation(
+                    count=2,approved_host="approved",
+                    disk_dir=Path("/images"),nvram_dir=Path("/nvram"),
+                    template=Path("/base.qcow2"),
+                    effective_subnet="192.168.241.0/24",
+                    resources={"detected_outbound_interface":"eno1",
+                               "actual_master_memory_mib":4096},
+                    candidates=sample_blueprint())
+
+    def test_valid_recheck_never_writes(self):
+        facts={"available_ram_mib":60000}
+        report={"preflight_pass":True,"errors":[],
+                "detected_outbound_interface":"enp1s0"}
+        with patch.object(c,"guard_host"), \
+             patch.object(c.audit,"collect",return_value=facts), \
+             patch.object(c.audit,"evaluate",return_value=report), \
+             patch.object(c,"read_inventory",return_value=([],[])), \
+             patch.object(c,"staging_dir",side_effect=AssertionError("Writes forbidden")):
+            output=c.revalidate_before_reservation(
+                count=2,approved_host="approved",
+                disk_dir=Path("/images"),nvram_dir=Path("/nvram"),
+                template=Path("/base.qcow2"),
+                effective_subnet="192.168.241.0/24",
+                resources={"detected_outbound_interface":"enp1s0",
+                           "actual_master_memory_mib":4096},
+                candidates=sample_blueprint())
+        self.assertTrue(output["stage_resource_rechecked"])
 
 
 if __name__=="__main__":
