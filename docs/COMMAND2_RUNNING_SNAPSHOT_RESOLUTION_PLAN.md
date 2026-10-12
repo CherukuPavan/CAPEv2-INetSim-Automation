@@ -102,3 +102,64 @@ Research alternate if native libvirt snapshots cannot revert TPM+UEFI:
 - Libvirt swtpm snapshot RFE status: https://bugzilla.redhat.com/show_bug.cgi?id=1855367
 - QEMU swtpm migration support: https://www.qemu.org/docs/master/specs/tpm
 - libvirt save/restore disk warning: https://www.libvirt.org/manpages/virsh.html
+
+## 2026-10-12 implementation update — experimental native snapshot guard
+
+Additional development code, **not executed on SSL-55 or the second host**:
+
+1. `scripts/command2_snapshot_recovery_preflight.py`: hashes the
+   ALREADY-CAPTURED independent full cold bundle including the separate
+   `disk.qcow2`, `UEFI_VARS.fd`, and each swtpm private file, while the
+   disposable guest is running. Requires root-owned private paths, exact
+   guest UUID, stopped-at-capture manifest, and separately reviewed manifest
+   SHA-256. It never touches live guest state. Its PASS is proof of backup
+   byte integrity only; not proof recovery boot works.
+2. `scripts/command2_native_snapshot_stack_guard.py`: rejects experimental
+   native internal snapshot capture on the disposable other host unless
+   the *running libvirt daemon* is >=10.10.0 (10.9 UEFI reversion bugs),
+   the QEMU hypervisor is >=9.0, libvirt XML reports QCOW2 pflash NVRAM,
+   `qemu-img info` confirms the NVRAM file is an independent QCOW2,
+   swtpm2 exists, exactly one independent clone disk is present,
+   and 40GiB shared reserve + >=2x guest RAM +2GiB margin remains.
+   This is conservative; it does not promise that TPM snapshots work.
+3. The existing OTHER-HOST-ONLY, operator-approved capture helper
+   `scripts/command2_running_cape_snapshot_gate.py` now demands BOTH
+   protections before even attempting a running snapshot; it recomputes
+   the recovery hashes and rechecks stack admission after typed approval.
+   Then it verifies the libvirt snapshot XML has `state=running`,
+   precisely one internal disk and internal guest-memory state. A successful
+   creation is **still an experiment, not CAPE-ready**; actual benign
+   snapshot revert and repeated TPM+UEFI recovery remain blocking.
+   Legacy capture callers without the required recovery-bundle and
+   reviewed-manifest-SHA arguments now refuse.
+4. `scripts/command2_windows_benign_snapshot_witness.ps1` provides read-only
+   `-Mode Baseline` and `-Mode Verify`, plus separately typed-approved
+   `-Mode Mark` that writes ONE harmless file to Public Documents.
+   It records TPM, Secure Boot, BitLocker, Windows identity, host-only
+   CAPE Agent response and IPv4/IPv6 routes. After a revert, marker absence
+   plus matching off-guest baseline is disk state evidence, **NOT** itself
+   proof of swtpm persistent state restoration. Preserve baseline off
+   guest BEFORE taking the snapshot; snapshot/revert rewinds Windows disk
+   reports and marker.
+5. The full CI test set includes synthetic altered/stolen cold bundle tests,
+   RAW-vs-QCOW2 NVRAM, libvirt/QEMU version checks, no-network-mutation
+   safeguards, and Windows PowerShell syntax. CI run 38239479336 SUCCESS.
+
+### Operator decision for canonical SSL-55 win11_1
+
+The independent `win11_1` has working Windows + CAPE Agent + isolated
+network and a full, SHA-verified cold bundle, but **no running snapshot**.
+It currently uses RAW OVMF variables + swtpm2. Therefore no supported
+generic snapshot command has been approved on SSL-55, and the new
+OTHER-HOST experimental capture script forbids this machine outright.
+The first next host action is a pinned, READ-ONLY compatibility audit
+`command2_ssl55_running_snapshot_readonly.py` plus `virsh version --daemon`
+into ONE TXT report. Do not call this result a snapshot creation.
+
+For a true running snapshot with a Windows 11 TPM, validate on the
+separately approved disposable second host first. A native
+QCOW2-pflash/libvirt snapshot that passes one libvirt command but FAILS
+repeated TPM/UEFI/BitLocker/Agent/isolated egress revert tests must NOT
+be registered in CAPE. If it fails, design custom CAPE machinery for
+same-epoch QEMU running save plus disk/OVMF/swtpm restore, rather than
+misrepresenting a disk-only checkpoint as a running snapshot.
