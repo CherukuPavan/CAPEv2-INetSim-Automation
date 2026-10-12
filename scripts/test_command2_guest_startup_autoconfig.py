@@ -41,6 +41,33 @@ class WindowsStartupBootstrapTests(unittest.TestCase):
                   "Get-Volume","expected_machine_uuid"):
             self.assertIn(s,self.text)
 
+    def test_install_and_verify_are_source_hash_pinned(self):
+        for snippet in (
+                '[ValidateSet("Install","Verify","Run")]',
+                "ExpectedRunnerSha256", "ExpectedPersonalizerSha256",
+                "AssertPinnedSha $PSCommandPath",
+                "AssertPinnedSha $sourcePersonalizer",
+                "AssertPinnedSha $LocalRunner",
+                "AssertPinnedSha $LocalPersonalize",
+                "COMMAND1_WINDOWS_BOOTSTRAP_READONLY_VERIFIED",
+                "ExactBootTask",
+                "source_master_clone_ready_by_this_check_alone=$false"):
+            self.assertIn(snippet,self.text)
+
+    def test_verified_task_must_be_system_startup_and_exact_action(self):
+        for s in ("ServiceAccount","MSFT_TaskBootTrigger",
+                  "Settings.Enabled","NT AUTHORITY\\\\SYSTEM",
+                  "expectedArgs","$triggers.Count -ne 1",
+                  "$actions.Count -ne 1",
+                  "boot_trigger_verified=$true",
+                  "system_principal_verified=$true"):
+            self.assertIn(s,self.text)
+        # Verify is before the install/run path, so a verification-only
+        # invocation cannot accidentally proceed to optical guest changes.
+        self.assertLess(self.text.index('if ($Mode -eq "Verify")'),
+                        self.text.index('if ($Mode -eq "Install")'))
+        self.assertIn("no_changes_made=$true",self.text)
+
     def test_no_guest_network_weakening_or_host_commands(self):
         for s in ("Disable-NetAdapterBinding","Set-NetFirewallProfile",
                   "New-NetRoute","virsh ","nft ","Disable-WindowsOptionalFeature",
