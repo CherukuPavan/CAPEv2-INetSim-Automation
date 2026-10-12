@@ -33,7 +33,7 @@ def snapxml(vm, state="running", memory="internal", disk="internal"):
 def fake_virsh(rows, with_snap=True, memory="internal"):
     indexed={r["libvirt_name"]:r for r in rows}
     def invoke(*cmd):
-        name=cmd[1]
+        name=cmd[2] if cmd[0]=="dumpxml" and cmd[1]=="--inactive" else cmd[1]
         r=indexed[name]
         if cmd[0]=="domuuid":return r["libvirt_uuid_candidate"]
         if cmd[0]=="domstate":return "shut off"
