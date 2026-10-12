@@ -25,6 +25,7 @@ revalidate libvirt, UUIDs, paths, networking and storage.
 | `identity-batch` | NEW: one count-driven, all-guest zero-NIC identity ISO preflight, followed in apply mode by ordered per-VM identity ISO build + attach using existing safeguards | All VMs must be SHUT OFF and zero-NIC; each actual step keeps independent typed approval; **does not** install Windows task, boot Windows, set IP, attach NIC, snapshot, or complete Command 2. If any step fails, retain artifacts and stop without blind retry. |
 | `identity-build` | One SHA-verified, UUID-bound per-guest read-only optical configuration ISO | Windows SYSTEM startup bootstrap must be installed beforehand. |
 | `identity-attach` | Inserts the ISO into exactly one previously empty CD-ROM on a shut-off zero-NIC clone | Operator separately boots guest to perform hostname personalization and verifies identity; no automatic guest start. |
+| `identity-boot` | NEW: explicit separate-host **one-VM** zero-NIC first Windows boot, starting PAUSED, checking live clone disk/UEFI/TPM/CD-ROM and no NIC/passthrough, then resuming | Requires the source golden Windows SYSTEM startup task already installed and reviewed. May trigger Windows hostname rename/reboot but cannot independently attest it. The guest must be safely shut off and its changed identity verified before later NIC phases. Never starts SSL-55's clone. |
 | `nic-attach` | Adds exactly one isolated network NIC in saved XML, after root-private network acceptance receipt | The real packet-isolation/reboot evidence is operator-witnessed; the receipt cannot be invented by the software. |
 | `network-approve` | A second ISO containing host-approved NIC/network JSON+hash replaces the first media in saved guest XML | Separate Windows boot needed to apply unique static IPv4 and prove agent/network, no gateway. |
 | `cold-capture`, `cold-verify` | Full disk + OVMF + swtpm backup while guest shut off, SHA-256 checks | Snapshot-only copy is insufficient; real cold restore needs a separate gate. |
@@ -106,6 +107,34 @@ source Windows master must have been prepared beforehand.
 
 **Do not run apply on SSL-55.** This code is offline CI tested only. No
 separate-host physical deployment or end-to-end Windows integration is certified.
+
+## Guarded first zero-NIC identity boot
+
+After the successful `identity-batch --mode apply` and separate approval
+that the Windows template already contains the exact pinned SYSTEM startup
+task, the saved-off clone's identity ISO may be used to initialize its
+Windows hostname. The development helper checks the exact journal UUID,
+independent disk/OVMF, SHA-matched mounted ISO, zero external NICs, protected
+`win11` source shut-off, free RAM and no existing snapshots before touching
+the VM. It uses `virsh start --paused`, reads the live domain device graph,
+and only then resumes the clone. If the paused device check fails, it
+**leaves the VM paused** for operator review; no forced shutdown/retry.
+
+```bash
+# Plan only, on a separate already prepared Ubuntu/KVM host:
+sudo python3 -B scripts/command2_portable_workflow.py \
+  --phase identity-boot --mode plan \
+  --approved-host OTHERHOST --vm win11_1 \
+  --journal /absolute/private/command2-identity-reservation.json
+```
+
+The corresponding `--mode apply` would require a separate exact typed
+approval, not a silent bulk start. **No such real guest boot has been
+performed** by this code or the CI tests. Host observation alone cannot
+prove the Windows startup task ran, that the identity is correct or that
+Windows safely completed its restart; those remain mandatory acceptance
+steps before any guest NIC attachment, host isolation approval, IP change,
+CAPE memory snapshot or N-machine registration.
 
 ## Per-guest example once a signed reservation is present
 
