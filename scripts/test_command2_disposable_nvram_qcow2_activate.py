@@ -134,7 +134,7 @@ class ConversionActivation(unittest.TestCase):
                           '"destroy"', '"start"', '"shutdown"', '"net-start"',
                           '"attach-interface"', 'os.replace('):
             self.assertNotIn(forbidden,content)
-        self.assertIn('virsh("define",str(fname))',content)
+        self.assertIn('virsh("define",str(fname),"--validate")',content)
         self.assertIn("raw-nvram-before-transition.xml",content)
         self.assertIn("ACTIVATE-QCOW2-OVMF-ON-DISPOSABLE",content)
 
