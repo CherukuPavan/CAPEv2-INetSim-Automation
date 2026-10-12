@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -101,25 +102,27 @@ def checked_plan(host,journal,vm,receipt):
     row,subnet,config=workflow.load_guest(journal,host,vm)
     need(type(receipt) is Path and receipt.is_absolute(),
          "Exact absolute network acceptance receipt required")
-    acceptance=json.loads(receipt.read_text(encoding="utf-8"))
-    need(acceptance.get("kind")=="COMMAND2_SEPARATE_HOST_NETWORK_ACCEPTANCE_V2",
-         "First one-NIC Windows boot requires V2 master bootstrap acceptance")
+    # Validate the privileged receipt metadata/size before reading its bytes.
     need(nic.read_acceptance_receipt(str(receipt),vm,row["libvirt_uuid_candidate"],
                                     row["mac_candidate"],
                                     row["guest_static_ipv4_target"],host),
          "Physical host isolation/Command1 master bootstrap unaccepted")
+    acceptance=json.loads(receipt.read_text(encoding="utf-8"))
+    need(acceptance.get("kind")=="COMMAND2_SEPARATE_HOST_NETWORK_ACCEPTANCE_V2",
+         "First one-NIC Windows boot requires V2 master bootstrap acceptance")
     need(virsh("domuuid",vm).lower()==row["libvirt_uuid_candidate"] and
          virsh("domstate",vm).lower()=="shut off",
          "Exact guest must remain shut off before approved first boot")
-    need(virsh("domstate","win11").lower()=="shut off",
-         "Master Windows 11 must remain off")
+    need(virsh("domstate","win11").lower()=="shut off" and
+         virsh("domuuid","win11").lower()==acceptance["source_master_uuid"],
+         "Protected Command1 source master identity/state does not match pinned V2 receipt")
     need(not virsh("snapshot-list",vm,"--name").strip(),
          "New guest cannot inherit existing libvirt snapshot")
     info=virsh("dominfo",vm)
     need(re.search(r"(?mi)^Autostart:\s+(?:disable|disabled|no)\s*$",info),
          "Guest unexpectedly set to autostart")
-    bridge_ip=str(__import__("ipaddress").IPv4Address(
-        int(__import__("ipaddress").IPv4Network(subnet).network_address)+1))
+    bridge_ip=str(ipaddress.IPv4Address(
+        int(ipaddress.IPv4Network(subnet).network_address)+1))
     need(nic.verify_network_live(subnet,bridge_ip),
          "Dedicated physical host isolation not active")
     disk=Path(row["disk_target"])
@@ -207,8 +210,8 @@ def approved_boot(host,journal,vm,receipt):
         disk=Path(row["disk_target"])
         iso=disk.parent/(vm+".command2_network_approved.iso")
         inspect_xml(virsh("dumpxml",vm),vm,row,iso)
-        bridge_ip=str(__import__("ipaddress").IPv4Address(
-            int(__import__("ipaddress").IPv4Network(subnet).network_address)+1))
+        bridge_ip=str(ipaddress.IPv4Address(
+            int(ipaddress.IPv4Network(subnet).network_address)+1))
         need(nic.verify_network_live(subnet,bridge_ip) and
              virsh("domstate","win11").lower()=="shut off",
              "Isolated network/master changed; leave guest paused for review")
