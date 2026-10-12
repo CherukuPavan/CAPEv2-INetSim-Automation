@@ -25,6 +25,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 import command2_cape_agent_probe as agentprobe
 import command2_snapshot_recovery_preflight as recovery
+import command2_native_snapshot_stack_guard as native
 
 SENTINEL = Path("/var/backups/cape-win11-preservation/win11-state-92POdfNc")
 LOCK = Path("/run/lock/cape-command2-running-snapshot.lock")
@@ -224,6 +225,7 @@ def capture(name, target_host, expected_uuid, expected_mac, guest_ip,
     require(recovery_bundle is not None and reviewed_manifest_sha is not None,
             "Verified, explicitly SHA-pinned full cold recovery bundle required")
     cold = recovery.inspect(name,expected_uuid,recovery_bundle,reviewed_manifest_sha)
+    native_pre=native.inspect(name)
     pre = plan(name,target_host,expected_uuid,expected_mac,guest_ip,receipt,subnet)
     require(pre["receipt_sha256"] is not None,
             "Prior separate-host acceptance evidence required")
@@ -240,6 +242,8 @@ def capture(name, target_host, expected_uuid, expected_mac, guest_ip,
         fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
         again = plan(name,target_host,expected_uuid,expected_mac,guest_ip,receipt,subnet)
         rechecked = recovery.inspect(name,expected_uuid,recovery_bundle,reviewed_manifest_sha)
+        native_again=native.inspect(name)
+        require(native_again==native_pre,"Native QEMU/libvirt snapshot stack changed before capture")
         require(rechecked["manifest_sha256"] == cold["manifest_sha256"] and
                 rechecked["members"] == cold["members"],
                 "Cold full-state recovery source changed before snapshot capture")
@@ -275,6 +279,7 @@ def capture(name, target_host, expected_uuid, expected_mac, guest_ip,
             "memory_and_disk_metadata_present":True,
             "guest_still_running":True,"capture_receipt_sha256":pre["receipt_sha256"],
             "guest_agent_http_verified_before_capture":True,
+            "native_snapshot_stack_admitted":native_pre,
             "reviewed_complete_cold_bundle_verified":True,
             "recovery_manifest_sha256":cold["manifest_sha256"],
             "actual_cold_restore_boot_tested":False,
@@ -311,7 +316,7 @@ def main():
                           args.expected_mac,args.guest_ip,args.receipt,args.subnet)
         print(json.dumps(report,indent=2,sort_keys=True))
         return 0
-    except (SnapshotBlocked,recovery.RecoveryBlocked,OSError,
+    except (SnapshotBlocked,recovery.RecoveryBlocked,native.NativeBlocked,OSError,
             ValueError,TypeError,ET.ParseError) as exc:
         print("BLOCKED: "+str(exc),file=sys.stderr)
         return 2
