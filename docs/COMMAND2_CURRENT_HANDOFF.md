@@ -1,5 +1,11 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 14:12 UTC — Count-bound agent proof + real PosixPath integration defects fixed
+
+New read-only `scripts/command2_portable_agent_batch_gate.py` probes each reserved N guest's exact CAPE Agent administrator HTTP endpoint after checking its running/saved isolated MAC/NIC/disk/firmware, no host-linked devices, shut-off master and live lab nft/libvirt policy. Its `agent-batch` phase is added to `command2_portable_workflow.py`. A failing guest prevents declaring all-N agent reachability. **No** IP/hostname, TPM, snapshot, or containment attestation is fabricated. The offline unit suite exposed and corrected the serious misuse of `type(PathObject) is Path` instead of `isinstance(PathObject,Path)` in both new agent and firstboot adapters, which would always reject actual Ubuntu `PosixPath` objects. Follow-up offline CI [run 38260332749](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38260332749) PASS on `ce00b5112e4436fcd5906efc5dfffd9cefb4cef2`, and all new source files are covered by workflow triggers.
+
+**Current completion claim: FALSE.** Commands 1/2 as complete fresh-host installer, real SSL-55 `win11_1` RAM snapshot, per-VM atomic swtpm+OVMF revert, INetSim/CAPE parallel analysis and physical N-clone acceptance have NOT happened. The separate approved host remains unmodified and SSL55 master/trial remain protected. No Command3 work is requested from the user yet.
+
 ## 2026-10-12 — APPROVED ONE-NIC FIRST BOOT REMOVES A TWO-BOOT DEPENDENCY (CI PASS; NOT PRODUCTION)
 
 Operator reiterated: do not declare Commands 1/2 complete or ask for Command 3 until ALL installation, clone/IP/CAPE/snapshot functions really work. The software target is one Command 1 on supported fresh Ubuntu plus one Command 2 for N Windows clones ending in verified CAPE RUNNING-state snapshots, and then the operator supplies Command 3 config edits. Current work remains on `development`. No SSL-55, second host, Windows VM, or malware was changed during this code pass.
