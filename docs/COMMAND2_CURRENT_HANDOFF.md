@@ -1,5 +1,16 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 07:26 UTC — FIRST LIVE COLD BACKUP WRAPPER TIMEOUT; NO BACKUP MADE
+
+User uploaded `CAPE_Command2_ColdBackupAndBoot_20261012_072649.txt` and screenshot. Exact result:
+- `scripts/command2_ssl55_stopped_backup.py --mode plan` read-only PASS: clone running, apparent disk 29.98GiB, 94.69GiB free, conservative backup gate 74.98GiB, 3 artifacts including QCOW2/UEFI VARS/swtpm.
+- Operator approved `APPROVE-WIN11_1-COLD-BOOT-TEST`. Wrapper invoked **`virsh shutdown win11_1`**, which said `Domain 'win11_1' is being shutdown` (request accepted, not poweroff proof).
+- After waiting 60*3sec=180s it printed `STOP: Windows did not shut down gracefully. No forced shutdown or backup copy attempted.` IMPORTANT: no cold copy/checkpoint, no forced poweroff, no restart from wrapper. Exact current VM state AFTER timeout is **not reported**; must check `sudo virsh -c qemu:///system domstate win11_1`.
+- Recovery: if still running, operator should open Windows desktop in virt-manager and initiate **normal in-guest shutdown** (`shutdown.exe /s /t 0`, no /f), then check state is `shut off`. If already off, do NOT send extra power signals. Never use `virsh destroy` or force power off.
+- Once exact clone is shut off and all QEMU/swtpm PIDs exited, execute already-created stopped-only backup script with pinned SHA + explicit local TTY approval `CAPTURE-STOPPED-WIN11_1`. Only AFTER SUCCESS, verify network/guard and restart existing win11_1; then bounded benign agent GET and post-blockpull read-only acceptance. Preserve protected original master/trial. Do not retry old wrapper because it will demand running VM.
+- Guard against user confusing first and second operator approvals. The first approved ACPI shutdown timing out does NOT mean second explicit copy approval occurred. No snapshot/revert/TPM restore/negative guest egress test.
+
+
 ## 2026-10-12 07:15 UTC — COLD CAPACITY PASS AND STOPPED-ONLY BACKUP CODE
 
 User's REAL `CAPE_Command2_RecoveryPlan_20261012_071501.txt`:
