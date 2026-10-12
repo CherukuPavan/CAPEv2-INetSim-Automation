@@ -208,6 +208,11 @@ if ($Mode -eq "Apply") {
     exit 0
 }
 
+if ($legacyPresent) {
+    # Do not certify an already-configured clone which still holds the
+    # original master source IP: that could cause collision on next boot.
+    Deny "Original golden-master IP still present after DHCP conversion"
+}
 if ([Environment]::MachineName -ine [string]$conf.hostname) {
     Deny "Unique Windows hostname not effective; reboot after explicit rename"
 }
