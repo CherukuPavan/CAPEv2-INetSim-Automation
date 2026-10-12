@@ -87,6 +87,31 @@ def safe_parent(path):
          "Destination parent must be root-owned non-group/world-writable")
     return dest
 
+def backing_chain(disk):
+    """Admit every resolved master backing layer, not just active top."""
+    rows=json.loads(run("qemu-img","info","--backing-chain",
+                        "--output=json",str(disk),timeout=90))
+    need(type(rows) is list and 1<=len(rows)<=16,
+         "Missing/overlong master QCOW2 backing chain")
+    paths=[]
+    for i,row in enumerate(rows):
+        need(type(row) is dict and row.get("format")=="qcow2" and
+             type(row.get("filename")) is str,
+             "Backing chain has unexpected non-QCOW2 layer")
+        path=Path(row["filename"])
+        regular(path)
+        paths.append(path)
+        if i<len(rows)-1:
+            back=row.get("full-backing-filename")
+            need(type(back) is str and Path(back)==Path(rows[i+1]["filename"]),
+                 "Backing chain links do not identify the next checked layer")
+    need(paths[0]==disk and len({str(x) for x in paths})==len(paths),
+         "Original master disk top/chain mismatch or cycle")
+    cap=rows[0].get("virtual-size")
+    need(type(cap) is int and 8*1024**3<=cap<=512*1024**3,
+         "Master virtual disk capacity implausible")
+    return paths,cap
+
 def source():
     need(os.geteuid()==0,"Root required for master source and TPM checks")
     need(virsh("domstate",VM).strip().lower()=="shut off",
@@ -113,11 +138,7 @@ def source():
          "Master requires exactly one file-backed QCOW2 Windows OS disk")
     disk=Path(disks[0].find("source").get("file",""))
     regular(disk)
-    info=json.loads(run("qemu-img","info","--output=json",str(disk)))
-    need(info.get("format")=="qcow2" and
-         type(info.get("virtual-size")) is int and
-         8*1024**3<=info["virtual-size"]<=512*1024**3,
-         "Master QCOW2 missing or implausible Windows volume size")
+    chain,virtual_size=backing_chain(disk)
     firmware=root.find("./os/nvram")
     need(firmware is not None and (firmware.text or "").strip(),
          "Exact UEFI NVRAM missing")
@@ -154,7 +175,7 @@ def source():
     return {"vm":VM,"uuid":master_uuid,"domain_xml":raw,
             "source_disk":disk,"source_nvram":nv,
             "tpm_members":entries,"tpm_dir":state,
-            "virtual_size":info["virtual-size"],
+            "backing_chain":chain,"virtual_size":virtual_size,
             "master_shut_off":True,
             "active_source_snapshot_revert_performed":False}
 
@@ -267,10 +288,11 @@ def capture(dest):
         current=source()
         need(current["domain_xml"]==initial["domain_xml"] and
              current["uuid"]==initial["uuid"] and
-             current["source_disk"]==initial["source_disk"],
-             "Master source changed after approved export plan")
-        sources=[current["source_disk"],current["source_nvram"],
-                 *current["tpm_members"]]
+             current["source_disk"]==initial["source_disk"] and
+             current.get("backing_chain")==initial.get("backing_chain"),
+             "Master storage chain changed after approved export plan")
+        sources=[*current.get("backing_chain",[current["source_disk"]]),
+                 current["source_nvram"],*current["tpm_members"]]
         before=stamp(sources)
         dest.mkdir(mode=0o700)
         attempted=True
