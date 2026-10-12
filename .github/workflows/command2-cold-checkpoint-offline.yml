@@ -16,6 +16,10 @@ on:
       - "scripts/test_command2_windows_guest_config.py"
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_guest_one_nic_firstboot.ps1"
+      - "scripts/command2_guest_benign_egress_probe.ps1"
+      - "scripts/command2_guest_benign_egress_RUN.cmd"
+      - "scripts/command2_ssl55_benign_egress_iso.py"
+      - "scripts/test_command2_ssl55_benign_egress_iso.py"
       - "scripts/command2_ssl55_cold_boot_resume.py"
       - "scripts/test_command2_ssl55_cold_boot_resume.py"
       - "scripts/command2_ssl55_stopped_backup.py"
@@ -125,6 +129,10 @@ on:
       - "scripts/test_command2_windows_guest_config.py"
       - "scripts/command2_guest_personalize.ps1"
       - "scripts/command2_guest_one_nic_firstboot.ps1"
+      - "scripts/command2_guest_benign_egress_probe.ps1"
+      - "scripts/command2_guest_benign_egress_RUN.cmd"
+      - "scripts/command2_ssl55_benign_egress_iso.py"
+      - "scripts/test_command2_ssl55_benign_egress_iso.py"
       - "scripts/command2_ssl55_cold_boot_resume.py"
       - "scripts/test_command2_ssl55_cold_boot_resume.py"
       - "scripts/command2_ssl55_stopped_backup.py"
@@ -603,7 +611,8 @@ jobs:
             'scripts/command2_guest_startup_autoconfig.ps1',
             'scripts/command2_guest_one_nic_firstboot.ps1',
             'scripts/command2_windows_one_nic_diagnostic.ps1',
-            'scripts/command2_ssl55_win11_1_oneclick_guest_fix.ps1'
+            'scripts/command2_ssl55_win11_1_oneclick_guest_fix.ps1',
+            'scripts/command2_guest_benign_egress_probe.ps1'
           )
           foreach ($scriptName in $scripts) {
             $tokens = $null
