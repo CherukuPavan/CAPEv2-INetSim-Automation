@@ -69,6 +69,20 @@ class Workflow(unittest.TestCase):
                              str(Path(td)/"command2-guest-config-win11_1.json"))
             self.assertFalse(meta["master_vm_mutations_authorized"])
 
+    def test_approved_firstboot_requires_separate_network_evidence(self):
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td)
+            with self.assertRaisesRegex(w.WorkflowBlocked,"network_receipt"):
+                self.choose_fixture(j,rows,"approved-firstboot","apply")
+            script,argv,result=self.choose_fixture(j,rows,"approved-firstboot",
+                  "apply",network_receipt=Path("/private/approved-v2.json"))
+            self.assertEqual(script.name,"command2_portable_approved_firstboot.py")
+            self.assertEqual(argv[argv.index("--mode")+1],"boot")
+            self.assertEqual(argv[argv.index("--receipt")+1],
+                             "/private/approved-v2.json")
+            self.assertEqual(argv[argv.index("--journal")+1],str(j))
+            self.assertFalse(result["master_vm_mutations_authorized"])
+
     def test_identity_first_boot_is_separate_explicit_other_host_phase(self):
         with TemporaryDirectory() as td:
             j,rows=self.makefixture(td)
