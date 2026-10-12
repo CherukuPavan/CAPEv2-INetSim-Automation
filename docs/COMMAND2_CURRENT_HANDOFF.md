@@ -1,5 +1,16 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 07:34 UTC — COLD BACKUP ACTUALLY CAPTURED; RESTART STATUS UNKNOWN + PORTABLE AUTO-SUBNET
+
+Actual uploaded `CAPE_Command2_ColdResume_20261012_073419.txt`:
+- User shut Windows down manually with `shutdown.exe /s /t 0` after ACPI `virsh shutdown` timed out; host wrapper saw `win11_1` SHUT OFF, exact expected identity, 94.69 GiB pre-copy free, 29.98 GiB apparent source disk.
+- `scripts/command2_ssl55_stopped_backup.py --mode capture` separately approved `CAPTURE-STOPPED-WIN11_1`; created NEW cold backup directory `/var/lib/libvirt/images/cape-clones-staging/cape-win11_1-cold-recovery/cold-b8c6f2d3b4ba4e948dc476b2a1b35c2d`. Report: `STOPPED_CLONE_BACKUP_CAPTURED_UNRESTORED` with three source+dest SHA256 verified files: `disk.qcow2`, `uefi-vars.fd`, `tpm-tpm2-00.permall`. Saved domain.xml and manifest.json. Original master untouched by backup code; no restore performed.
+- Uploaded report **ENDS** at `========== PRE-BOOT NETWORK SAFETY ==========`. This report does NOT establish that the wrapper passed guard checks or restarted the VM. Current actual VM state is UNKNOWN; **inspect read-only first before any start**. Do not repeat checkpoint capture or blindly restart while wrapper might still be running.
+- Backup is a verified cold artifact, not yet a VERIFIED RECOVERABLE RESTORE; CAPE Agent post-restart, guest independent cold-boot, IPv4/IPv6/L2 negative egress and running memory+disk+UEFI+swtpm snapshot/revert still unverified.
+- **Other-host portability fix committed only to development**: `command2_target_host_preflight.select_analysis_subnet(profile,"auto")` selects first nonconflicting RFC1918 /24 candidate from target host kernel routes, interface addresses and all libvirt network inventories; default `--subnet auto` on `command2_portable_zero_nic_entrypoint.py`; source of selected subnet carried consistently through identity/IP allocation, guest JSON, network and CAPE configuration drafts and staging. Fail-closed on absent/invalid inventory, no suitable range, or explicitly specified overlapping subnet. Before ANY stage writes, fresh read-only target host preflight enforces unchanged outbound interface, subnet nonoverlap, RAM reserve and no generated UUID/MAC collision. No automatic nft changes; no NIC started. CI regression coverage added for overlapping routes, libvirt networks, invalid inventory and drift.
+- Operator requested portability/no errors on another machine. Never promise zero errors. Current GitHub has only offline mock CI, NOT real complete 3-command validation on a second host. Separate validation required for installer dependencies, CAPE/INetSim, safe NIC/IPv6/L2 containment, Windows customization, TPM+UEFI snapshot and revert and count-based parallel analysis before production use.
+
+
 ## 2026-10-12 07:26 UTC — FIRST LIVE COLD BACKUP WRAPPER TIMEOUT; NO BACKUP MADE
 
 User uploaded `CAPE_Command2_ColdBackupAndBoot_20261012_072649.txt` and screenshot. Exact result:
