@@ -69,6 +69,16 @@ class Workflow(unittest.TestCase):
                              str(Path(td)/"command2-guest-config-win11_1.json"))
             self.assertFalse(meta["master_vm_mutations_authorized"])
 
+    def test_identity_first_boot_is_separate_explicit_other_host_phase(self):
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td)
+            script,argv,result=self.choose_fixture(j,rows,"identity-boot","apply")
+            self.assertEqual(script.name,"command2_portable_identity_boot.py")
+            self.assertEqual(argv[argv.index("--mode")+1],"boot")
+            self.assertEqual(argv[argv.index("--vm")+1],"win11_1")
+            self.assertEqual(argv[argv.index("--journal")+1],str(j))
+            self.assertFalse(result["master_vm_mutations_authorized"])
+
     def test_stage_apply_delegates_to_authoritative_count_stager(self):
         with patch.object(w,"canonical_host",return_value=HOST),\
              patch.object(w.os,"geteuid",return_value=0),\
