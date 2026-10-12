@@ -115,6 +115,12 @@ if ($adapters.Count -ne 1 -or $matching.Count -ne 1) {
 $nic=$matching[0]
 $routes=@(Get-NetRoute -AddressFamily IPv4 -InterfaceIndex $nic.ifIndex -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue)
 if ($routes.Count -ne 0) { Deny "Unexpected default route on isolated guest NIC" }
+# A zero-default-gateway IPv4 configuration is NOT sufficient when
+# Windows retains a reachable IPv6 default route on its isolated NIC.
+$v6Routes=@(Get-NetRoute -AddressFamily IPv6 -InterfaceIndex $nic.ifIndex -DestinationPrefix "::/0" -ErrorAction SilentlyContinue)
+if ($v6Routes.Count -ne 0) { Deny "Unexpected IPv6 default route on isolated guest NIC" }
+$ipif=@(Get-NetIPInterface -InterfaceIndex $nic.ifIndex -AddressFamily IPv4 -ErrorAction Stop)
+if ($ipif.Count -ne 1) { Deny "Cannot uniquely identify IPv4 NIC configuration" }
 $addresses=@(Get-NetIPAddress -InterfaceIndex $nic.ifIndex -AddressFamily IPv4 -ErrorAction Stop)
 $other=@($addresses | Where-Object {
   $_.IPAddress -ne [string]$cfg.ipv4 -and $_.IPAddress -notlike "169.254.*"
@@ -123,11 +129,23 @@ if ($other.Count -ne 0) { Deny "Unexpected existing guest IP; no overwrite" }
 $matchingIP=@($addresses | Where-Object {
   $_.IPAddress -eq [string]$cfg.ipv4 -and $_.PrefixLength -eq $prefix
 })
+$sameIPWrongPrefix=@($addresses | Where-Object {
+  $_.IPAddress -eq [string]$cfg.ipv4 -and $_.PrefixLength -ne $prefix
+})
+if ($sameIPWrongPrefix.Count -ne 0 -or $matchingIP.Count -gt 1) {
+  Deny "Existing guest IPv4 prefix or address identity differs; refuse overwrite"
+}
 if ($Mode -eq "Verify") {
+  if ($matchingIP.Count -ne 1 -or [string]$ipif[0].Dhcp -ne "Disabled") {
+    Deny "Expected unique STATIC IPv4 address and disabled DHCP not verified"
+  }
   [pscustomobject]@{ result="COMMAND2_GUEST_NETWORK_READONLY_VERIFICATION"
     hostname_verified=$true; nic_mac_verified=$true
-    expected_static_ipv4_present=($matchingIP.Count -eq 1)
-    default_route_present=$false; no_changes_made=$true } | ConvertTo-Json -Compress
+    expected_static_ipv4_present=$true
+    dhcp_disabled=$true
+    ipv4_default_route_present=$false
+    ipv6_default_route_present=$false
+    no_changes_made=$true } | ConvertTo-Json -Compress
   exit 0
 }
 if ($Mode -ne "Network") { Deny "Invalid personalization mode" }
@@ -135,10 +153,29 @@ if (-not $HostIsolationVerified) {
   Deny "Host must independently prove IPv4/IPv6 isolation and reboot persistence before NETWORK mode"
 }
 GuestAdminRequired
-if ($matchingIP.Count -eq 0) {
+if ($matchingIP.Count -eq 1) {
+  # An identical DHCP lease is NOT a static IP. Stop rather than lie about
+  # successful personalization or unexpectedly delete a DHCP lease.
+  if ([string]$ipif[0].Dhcp -ne "Disabled") {
+    Deny "Expected IPv4 exists but DHCP is still enabled; manual consistency review"
+  }
+} else {
   Set-NetIPInterface -InterfaceIndex $nic.ifIndex -AddressFamily IPv4 -Dhcp Disabled -ErrorAction Stop
   New-NetIPAddress -InterfaceIndex $nic.ifIndex -IPAddress ([string]$cfg.ipv4) -PrefixLength $prefix -AddressFamily IPv4 -ErrorAction Stop | Out-Null
 }
+# A successful write call is NOT final acceptance: read the live Windows
+# routing table/address again after any network-change side effects.
+$finalIP=@(Get-NetIPAddress -InterfaceIndex $nic.ifIndex -AddressFamily IPv4 -ErrorAction Stop |
+    Where-Object { $_.IPAddress -eq [string]$cfg.ipv4 -and $_.PrefixLength -eq $prefix })
+$finalIPv4=Get-NetIPInterface -InterfaceIndex $nic.ifIndex -AddressFamily IPv4 -ErrorAction Stop
+$finalRoutes=@(Get-NetRoute -AddressFamily IPv4 -InterfaceIndex $nic.ifIndex -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue)
+$finalV6Routes=@(Get-NetRoute -AddressFamily IPv6 -InterfaceIndex $nic.ifIndex -DestinationPrefix "::/0" -ErrorAction SilentlyContinue)
+if ($finalIP.Count -ne 1 -or @($finalIPv4).Count -ne 1 -or
+    [string]$finalIPv4.Dhcp -ne "Disabled" -or
+    $finalRoutes.Count -ne 0 -or $finalV6Routes.Count -ne 0) {
+  Deny "Post-change static IPv4, DHCP or no-default-route acceptance failed"
+}
 [pscustomobject]@{ result="COMMAND2_WINDOWS_STATIC_IPV4_APPLIED_OR_VERIFIED"
   hostname=$cfg.hostname; ipv4=$cfg.ipv4; mac=$cfg.nic_mac
-  gateway_added=$false } | ConvertTo-Json -Compress
+  dhcp_disabled=$true; ipv4_default_route_present=$false
+  ipv6_default_route_present=$false; gateway_added=$false } | ConvertTo-Json -Compress
