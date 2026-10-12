@@ -92,3 +92,38 @@ References:
 bulk clones or malware from the passing single-VM checks. At least one
 separately approved physical host and security/rollback acceptance are
 still required. Offline green CI is not a deployment certificate.
+
+
+## Additional concrete CAPE machinery compatibility finding (2026-10-12)
+
+The upstream CAPEv2 `modules/machinery/kvm.py` delegates the analysis-start
+operation to `LibVirtMachinery.start()`. The upstream
+`lib/cuckoo/common/abstracts.py` implementation selects a configured
+libvirt snapshot and executes `vm.revertToSnapshot(snapshot, flags=0)`,
+then waits for the guest to become RUNNING. That is why merely setting a
+guest's IP/hostname or producing a cold backup cannot make a CAPE machine
+ready for repeated analysis.
+
+CAPE's own guest-saving documentation also requires capturing the prepared
+guest with its agent running before relying on that snapshot. The VM's
+existing RAW OVMF pflash VARS and swtpm2 persistent state are distinct
+from ordinary disk+RAM. Libvirt release notes specify that internal UEFI
+pflash snapshots require QCOW2 NVRAM; even then the swtpm revert semantics
+must be independently demonstrated. No production-ready CAPE reset may be
+inferred from offline green CI or a merely present snapshot label.
+
+**Acceptable development next paths on the disposable, approved second host:**
+(a) prove a specific compatible hardware/firmware+TPM arrangement actually
+handles repeated running-memory/disk snapshot/revert and guest state,
+**without changing the SSL-55 master**, or (b) engineer and test a separate,
+explicit CAPE machinery adapter for restoring the complete cold disk +
+OVMF + swtpm state prior to EACH analysis. Generic KVM `kvm.conf`
+registration MUST remain gated until one path passes repeated harmless
+analysis cycles. The latter adapter is a substantive Command 2 deliverable,
+not a simple config toggle.
+
+CAPE references:
+- https://capev2.readthedocs.io/en/latest/installation/guest/saving.html
+- https://github.com/kevoreilly/CAPEv2/blob/master/modules/machinery/kvm.py
+- https://github.com/kevoreilly/CAPEv2/blob/master/lib/cuckoo/common/abstracts.py
+- https://libvirt.gitlab.io/libvirt/news.html (libvirt v10.9.0 UEFI snapshot update)
