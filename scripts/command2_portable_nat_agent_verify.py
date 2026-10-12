@@ -65,7 +65,7 @@ def ready(host,journal,vm,nat_iso,evidence):
     folder=transport.verified_evidence_folder(evidence)
     stage=folder/(vm+transport.STAGE_SUFFIX)
     stored=approved.trusted_stage_json(stage)
-    current=transport.inspect(host,journal,vm,nat_iso)
+    current=transport.inspect(host,journal,vm,nat_iso,evidence)
     before={
        "vm":vm,"host":host,"uuid":current["uuid"],"mac":current["mac"],
        "source_gateway":current["source_gateway"],
