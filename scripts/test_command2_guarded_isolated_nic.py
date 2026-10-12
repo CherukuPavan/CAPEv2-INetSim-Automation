@@ -49,6 +49,54 @@ def faux_virsh(*a):
 
 
 class AttachTests(unittest.TestCase):
+    def test_legacy_and_first_boot_receipts_remain_strictly_separate(self):
+        import json
+        import os
+        import stat
+        base={"approved_host":HOST,"vm":VM,"uuid":UUID,"mac":MAC,
+              "guest_ip":"192.168.240.101","operator":"test-operator",
+              **{f:True for f in n.PROOF_FIELDS}}
+        with tempfile.TemporaryDirectory() as td:
+            receipt=Path(td)/"receipt.json"
+            original_stat=Path.stat
+            def root_owned(path,*args,**kwargs):
+                value=original_stat(path,*args,**kwargs)
+                data=list(value)
+                data[4]=0
+                return os.stat_result(data)
+            def check(record):
+                receipt.write_text(json.dumps(record),encoding="utf-8")
+                receipt.chmod(0o600)
+                return n.read_acceptance_receipt(str(receipt),VM,UUID,MAC,
+                                                  "192.168.240.101",HOST)
+            with patch.object(Path,"stat",root_owned):
+                legacy={**base,
+                        "kind":"COMMAND2_SEPARATE_HOST_NETWORK_ACCEPTANCE_V1"}
+                self.assertTrue(check(legacy))
+                with self.assertRaisesRegex(n.NicBlocked,"zero-NIC"):
+                    check({**legacy,"windows_zero_nic_identity_verified":False})
+                initial={**base,
+                         "kind":"COMMAND2_SEPARATE_HOST_NETWORK_ACCEPTANCE_V2",
+                         "windows_zero_nic_identity_verified":False,
+                         "source_master_uuid":
+                             "12345678-1234-4234-8234-000000000002",
+                         "source_master_runner_sha256":"a"*64,
+                         "source_master_personalizer_sha256":"b"*64,
+                         **{f:True for f in n.BOOTSTRAP_FIRST_PROOF_FIELDS}}
+                self.assertTrue(check(initial))
+                for bad in (
+                    {**initial,"windows_zero_nic_identity_verified":True},
+                    {**initial,"source_master_runner_sha256":"not-a-hash"},
+                    {**initial,"source_master_uuid":UUID},
+                    {**initial,"one_nic_firstboot_pending":False},
+                    {**initial,"host_ipv6_external_egress_negative_test":False},
+                    {**initial,"l2_lateral_guest_containment_verified":False},
+                ):
+                    with self.assertRaises(n.NicBlocked):
+                        check(bad)
+                with self.assertRaises(n.NicBlocked):
+                    check({**initial,"kind":"COMMAND2_FAKE_ACCEPTANCE_V3"})
+
     def test_plan_exact_vm_no_network_changes(self):
         with patch.object(n.socket,"gethostname",return_value=HOST),\
              patch.object(n,"SENTINEL",Path(__file__).with_name("_no_ssl55_sentinel_")) ,\
