@@ -66,7 +66,8 @@ def inspect(vm):
          nvram is not None and nvram.get("format")=="qcow2" and nvram.text,
          "QEMU internal running pflash snapshot requires QCOW2 NVRAM and matching XML")
     path=Path(nvram.text)
-    need(path.is_absolute() and path.name==vm+".command2_VARS.fd" and
+    need(path.is_absolute() and path.name in
+         (vm+".command2_VARS.fd",vm+".command2_VARS.fd.qcow2") and
          not path.is_symlink() and path.is_file(),
          "NVRAM filename or type not independently reviewed")
     nv_info=json.loads(command("qemu-img","info","-U","--output=json",str(path)))
