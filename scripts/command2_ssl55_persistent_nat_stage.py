@@ -115,7 +115,7 @@ def inspect(online=False):
     need(virsh("list","--name").splitlines()==[VM],
          "Unknown guest running")
     check_snapshot()
-    source=domain(virsh("dumpxml","--inactive",MASTER),*MASTER)
+    source=domain(virsh("dumpxml","--inactive",MASTER[0]),*MASTER)
     need(len(source)==1 and source[0]["network"]==DEFAULT and
          source[0]["model"]=="e1000e",
          "Protected master network no longer same NAT/e1000e")
