@@ -29,6 +29,7 @@ class WindowsNat(unittest.TestCase):
             self.assertEqual(r[0]["ipv4"],"192.168.122.201")
             self.assertEqual(r[0]["default_gateway"],"192.168.122.1")
             self.assertEqual(r[0]["dns_ipv4"],"192.168.122.1")
+            self.assertEqual(r[0]["exact_golden_windows_bootstrap_ip"],"192.168.122.125")
             self.assertEqual(r[-1]["hostname"],f"WIN11-{n}")
             self.assertTrue(all(x["expected_nic_count"]==1 and
                  x["nic_network"]=="default" and
