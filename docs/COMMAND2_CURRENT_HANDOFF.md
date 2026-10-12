@@ -1,5 +1,13 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 09:24 — HOST BRIDGE AUDIT BLOCKED ONLY ON EMPTY IPV6 INVENTORY (READ-ONLY)
+
+Actual uploaded `CAPE_Command2_HostBridgeL2_20261012_092420.txt`:
+`BLOCKED_ISOLATION_RUNTIME_INSPECTION`, `reason: Unexpected CAPE bridge IPv6 interface inventory`, `no_host_guest_mutation_performed: true`. Audit reached `bridge_ipv6()` after `domain_preflight()`, `network_preflight()` and `bridge_config()` did **not** raise. This means the exact protected VM identities/states, single Linux TAP member and per-port isolated flag, libvirt no-forward network checks passed **at that inspection time**, but later nft firewall_shape() did NOT run and final audit did NOT complete. Do not mislabel complete runtime isolation audit as PASS.
+
+Likely cause: `ip -j -6 addr show dev cape-lab0` can return `[]` on an existing bridge with no IPv6 addresses. The original code incorrectly required exactly one IPv6 interface JSON object. Fixed `scripts/command2_ssl55_l2_runtime_readonly.py` to verify bridge identity independently via `ip -j link show dev cape-lab0`, accept either empty IPv6 list or exactly one expected bridge entry, reject malformed/foreign entries and any scope other than link/host. Added 8 regression tests including empty/foreign/global IPv6; GitHub Actions run **38229894575** passed Windows parser+offline. Host code remains strictly read-only; no shell VM start/reboot/network restart/copy/snapshot or malware. NEXT: re-run ONLY the patched pinned host kernel L2 configuration audit once and upload TXT. Full negative packet-path and guest-to-guest test remains unverified even on a PASS; TPM/OVMF restore, running snapshot/revert and second host portability still unverified. Keep original master and trial off; shared free disk after cold backup most recently ~64.8GiB, do not make additional full-size clone copies without capacity checks.
+
+
 ## 2026-10-12 ~09:19 UTC — HOST BRIDGE L2 RUNTIME READ-ONLY ACCEPTANCE IMPLEMENTED
 
 User's latest Windows benign V2 screenshot is a **PASS_TARGETED_PROBES_ONLY**: exact static guest IP, zero guest IPv4/IPv6 default routes, four `SOCKET_FAILED_NetworkUnreachable` on enumerated public endpoints; no guest network changes, but full egress and guest-to-guest L2 NOT proved. V2 ISO installer uploaded report SUCCESS; cold boot and CAPE Agent preexisting PASS.
