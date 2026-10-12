@@ -63,8 +63,8 @@ class MultiVM(unittest.TestCase):
                               return_value=NETWORK),\
                  patch.object(boot,"completed_running_clones",
                               side_effect=approve),\
-                 patch.object(g,"agent_get",return_value={
-                              "ip":IP,"agent_version":"0.23"}),\
+                 patch.object(g,"agent_get",side_effect=lambda ip,source:{
+                              "ip":ip,"agent_version":"0.23"}),\
                  patch.object(g,"mac_of_neighbor",return_value=MAC):
                 result=g.inspect("lab02",JOURNAL,VM,iso,witnesses)
             self.assertEqual(result["vm"],VM)
