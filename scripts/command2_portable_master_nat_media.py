@@ -45,7 +45,9 @@ def safe_dir(dest):
     return p
 
 def script_source():
-    path=Path(__file__).resolve().with_name("command2_guest_master_nat.ps1")
+    # Preserve the original on-disk leaf for symlink rejection; calling
+    # resolve() on the guest payload itself would hide a symlink.
+    path=Path(__file__).resolve().parent/"command2_guest_master_nat.ps1"
     need(path.is_file() and not path.is_symlink(),
          "Reviewed Windows NAT bootstrap script missing")
     st=path.stat()
