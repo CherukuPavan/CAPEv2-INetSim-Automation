@@ -275,6 +275,28 @@ def suggest_nonoverlapping_subnet(routes, addresses, networks):
     return None
 
 
+
+def select_analysis_subnet(profile, requested="auto"):
+    """Pure fail-closed subnet resolution; never modifies host network.
+
+    Inventory MUST be present and parsable. The default "auto" chooses
+    the first collision-free RFC1918 /24 candidate; explicit CIDR choices
+    are still checked independently by evaluate(), not automatically
+    changed when occupied. This is a plan decision, not network approval.
+    """
+    if requested != "auto":
+        return requested
+    routes = profile.get("kernel_ipv4_routes")
+    addrs = profile.get("kernel_ipv4_addresses")
+    nets = profile.get("libvirt_ipv4_networks")
+    selection = suggest_nonoverlapping_subnet(routes, addrs, nets)
+    if selection is None:
+        raise count_plan.PortablePlanBlocked(
+            "AUTO_SUBNET_UNAVAILABLE_OR_ALL_CANDIDATES_CONFLICT: "
+            "inspect local routes, addresses and libvirt networks")
+    return selection
+
+
 def evaluate(profile, count, disk_dir, nvram_dir, cidr):
     """Fail-closed readiness on supplied/synthetic inventory; no mutations."""
     if type(count) is not int or not (1 <= count <= count_plan.MAX_COUNT):
