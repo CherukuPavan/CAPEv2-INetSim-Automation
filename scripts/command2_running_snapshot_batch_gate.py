@@ -133,8 +133,9 @@ def live_domain(name,row):
          "Expected one QCOW2 Windows OS disk")
     firmware=root.find("./os/nvram")
     need(firmware is not None and
-         firmware.text==row["uefi_nvram_target"],
-         "Guest OVMF state not independently assigned")
+         firmware.get("format")=="qcow2" and
+         firmware.text==row["uefi_nvram_target"]+".qcow2",
+         "VM must actually use its own QCOW2 OVMF sidecar for native running CAPE snapshots")
     tpm=root.find("./devices/tpm/backend")
     need(tpm is not None and tpm.get("type")=="emulator" and
          tpm.get("version")=="2.0",
