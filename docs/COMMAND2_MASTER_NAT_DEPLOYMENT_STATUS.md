@@ -5,34 +5,34 @@ All changes are on branch **development**, not main.
 
 ## Physical SSL55 reference (PASS — leave untouched)
 
-On protected \`CSE-SSL-55\`, the operator's real upload
-\`CAPE_SSL55_OneNAT_SnapshotFix_20261012_195300.txt\` confirmed:
-- Only \`win11_1\` is running. Protected master \`win11\` and
-  \`win11_trial_1\` are shut off and unchanged.
-- Exactly one persistent \`e1000e\` NIC on libvirt \`default\` NAT,
-  \`virbr0\`, MAC \`02:ca:55:11:01:02\`. Windows DHCP lease and
-  active+inactive network host reservation \`192.168.122.131\`,
-  gateway/DNS \`192.168.122.1\`; physical HTTPS 200 and Agent 0.23 proof.
+On protected `CSE-SSL-55`, the operator's real upload
+`CAPE_SSL55_OneNAT_SnapshotFix_20261012_195300.txt` confirmed:
+- Only `win11_1` is running. Protected master `win11` and
+  `win11_trial_1` are shut off and unchanged.
+- Exactly one persistent `e1000e` NIC on libvirt `default` NAT,
+  `virbr0`, MAC `02:ca:55:11:01:02`. Windows DHCP lease and
+  active+inactive network host reservation `192.168.122.131`,
+  gateway/DNS `192.168.122.1`; physical HTTPS 200 and Agent 0.23 proof.
 - Three independent **running RAM + Windows OS QCOW2 + UEFI QCOW2**
   internal snapshot labels validated within libvirt and BOTH exact files:
-  \`cape_candidate_win11_1\`, \`cape_postnat_win11_1\`,
-  \`cape_one_nat_win11_1\`. No snapshot has been reverted or deleted.
+  `cape_candidate_win11_1`, `cape_postnat_win11_1`,
+  `cape_one_nat_win11_1`. No snapshot has been reverted or deleted.
 - **NO matching swtpm persistent/volatile capture-at-snapshot-epoch,
   TPM-safe restore, or two benign restore cycles.**
-  \`cape_one_nat_win11_1\` is a candidate, not \`cape_ready_win11_1\`.
+  `cape_one_nat_win11_1` is a candidate, not `cape_ready_win11_1`.
   **Never click Revert/Apply in virt-manager on the protected VM.**
 
 ## New portable master-style NAT path (CODED; physical test PENDING)
 
 Existing original, isolated Command2 stages produce unique Windows guest
-identity journal entries containing old \`192.168.240.x\` candidate IPs and
+identity journal entries containing old `192.168.240.x` candidate IPs and
 create 1..16 independent **SHUT-OFF, ZERO-NIC** guests. Do not blindly
 apply the old guest static isolated-network config to the new NAT NIC.
 
 After root-on-*OTHER-HOST* identity reservation + stopped zero-NIC
 staging, use the guarded dispatcher:
 
-\`\`\`bash
+```bash
 # Read-only actual master/default NAT and all-N journal checks
 sudo python3 -B scripts/command2_portable_workflow.py \
   --phase master-nat-plan --mode plan \
@@ -66,36 +66,36 @@ sudo python3 -B scripts/command2_portable_workflow.py \
   --approved-host "ACTUAL_NON_SSL55_HOST" \
   --journal "/root/cape/command2-identity-reservation.json" \
   --nat-media-dir "/root/cape/nat-iso"
-\`\`\`
+```
 
 
-After attaching each approved \`CAPE_NAT2\` ISO to its matching stopped
+After attaching each approved `CAPE_NAT2` ISO to its matching stopped
 VM and starting the guest (NOT done by the above phases), Windows
 Administrator should run the exact pinned script from that ISO with the
-\`nat-config.json\` file and its 64-hex SHA from \`nat-config.sha256\`,
-starting with \`-Mode Plan\`. Use \`-Mode Apply -ApproveBenignNat
--ApproveRename\` only if all identities match and approved for benign
+`nat-config.json` file and its 64-hex SHA from `nat-config.sha256`,
+starting with `-Mode Plan`. Use `-Mode Apply -ApproveBenignNat
+-ApproveRename` only if all identities match and approved for benign
 provisioning, followed by a **manual** Windows reboot if the hostname
-changed. Then run \`-Mode Verify -RequireHTTPS\` after reboot. Keep
+changed. Then run `-Mode Verify -RequireHTTPS` after reboot. Keep
 Windows evidence per VM; a successful ISO builder alone is not Windows
 setup completion.
 
 The host can independently verify ALL running guests and their actual
 agent network addresses with:
 
-\`\`\`bash
+```bash
 sudo python3 -B scripts/command2_portable_workflow.py \
   --phase master-nat-agents --mode plan \
   --approved-host "ACTUAL_NON_SSL55_HOST" \
   --journal "/root/cape/command2-identity-reservation.json"
-\`\`\`
+```
 
 This read-only stage checks exactly N running clones, saved+live
-\`default\` NAT e1000e MAC identity, exact active/persistent DHCP host
+`default` NAT e1000e MAC identity, exact active/persistent DHCP host
 reservation and observed lease, host route via virbr0, and each CAPE
-Agent's \`:8000\` HTTP JSON identity/admin. It still does NOT prove
+Agent's `:8000` HTTP JSON identity/admin. It still does NOT prove
 guest Windows HTTPS, TPM restoration, outbound sample containment or
-N simultaneous CAPE jobs. Only Windows \`-Mode Verify -RequireHTTPS\`
+N simultaneous CAPE jobs. Only Windows `-Mode Verify -RequireHTTPS`
 can supply the separate per-guest HTTPS observation.
 
 The command paths above are *examples* for a newly prepared test host.
@@ -105,21 +105,21 @@ identities. Never execute the portable workflow on SSL55. There is
 NO automatic installation of guest-side scripts or attachment of the new
 media yet. Creating an ISO does NOT configure or start Windows.
 
-Each ISO contains \`nat-config.json\`, \`nat-config.sha256\` and
-\`command2_guest_master_nat.ps1\`. Inside the approved Windows clone,
-the separately reviewed script has \`Plan\`, \`Apply\`, \`Verify\` modes,
+Each ISO contains `nat-config.json`, `nat-config.sha256` and
+`command2_guest_master_nat.ps1`. Inside the approved Windows clone,
+the separately reviewed script has `Plan`, `Apply`, `Verify` modes,
 requires matching SMBIOS UUID, one exact NIC/MAC and config SHA256,
 and only applies DHCP+gateway/DNS after explicit benign-only approval.
 Windows hostname rename requires separate approval and manual reboot.
-Verify can require HTTPS with \`-RequireHTTPS\`. Because the older
+Verify can require HTTPS with `-RequireHTTPS`. Because the older
 Windows startup task currently accepts ONLY isolated-network approval
-media \`CAPE_CMD2\`, **CAPE_NAT2 is NOT yet auto-consumed at boot**.
+media `CAPE_CMD2`, **CAPE_NAT2 is NOT yet auto-consumed at boot**.
 Correct auto-attachment + SYSTEM execution + reboot and post-boot proof
 remain an engineering acceptance task on the separate host.
 
 ## How to keep NAT and malware containment distinct
 
-The libvirt master source's \`default\`/virbr0 NAT gives Windows actual
+The libvirt master source's `default`/virbr0 NAT gives Windows actual
 Internet, as required. **This topology is not an isolated malware lab.**
 Do not claim NAT per-port isolation or release malicious files; actual
 analysis-time egress restriction requires a separate reviewed host
@@ -128,21 +128,21 @@ DNS/INetSim routing policy and reboot-persistent enforcement.
 
 Every clone additionally needs: unique effective Windows hostname,
 NAT DHCP address and host route, Windows DNS+real HTTPS proof, CAPE
-Agent \`:8000\` reachability, exact CAPE IP/VM registration, independently
+Agent `:8000` reachability, exact CAPE IP/VM registration, independently
 verified running OS+UEFI+RAM snapshot, and a **physically twice-tested
-TPM-compatible disposable restore** before becoming \`CAPE_READY\`.
+TPM-compatible disposable restore** before becoming `CAPE_READY`.
 
 ## TPM restoration is a real architectural gap
 
 Upstream QEMU supports TPM emulator migration/snapshot semantics;
 however, the specific libvirt running snapshot process here has NOT
-proven that \`swtpm\` persistent/volatile blobs are atomically
+proven that `swtpm` persistent/volatile blobs are atomically
 checkpointed with disk, firmware and RAM. See:
 - https://www.qemu.org/docs/master/specs/tpm
 - https://manpages.debian.org/trixie/swtpm-tools/swtpm_ioctl.8.en.html
 - https://lists.libvirt.org/archives/list/users@lists.libvirt.org/message/7BF52MFBOHLST55FUUWNLQ76JFR4ZF6V/
 
-A file copied from \`/var/lib/libvirt/swtpm\` AFTER snapshot capture is
+A file copied from `/var/lib/libvirt/swtpm` AFTER snapshot capture is
 **not** an exact-epoch TPM snapshot. No unsafe retroactive attachment of
 that file is allowed. Plan a disposable host/VM recovery with independent
 cold recovery backup and two benign restore cycles, observing BitLocker,
