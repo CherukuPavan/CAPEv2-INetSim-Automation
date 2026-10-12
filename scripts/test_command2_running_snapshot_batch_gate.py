@@ -114,6 +114,21 @@ class SnapshotBatch(unittest.TestCase):
             with self.assertRaisesRegex(g.GateBlocked,"RUNNING"):
                 g.snapshot_metadata("win11_1","cape_ready_win11_1")
 
+    def test_public_or_link_local_or_default_nat_subnet_refused(self):
+        r=row(1)
+        for subnet in ("169.254.100.0/24","127.0.0.0/24",
+                       "192.168.122.0/24","8.8.8.0/24"):
+            with self.subTest(subnet=subnet),self.assertRaises(g.GateBlocked):
+                g.expected_guest(r,subnet)
+
+    def test_world_writable_witness_directory_refused(self):
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            with patch.object(g.os,"geteuid",return_value=0), \
+                 patch.object(g.os,"stat",wraps=g.os.stat):
+                with self.assertRaisesRegex(g.GateBlocked,"Root private"):
+                    g.private_evidence_folder(root)
+
     def test_nonsequential_reservation_fails(self):
         rows=[row(2),row(1)]
         data={"format":"CAPE_COMMAND2_GUEST_IDENTITY_RESERVATION",
