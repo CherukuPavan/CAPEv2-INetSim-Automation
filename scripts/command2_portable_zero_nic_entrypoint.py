@@ -139,6 +139,7 @@ def proposal(*,count,approved_host,disk_dir,nvram_dir,template,subnet):
     cape_conf=capeplan.create_cape_kvm_conf(
         reserve.payload(candidate, approved_host), chosen_subnet)
     return candidate,{"analysis_subnet":chosen_subnet,
+                      "detected_outbound_interface":report["detected_outbound_interface"],
                       "auto_subnet_chosen_during_readonly_preflight":subnet=="auto",
                       "actual_master_memory_mib":guest_ram_mib,
                       "available_ram_mib":facts["available_ram_mib"],
@@ -151,6 +152,36 @@ def proposal(*,count,approved_host,disk_dir,nvram_dir,template,subnet):
                       "network_isolation_verified":False,
                       "nic_attachment_authorized":False,
                       "resource_preflight_pass":True}
+
+
+
+def revalidate_before_reservation(*,count,approved_host,disk_dir,nvram_dir,
+                                  template,effective_subnet,resources,candidates):
+    """Fresh read-only capacity/network check immediately before ANY stage writes."""
+    guard_host(approved_host,"stage")
+    facts=audit.collect(str(disk_dir),str(nvram_dir),str(template),count)
+    report=audit.evaluate(facts,count,str(disk_dir),
+                          str(nvram_dir),effective_subnet)
+    require(report["preflight_pass"],
+            "Pre-stage host/network changed; no reservation or clones created: "+
+            ",".join(report["errors"]))
+    require(report["detected_outbound_interface"] ==
+            resources["detected_outbound_interface"],
+            "Outbound interface changed since plan")
+    require(facts.get("available_ram_mib") is not None and
+            facts["available_ram_mib"] >=
+            count*resources["actual_master_memory_mib"]+
+            audit.HOST_RAM_RESERVE_MIB,
+            "Host RAM changed since approved plan")
+    existing_uuids,existing_macs=read_inventory()
+    for item in candidates["candidates"]:
+        require(item["libvirt_uuid_candidate"] not in existing_uuids,
+                "Reserved candidate UUID appeared in another VM")
+        require(item["mac_candidate"].lower() not in existing_macs,
+                "Reserved candidate NIC MAC appeared on host")
+    return {"stage_resource_rechecked":True,
+            "selected_subnet_still_nonoverlapping":True,
+            "outbound_interface_unchanged":True}
 
 
 def staging_dir(path):
@@ -196,6 +227,10 @@ def execute(*, count,approved_host,disk_dir,nvram_dir,template,
     if folder.exists():
         require(not (folder/reserve.RECORD_NAME).exists(),
                 "Existing identity reservation: manual reconcile before retry")
+    revalidate_before_reservation(
+        count=count,approved_host=approved_host,disk_dir=disk_dir,
+        nvram_dir=nvram_dir,template=template,effective_subnet=effective_subnet,
+        resources=resources,candidates=candidates)
     folder=staging_dir(folder)
     recorded=reserve.reserve(candidates,folder,expected_host=approved_host)
     require(recorded["guest_count"]==count and not recorded["guest_vm_created"],
