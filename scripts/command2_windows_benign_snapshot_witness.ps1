@@ -28,7 +28,7 @@ function Optional([string]$Key,[scriptblock]$Task) {
 Record 'RESULT_TYPE' 'COMMAND2_BENIGN_SNAPSHOT_WITNESS_V1'
 Record 'MODE' $Mode
 Record 'TIME_UTC' ([DateTime]::UtcNow.ToString('o'))
-Record 'HOSTNAME' [Environment]::MachineName
+Record 'HOSTNAME' ([Environment]::MachineName)
 Record 'MARKER_LOCATION' $Marker
 Record 'GUEST_SECURITY_SETTINGS_MODIFIED' 'FALSE'
 Record 'MALWARE_OR_EXTERNAL_DOWNLOAD_USED' 'FALSE'
