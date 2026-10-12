@@ -1,5 +1,21 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 ~10:42+ — SNAPSHOT PROGRESS: GUARDED EXPERIMENTAL CAPTURE NOW BINDS FULL COLD BUNDLE, NATIVE FIRMWARE STACK AND WINDOWS WITNESS
+
+Operator asks assistant to finish Command 2 and fix missing running snapshot for REAL SSL55 `win11_1` so it can inform other-machine automation; protected master `win11` and trial remain SHUT OFF and MUST NOT be modified. **win11_1 HAS NOT YET RECEIVED A VERIFIED RUNNING SNAPSHOT**; independent boot+agent+one NIC+Windows benign targeted external IPv4/IPv6 negative probes + Linux bridge isolation policy were accepted, cold bundle byte-verified at capture but its real restore NOT tested. Storage last 64.77GiB, 40GiB reserve. No malware.
+
+Research 2026-10-12: libvirt 10.9 introduced internal QCOW2 OVMF running snapshots but v10.10 fixed UEFI snapshot reversion bugs; RAW OVMF variable store unsupported, current swtpm state consistency independent physical blocker. QEMU swtpm migration supports snapshotting at QEMU layer but libvirt snapshot semantics cannot be assumed to restore TPM without actual repeat tests. Sources: https://libvirt.gitlab.io/libvirt/news.html ; https://www.qemu.org/docs/master/specs/tpm ; https://lists.libvirt.org/archives/list/users%40lists.libvirt.org/message/QGU2EQQSUC6X6CGK4QPTHH2EIWMOXHOP/
+
+New development code (no changes to SSL55 host or second host):
+- `scripts/command2_snapshot_recovery_preflight.py` hashes complete previously captured cold bundle disk+UEFI+swtpm files and root/private/UUID/manifest SHA constraints independently while VM is running; not equivalent to restore test.
+- `scripts/command2_native_snapshot_stack_guard.py`: checks other host live daemon >=10.10.0 and QEMU >=9, exact QCOW2 OVMF variable store on disk and in VM XML, swtpm2, RAM/storage safety. Only *experimental admission*, not actual TPM/UEFI revert proof.
+- `command2_running_cape_snapshot_gate.py` capture now requires `--recovery-bundle` + `--reviewed-manifest-sha`, revalidates recovery bytes and native stack after typed approval, requires running+one internal memory/disk XML; capture remains ONLY on approved other host, not SSL55; restored state unproven.
+- `command2_windows_benign_snapshot_witness.ps1`: harmless Baseline/Mark/Verify measurements; Mark is one exclusively created benign file with typed guest approval after running snapshot; Verify after revert checks disappearance, reads Get-Tpm, Secure Boot, BitLocker, route, agent. Human must preserve baseline OFF GUEST before revert; marker removal alone does NOT prove TPM/UEFI rollback.
+- CI run **38239479336** PASSED all Python offline (including malicious backup substitutions) and Windows PowerShell parser. New docs section `docs/COMMAND2_RUNNING_SNAPSHOT_RESOLUTION_PLAN.md`.
+
+NEXT DECISIVE SSL55 EVIDENCE: run only pinned `scripts/command2_ssl55_running_snapshot_readonly.py` (currently source blob check from GitHub) with `sudo virsh -c qemu:///system version --daemon` to ONE TXT. It has NO mutation and prints no TPM secrets. Review before proposing any change. Do not generate another 30GiB copy or force snapshot on SSL55. To physically PROVE running snapshot, use user-approved second Ubuntu/KVM system with two disposable Windows VMs, full cold bundle before snapshot, enough disk space, isolated ingress/egress and record repeated benign TPM/OVMF/BitLocker/agent reset. Only after repeated success adapt an appropriate proven strategy back to SSL55 and production-grade count automation. Existing three-command user goal still requires complete orchestrator, per-guest CAPE register and independent end-to-end fresh-host acceptance; no production-ready claim or Command3 handoff yet.
+
+
 ## 2026-10-12 ~10:30 — USER REQUIRES SNAPSHOT FOR WIN11_1 AND ALL COMMAND2 CLONES: ACTIVE ENGINEERING, NOT YET PHYSICALLY COMPLETE
 
 User explicitly confirmed `win11_1` still has NO running snapshot, requests all needed fixes and full Command2 work before proceeding to Command3. **DO NOT CLAIM THIS IS SOLVED**. No current remote host terminal access; assistant has GitHub development connector only and must provide explicit guarded host command for actual evidence/changes. SSL55 master/trial off and immutable, independent clone RUNNING, previous full cold bundle captured but not restore-tested, ~64.77GiB available and 40GiB reserve.
