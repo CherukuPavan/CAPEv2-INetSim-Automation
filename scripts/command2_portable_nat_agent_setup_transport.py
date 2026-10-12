@@ -110,8 +110,10 @@ def agent_get(ip,source):
         need(type(parsed) is dict and parsed.get("message")=="CAPE Agent!" and
              parsed.get("is_user_admin") is True and
              type(parsed.get("version")) is str and
-             "execute" in parsed.get("features",[]),
-             "Expected elevated CAPE Agent with execute feature missing")
+             type(parsed.get("features")) is list and
+             "execute" in parsed["features"] and
+             "store" in parsed["features"],
+             "Expected elevated CAPE Agent store/execute features missing")
         return {"ip":ip,"source":source,
                 "admin_cape_agent_and_execute_feature":True,
                 "agent_version":parsed["version"]}
@@ -150,7 +152,6 @@ def inspect(host,journal,vm,iso):
     # The all-N attachment checker would reject any RUNNING clone; verify
     # only this exact saved+live permanent NIC and active NAT gateway.
     for arguments in (("dumpxml","--inactive",vm),("dumpxml",vm)):
-        attach.profile.profile if False else None
         root=ET.fromstring(attach.virsh(*arguments))
         need(root.findtext("name")==vm and root.findtext("uuid")==
              row["libvirt_uuid_candidate"],
