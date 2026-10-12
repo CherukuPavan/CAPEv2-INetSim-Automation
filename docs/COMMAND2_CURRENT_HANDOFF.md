@@ -1,5 +1,12 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 ~09:19 UTC — HOST BRIDGE L2 RUNTIME READ-ONLY ACCEPTANCE IMPLEMENTED
+
+User's latest Windows benign V2 screenshot is a **PASS_TARGETED_PROBES_ONLY**: exact static guest IP, zero guest IPv4/IPv6 default routes, four `SOCKET_FAILED_NetworkUnreachable` on enumerated public endpoints; no guest network changes, but full egress and guest-to-guest L2 NOT proved. V2 ISO installer uploaded report SUCCESS; cold boot and CAPE Agent preexisting PASS.
+- Added `scripts/command2_ssl55_l2_runtime_readonly.py` and offline synthetic `scripts/test_command2_ssl55_l2_runtime_readonly.py`; GitHub Actions run **38229380274** PASS both offline and Windows syntax. Host script checks exact CSE-SSL-55/VM UUIDs, master/trial off, live+inactive isolated guest NIC and flattened disk/UEFI/swtpm, active libvirt no-forward/no-DHCP/`port isolated=yes` network, kernel bridge `/sys/class/net/cape-lab0/brif` ports exactly one TAP from the running clone, that TAP master equals cape-lab0, TAP `brport/isolated` flag is actually 1, no bridge global/site IPv6, nft inet cape_analysis_guard chain structure and active dedicated CAPE firewall service, current storage reserve. No VM/network/firewall/disk writes or guest execution. Run only with SHA-pinned GitHub blob and upload TXT; never blindly retry an unexpected kernel bridge mismatch.
+- A passing kernel flag test is **configuration evidence**, not an end-to-end negative guest-to-guest lateral packet test; second guest disposable peer and full-state cold restore and running OVMF/TPM memory+disk snapshots remain unverified. Shared free space last reported ~64.8GiB: fail closed on further full-size VM clones without reserve. No malware testing authorization.
+
+
 ## 2026-10-12 ~09:16 local — WINDOWS BENIGN V2 TARGETED EGRESS PASS (REAL EVIDENCE)
 
 User attached screenshot of Windows `CAPE_Command2_GuestEgressProbe_V2.txt` plus HOST report `CAPE_Command2_EgressV2_20261012_091450.txt`. Host report proves the corrected v2 ISO was approved, installed onto CDROM sdb live and saved without guest execution, previous ISO untouched, win11_1 stayed RUNNING: `BENIGN_EGRESS_V2_ISO_INSERTED_NO_GUEST_EXECUTION`.
