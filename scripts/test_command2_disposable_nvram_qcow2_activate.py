@@ -60,7 +60,7 @@ class ConversionActivation(unittest.TestCase):
                 fields[4]=0
                 return os.stat_result(fields)
             return st
-        with patch.object(Path,"stat",mockstat),\\
+        with patch.object(Path,"stat",mockstat),\
              patch.object(a.prep,"hostname_guard"),\
              patch.object(a.prep.cold,"inspect",return_value={
                  "manifest_sha256":"a"*64}),\
