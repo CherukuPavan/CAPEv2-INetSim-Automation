@@ -27,6 +27,8 @@ revalidate libvirt, UUIDs, paths, networking and storage.
 | `identity-attach` | Inserts the ISO into exactly one previously empty CD-ROM on a shut-off zero-NIC clone | Operator separately boots guest to perform hostname personalization and verifies identity; no automatic guest start. |
 | `approved-firstboot` | NEW: one specifically approved Windows firstboot with an **already-attached** isolated NIC and V2 receipt verifying the trusted source-master SYSTEM task; checks exact disk/UEFI/swtpm/ISO and live paused guest NIC before resume | Does not claim Windows rename, static IPv4, CAPE Agent readiness, or snapshots; default is no-write plan and apply requires per-guest approval. |
 | `approved-firstboot-batch` | NEW: count-driven read-only all-N verified one-NIC preflight with per-VM private V2 receipts, aggregate RAM capacity check, then ordered individually authorized first boots | No physical real-host acceptance yet. Stops on any failure without cleaning/starting other guests. Source Windows bootstrap must be independently confirmed, network containment physically proven, and post-Windows proofs remain. |
+| `graceful-shutdown` | NEW: exact VM-bound Windows shutdown through an existing live QEMU Guest Agent channel if approved, then bounded ACPI fallback; waits for actual libvirt `shut off` before success | No forced poweroff/reset; never trusts `Domain is being shutdown`; fails if Windows does not respond. `plan` is read-only. |
+| `graceful-shutdown-batch` | NEW: all-N reservation-bound read-only preflight, then sequentially approved shutdown requests with actual stop-state confirmation | Stops on the first timed-out/failed guest; never force stops remaining guests or claims cold-state readiness prematurely. |
 | `identity-boot-batch` | NEW: one count-driven **all-VM** preflight of already attached zero-NIC identity media, then orderly guarded per-VM paused boots with separate typed approval | Stops on first error and preserves any running/paused guest; does NOT verify Windows rename, shut down guests, attach NICs, assign IPs or create snapshots. Requires adequate RAM for each actual boot. |
 | `identity-boot` | NEW: explicit separate-host **one-VM** zero-NIC first Windows boot, starting PAUSED, checking live clone disk/UEFI/TPM/CD-ROM and no NIC/passthrough, then resuming | Requires the source golden Windows SYSTEM startup task already installed and reviewed. May trigger Windows hostname rename/reboot but cannot independently attest it. The guest must be safely shut off and its changed identity verified before later NIC phases. Never starts SSL-55's clone. |
 | `nic-attach` | Adds exactly one isolated network NIC in saved XML, after root-private network acceptance receipt | The real packet-isolation/reboot evidence is operator-witnessed; the receipt cannot be invented by the software. |
@@ -239,6 +241,57 @@ After successful capture, repeated **benign** full-state snapshot reverts,
 TPM/OVMF/Secure Boot/BitLocker/Agent and IPv4/IPv6/L2 checks, final
 shutoff and CAPE machine registration are STILL REQUIRED. This is not
 the final two-command installer and has not run on physical lab VMs.
+
+## Verified Windows guest graceful shutdown (2026-10-12 fix)
+
+The SSL-55 operator observed that `virsh shutdown win11_1` printed
+`Domain 'win11_1' is being shutdown` while Windows stayed on until
+manually stopped. Libvirt documents that this response only acknowledges a
+request; Windows can ignore the virtual ACPI power button. Simply polling
+more often cannot make the guest comply.
+
+`scripts/command2_graceful_shutdown.py` adds a **real state-verified**
+host-side helper. For a matching reserved clone it requires the exact VM
+UUID, disk, OVMF state, isolated NIC, and swtpm2. On SSL-55 it is scoped
+to `--scope ssl55-clone --vm win11_1` and protects the source master
+and trial. On a separate host the matching canonical journal must be
+given with `--scope portable-other`. `--mode plan` is read-only,
+including an already-stopped VM. With explicit operator authorization,
+`--mode shutdown` first uses a supported live virtio QEMU guest-agent
+channel **if one already exists**. If that request fails or Windows
+does not stop promptly, it sends **one** ACPI graceful power-button
+event and waits up to the bounded deadline for actual `shut off`.
+Failure is **blocking**; it never uses `virsh destroy`, `reset`,
+arbitrary Windows process execution, or a hard-off fallback.
+
+The protected SSL-55 source/master was NOT modified during coding.
+The separate Windows source template's `command2_guest_startup_autoconfig.ps1`
+now configures Microsoft `PBUTTONACTION`=3 (AC-power button invokes
+Windows **Shut Down**) *only during an explicitly approved Install* with
+exact source UUID and reviewed script hashes, then verifies it.
+`-Mode Verify` checks the policy without modifying it. The Windows
+OS/guest-agent must still actually execute successfully; source code
+and CI cannot guarantee the OS will respond to ACPI. Since earlier
+clones exclude arbitrary host-connected channels, do not claim QGA is
+present on SSL-55 merely because agent fallback is implemented.
+
+```bash
+# Read-only plan; protected SSL55 exact guest. It is already off now.
+sudo python3 -B scripts/command2_graceful_shutdown.py \
+  --mode plan --scope ssl55-clone \
+  --approved-host cse-ssl-55 --vm win11_1
+
+# On an approved OTHER host, read-only all-N preflight:
+sudo python3 -B scripts/command2_portable_workflow.py \
+  --phase graceful-shutdown-batch --mode plan \
+  --approved-host OTHERHOST \
+  --journal /absolute/private/command2-identity-reservation.json
+```
+
+No need to invoke the shutdown helper on the currently stopped SSL-55
+`win11_1`. The next pending SSL-55 action is the separately guarded
+OFFLINE OVMF QCOW2 XML transition, **not** another shutdown. A snapshot
+or consistent swtpm rollback has NOT been performed.
 
 ## All-N benign CAPE Agent reachability gate
 
