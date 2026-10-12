@@ -32,6 +32,7 @@ import command2_windows_guest_config as windows
 BATCH_PHASE="identity-batch"
 BOOT_BATCH_PHASE="identity-boot-batch"
 APPROVED_BOOT_BATCH_PHASE="approved-firstboot-batch"
+CAPTURE_BATCH_PHASE="snapshot-capture-batch"
 
 PHASES={
     "stage":("command2_portable_zero_nic_entrypoint.py","stage","plan"),
@@ -427,7 +428,7 @@ def approved_firstboot_batch(args):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
@@ -443,6 +444,7 @@ def main():
     p.add_argument("--network-receipt",type=Path)
     p.add_argument("--network-receipt-dir",type=Path)
     p.add_argument("--snapshot-receipt",type=Path)
+    p.add_argument("--snapshot-evidence-dir",type=Path)
     p.add_argument("--witness-dir",type=Path)
     p.add_argument("--kvm-conf",type=Path)
     p.add_argument("--recovery-bundle",type=Path)
@@ -459,6 +461,14 @@ def main():
             return identity_boot_batch(args)
         if args.phase==APPROVED_BOOT_BATCH_PHASE:
             return approved_firstboot_batch(args)
+        if args.phase==CAPTURE_BATCH_PHASE:
+            host=canonical_host(args.approved_host)
+            need(os.geteuid()==0,"Root required for private snapshot evidence")
+            absolute(args.journal,"journal")
+            absolute(args.snapshot_evidence_dir,"snapshot_evidence_dir")
+            import command2_portable_snapshot_capture_batch as capture_batch
+            return capture_batch.run(host,args.journal,args.snapshot_evidence_dir,
+                                     "capture" if args.mode=="apply" else "plan")
         if args.phase=="agent-batch":
             need(args.mode=="plan",
                  "Read-only agent batch cannot apply changes")
