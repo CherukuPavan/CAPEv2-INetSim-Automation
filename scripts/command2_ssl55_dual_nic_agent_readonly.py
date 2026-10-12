@@ -30,6 +30,11 @@ UID="732b2256-ee99-41fa-881d-fbf5c476d960"
 MASTER=("win11","289d89be-68ec-4c62-90e1-ea930849266f")
 TRIAL=("win11_trial_1","e75f6fef-347d-462f-9738-4de3df6bfa74")
 SNAP="cape_candidate_win11_1"
+POSTNAT="cape_postnat_win11_1"
+POSTNAT_IMAGES=(
+    "/var/lib/libvirt/images/cape-clones-staging/win11_1.command2.qcow2",
+    "/var/lib/libvirt/qemu/nvram/win11_1.command2_VARS.fd.qcow2",
+)
 AGENT_PORT=8000
 PATHS={
     "original_isolated":("192.168.240.101","192.168.240.1",
@@ -158,16 +163,45 @@ def assess():
          "Unknown other guest running")
     snapshots=[x.strip() for x in
              virsh("snapshot-list",VM,"--name").splitlines() if x.strip()]
-    need(snapshots==[SNAP],"Existing candidate snapshot changed")
-    snaproot=ET.fromstring(virsh("snapshot-dumpxml",VM,SNAP))
-    mem=snaproot.find("memory")
-    need(snaproot.tag=="domainsnapshot" and
-         snaproot.findtext("name")==SNAP and
-         snaproot.findtext("state")=="running" and
-         mem is not None and mem.get("snapshot")=="internal" and
-         any(x.get("name")=="sda" and x.get("snapshot")=="internal"
-             for x in snaproot.findall("./disks/disk")),
-         "Saved running memory+OS disk snapshot missing")
+    second=sorted(snapshots)==sorted([SNAP,POSTNAT])
+    need(snapshots==[SNAP] or second,
+         "Unexpected candidate/post-NAT snapshot inventory")
+    for snap in ([SNAP,POSTNAT] if second else [SNAP]):
+        snaproot=ET.fromstring(virsh("snapshot-dumpxml",VM,snap))
+        mem=snaproot.find("memory")
+        domain=snaproot.find("domain")
+        disks=snaproot.findall("./disks/disk")
+        need(snaproot.tag=="domainsnapshot" and
+             snaproot.findtext("name")==snap and
+             snaproot.findtext("state")=="running" and
+             domain is not None and
+             domain.findtext("uuid")==UID and domain.findtext("name")==VM and
+             mem is not None and mem.get("snapshot")=="internal" and
+             sum(x.get("name")=="sda" and x.get("snapshot")=="internal"
+                 for x in disks)==1 and
+             len({d.get("name") for d in disks})==len(disks),
+             "Saved running memory+OS disk snapshot missing for "+snap)
+    # A second candidate must be real on BOTH exact, independent QCOW2
+    # files—not just a libvirt metadata node created after NAT changed.
+    if second:
+        from pathlib import Path
+        for raw in POSTNAT_IMAGES:
+            path=Path(raw)
+            need(path.is_file() and not path.is_symlink(),
+                 "Post-NAT image missing or linked")
+            info=json.loads(cmd("qemu-img","info","-U","--output=json",
+                                str(path),timeout=90))
+            need(type(info) is dict and info.get("format")=="qcow2" and
+                 not info.get("backing-filename"),
+                 "Post-NAT image not standalone QCOW2")
+            entries=info.get("snapshots",[])
+            need(type(entries) is list and all(type(x) is dict and
+                 type(x.get("name")) is str for x in entries),
+                 "Post-NAT image checkpoint list malformed")
+            names=[x["name"] for x in entries]
+            need(names.count(SNAP)==1 and names.count(POSTNAT)==1 and
+                 len(names)==2,
+                 "Post-NAT OS/UEFI actual QCOW2 checkpoints do not match")
     saved=interfaces(virsh("dumpxml","--inactive",VM))
     live=interfaces(virsh("dumpxml",VM))
     networks=libvirt_networks()
@@ -178,6 +212,9 @@ def assess():
     return {
         "result":"SSL55_DUAL_PERMANENT_NAT_CAPE_AGENT_AUDIT_READONLY",
         "vm":VM,"snapshot":SNAP,"state":"running",
+        "postnat_running_snapshot_verified":second,
+        "expected_running_snapshot_names":([SNAP,POSTNAT] if second else [SNAP]),
+        "TPM_safe_revert_proven":False,
         "interfaces_saved":saved,"interfaces_live":live,
         "routes_networks":networks,
         "nat_lease_observation":leases,
