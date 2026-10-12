@@ -57,14 +57,22 @@ class ISOs(unittest.TestCase):
                 p.write_bytes(b"mock-media"+b"x"*2048)
                 return SimpleNamespace(returncode=0)
             patches=shared(2,td)
-            secure=SimpleNamespace(st_mode=stat.S_IFREG|0o600,
-                                   st_uid=0,st_nlink=1)
+            real_fstat=m.os.fstat
+            def scoped_fstat(fd):
+                st=real_fstat(fd)
+                if stat.S_ISREG(st.st_mode) and stat.S_IMODE(st.st_mode)==0o600:
+                    # Only the script-created private lock needs its
+                    # simulated root owner. All directory descriptors
+                    # retain real st_dev/st_ino for tempfile safe cleanup.
+                    return SimpleNamespace(st_mode=st.st_mode,st_uid=0,
+                       st_nlink=st.st_nlink,st_dev=st.st_dev,st_ino=st.st_ino)
+                return st
             with patches[0],patches[1],patches[2],patches[3],\
                  patch.object(m.sys.stdin,"isatty",return_value=True),\
                  patch("builtins.input",return_value=(
                       "BUILD-2-IMMUTABLE-MASTER-NAT-WINDOWS-ISOS")),\
                  patch.object(m,"subprocess") as process,\
-                 patch.object(m.os,"fstat",return_value=secure):
+                 patch.object(m.os,"fstat",side_effect=scoped_fstat):
                 process.run.side_effect=fakeiso
                 got=m.build("lab02",Path("/root/j/command2-identity-reservation.json"),td)
             self.assertTrue(got["guest_media_created"])
