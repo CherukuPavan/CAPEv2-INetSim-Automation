@@ -153,6 +153,7 @@ class RunningSnapshotTests(unittest.TestCase):
                          "result":"COMMAND2_CAPE_AGENT_READONLY_VERIFIED"}),\
                      patch.object(s,"LOCK",lock),\
                      patch.object(s.recovery,"inspect",return_value={"manifest_sha256":"a"*64,"members":{}}),\
+                     patch.object(s.native,"inspect",return_value={"result":"TEST_NATIVE_ADMITTED"}),\
                      patch.object(s,"virsh",side_effect=faux_virsh):
                     with self.assertRaisesRegex(s.SnapshotBlocked,"INTERNAL disk and INTERNAL memory"):
                         s.capture(NAME,HOST,UUID,MAC,IP,"/verified",recovery_bundle=Path("/tmp/full-cold"),reviewed_manifest_sha="a"*64)
@@ -173,6 +174,7 @@ class RunningSnapshotTests(unittest.TestCase):
                  patch.object(s,"plan",return_value=pre),\
                  patch.object(s,"LOCK",lock),\
                      patch.object(s.recovery,"inspect",return_value={"manifest_sha256":"a"*64,"members":{}}),\
+                     patch.object(s.native,"inspect",return_value={"result":"TEST_NATIVE_ADMITTED"}),\
                  patch.object(s.agentprobe,"probe_agent",
                      side_effect=s.agentprobe.AgentBlocked("Agent missing")):
                 with self.assertRaisesRegex(s.agentprobe.AgentBlocked,"Agent missing"):
