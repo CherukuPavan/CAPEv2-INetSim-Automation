@@ -495,7 +495,7 @@ def graceful_shutdown_batch(args):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan","master-nat-attach","master-nat-media","master-nat-agents","master-nat-upload","master-nat-execute","master-nat-verify-windows"))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan","master-nat-attach","master-nat-media","master-nat-agents","master-nat-upload","master-nat-execute","master-nat-verify-windows","master-nat-running-snapshots"))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
@@ -533,6 +533,24 @@ def main():
             return approved_firstboot_batch(args)
         if args.phase==SHUTDOWN_BATCH_PHASE:
             return graceful_shutdown_batch(args)
+        if args.phase=="master-nat-running-snapshots":
+            host=canonical_host(args.approved_host)
+            need(os.geteuid()==0,
+                 "Root required for all-N running RAM/Windows/UEFI checkpoints")
+            absolute(args.journal,"journal")
+            absolute(args.witness_dir,"witness_dir")
+            if args.mode=="apply":
+                need(sys.stdin.isatty(),
+                     "Operator typed approval required before all-N VM snapshots")
+            child=Path(__file__).resolve().with_name(
+                "command2_portable_master_nat_running_snapshots.py")
+            need(child.is_file() and not child.is_symlink(),
+                 "Master NAT all-VM running snapshot helper missing")
+            return subprocess.run([sys.executable,"-B",str(child),
+                "--mode","capture" if args.mode=="apply" else "plan",
+                "--approved-host",host,"--journal",str(args.journal),
+                "--evidence-dir",str(args.witness_dir)],
+                check=False).returncode
         if args.phase=="master-nat-verify-windows":
             need(args.mode=="plan",
                  "Independent Windows NAT verification is a read-only phase")
