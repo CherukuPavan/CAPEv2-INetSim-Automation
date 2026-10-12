@@ -95,8 +95,11 @@ def verify_network_live(subnet, bridge_ip):
          not root.findall(".//route") and not root.findall(".//dhcp"),
          "Analysis network contains forwarding/NAT/DHCP/route")
     bridge = root.find("bridge")
+    port = root.find("port")
     ipnodes = root.findall("ip")
     dns = root.find("dns")
+    need(port is not None and port.get("isolated") == "yes",
+         "Guest-to-guest Linux bridge port isolation not configured")
     need(bridge is not None and bridge.get("name") == BRIDGE and
          len(ipnodes) == 1 and ipnodes[0].get("address") == bridge_ip and
          ipnodes[0].get("netmask") == "255.255.255.0" and
