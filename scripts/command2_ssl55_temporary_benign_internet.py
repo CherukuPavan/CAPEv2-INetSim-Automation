@@ -314,6 +314,10 @@ def setup_session(minutes):
     if detach_error:
         raise SessionBlocked("TRUSTED INTERNET NIC NOT VERIFIED REMOVED: "+
                              detach_error)
+    if ended=="session_interrupted_or_blocked":
+        raise SessionBlocked("Temporary NAT was cleaned up but the setup "
+                             "session failed/interrupted; confirm manually "
+                             "that Windows is offline before any snapshot")
     return {"result":"SSL55_TRUSTED_WINDOWS_SETUP_FINISHED_OFFLINE",
             "reason_session_ended":ended,
             "guest_real_internet_witness_required":True,
