@@ -109,7 +109,7 @@ class ScopedFirmware(unittest.TestCase):
         for bad in ('virsh("destroy"', 'virsh("shutdown"',
                     'virsh("snapshot-create"', 'virsh("snapshot-revert"',
                     'virsh("define"', 'virsh("start"',
-                    "qemu-img','rebase",'","shell=True"):
+                    'run("qemu-img","rebase"',"shell=True"):
             self.assertNotIn(bad,source)
     def test_prepare_only_writes_sidecar_after_shut_off_and_approval(self):
         self.mocked_inspect("shut off")
