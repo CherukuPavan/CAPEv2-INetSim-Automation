@@ -99,7 +99,9 @@ def expected_guest(row, subnet):
     net=ipaddress.IPv4Network(subnet,strict=True)
     name=row["libvirt_name"]
     index=int(VM_RE.fullmatch(name).group(1))
-    need(net.prefixlen==24 and net.is_private and
+    ranges=tuple(ipaddress.IPv4Network(x) for x in
+                 ("10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"))
+    need(net.prefixlen==24 and any(net.subnet_of(x) for x in ranges) and
          net!=ipaddress.IPv4Network("192.168.122.0/24") and
          row["guest_static_ipv4_target"]==
              str(ipaddress.IPv4Address(int(net.network_address)+100+index)),
@@ -179,6 +181,15 @@ def witness_gate(path,name,row,snapshot,host):
             "real_attestation_cryptographically_verified":False,
             "required_revert_gates_recorded":len(REQUIRED_CYCLE)}
 
+def private_evidence_folder(folder):
+    path=Path(folder)
+    need(path.is_absolute() and path.is_dir() and not path.is_symlink(),
+         "Private evidence directory missing")
+    st=path.stat()
+    need(st.st_uid==0 and stat.S_IMODE(st.st_mode)&0o077==0,
+         "Root private 0700 witness/journal directory required")
+    return path
+
 def evaluate(rows,subnet,host,journal,witness_dir):
     entries=[];passed=0
     for row in rows:
@@ -215,8 +226,8 @@ def main():
     a=p.parse_args()
     try:
         host_guard(a.approved_host)
-        need(a.witness_dir.is_absolute() and a.witness_dir.is_dir() and
-             not a.witness_dir.is_symlink(),"Missing approved witness directory")
+        private_evidence_folder(a.witness_dir)
+        private_evidence_folder(a.journal.parent)
         rows=reservation_rows(a.journal,a.approved_host)
         out=evaluate(rows,a.subnet,a.approved_host,a.journal,a.witness_dir)
         print(json.dumps(out,indent=2,sort_keys=True))
