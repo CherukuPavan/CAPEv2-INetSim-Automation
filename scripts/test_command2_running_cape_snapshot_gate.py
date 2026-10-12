@@ -152,9 +152,10 @@ class RunningSnapshotTests(unittest.TestCase):
                      patch.object(s.agentprobe,"probe_agent",return_value={
                          "result":"COMMAND2_CAPE_AGENT_READONLY_VERIFIED"}),\
                      patch.object(s,"LOCK",lock),\
+                     patch.object(s.recovery,"inspect",return_value={"manifest_sha256":"a"*64,"members":{}}),\
                      patch.object(s,"virsh",side_effect=faux_virsh):
                     with self.assertRaisesRegex(s.SnapshotBlocked,"INTERNAL disk and INTERNAL memory"):
-                        s.capture(NAME,HOST,UUID,MAC,IP,"/verified")
+                        s.capture(NAME,HOST,UUID,MAC,IP,"/verified",recovery_bundle=Path("/tmp/full-cold"),reviewed_manifest_sha="a"*64)
 
     def test_live_snapshot_requires_real_cape_agent_response(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -171,10 +172,20 @@ class RunningSnapshotTests(unittest.TestCase):
                  patch("builtins.input",return_value="CAPTURE-RUNNING-WIN11_1"),\
                  patch.object(s,"plan",return_value=pre),\
                  patch.object(s,"LOCK",lock),\
+                     patch.object(s.recovery,"inspect",return_value={"manifest_sha256":"a"*64,"members":{}}),\
                  patch.object(s.agentprobe,"probe_agent",
                      side_effect=s.agentprobe.AgentBlocked("Agent missing")):
                 with self.assertRaisesRegex(s.agentprobe.AgentBlocked,"Agent missing"):
-                    s.capture(NAME,HOST,UUID,MAC,IP,"/verified")
+                    s.capture(NAME,HOST,UUID,MAC,IP,"/verified",recovery_bundle=Path("/tmp/full-cold"),reviewed_manifest_sha="a"*64)
+
+    def test_capture_requires_explicit_separate_full_cold_backup(self):
+        with patch.object(s.socket,"gethostname",return_value=HOST),\
+             patch.object(s,"SENTINEL",Path(__file__).with_name("_missing_sentinel_")),\
+             patch.object(s.os,"geteuid",return_value=0),\
+             patch.object(s.sys.stdin,"isatty",return_value=True),\
+             patch.object(s,"plan",side_effect=AssertionError("No VM snapshot plan")):
+            with self.assertRaisesRegex(s.SnapshotBlocked,"SHA-pinned full cold"):
+                s.capture(NAME,HOST,UUID,MAC,IP,"/signed")
 
     def test_no_automatic_revert_or_network_mutation_commands(self):
         source=Path(s.__file__).read_text(encoding="utf-8")
