@@ -92,10 +92,10 @@ def authorized_stage(host,journal,vm,nat_iso,evidence_dir):
         "guest_restart_performed":False,
         "safe_for_malware_execution":False}
 
-def request_execute(ip,gateway,command):
-    need(command==script_command(command.split(
-         " -ExpectedSha256 ",1)[1].split(" ",1)[0]),
-         "Non-whitelisted PowerShell command refused")
+def request_execute(ip,gateway,json_sha256):
+    # The only command is generated HERE from a SHA-pinned known file.
+    # No operator-supplied commandline or shell interpolation is accepted.
+    command=script_command(json_sha256)
     body=urlencode({"command":command,"async":"1"}).encode("ascii")
     answer=transport.agent_post(ip,gateway,"/execute",body,
                                 "application/x-www-form-urlencoded")
@@ -138,10 +138,10 @@ def apply(host,journal,vm,nat_iso,evidence_dir):
     dirfd=os.open(target.parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     try: os.fsync(dirfd)
     finally: os.close(dirfd)
-    command=script_command(before["json_sha256"])
     try:
         transport_info=request_execute(before["bootstrap_ip"],
-                                       before["source_gateway"],command)
+                                       before["source_gateway"],
+                                       before["json_sha256"])
     except Exception as exc:
         raise GuestExecuteBlocked(
           "EXACT_WINDOWS_SETUP_REQUEST_MAY_HAVE_RUN: durable intent exists; "
