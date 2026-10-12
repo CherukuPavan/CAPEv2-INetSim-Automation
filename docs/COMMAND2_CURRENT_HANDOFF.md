@@ -1,5 +1,10 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 12:35 UTC — COUNT-DRIVEN SNAPSHOT INVENTORY NOW ACCEPTS PRIVATE STAGING JOURNAL
+
+`scripts/command2_snapshot_path_admission.py` now accepts `--journal /absolute/path/command2-identity-reservation.json` for approved other-host root-only 0700 staging journal (matching existing Command2 N-clone reservation schema, fixed ordered guest names/UUIDs). This removes hand-entering every UUID and shows per guest where firmware, NIC, native running snapshot or TPM/UEFI revert evidence still blocks deployment. Host `CSE-SSL-55` still may use only explicit `--reference-ssl55` (read-only) and cannot use journal for other hosts. No host, disk, VM, network, snapshot modifications; not a finished Command2 runner. Tests added for exact journal host/order and protected reference. Initial CI exposed malformed escaped newline in the new argparse section, fixed in commit `92d9f4e48aa399ade378e41c2b2efae80f0bcf94`; **new post-fix CI confirmation required** (last successful pre-journal CI 38249429972). Other-host physical 2-VM test and real running TPM-consistent snapshots still OPEN. Never claim completion from this planner.
+
+
 ## 2026-10-12 12:26+ — COUNT-AWARE SNAPSHOT LIFECYCLE INVENTORY IMPLEMENTED, OFFLINE CI GREEN
 
 User: "chalo chalo complete it" = continue completing all of Command2, especially each clone's final CAPE usable RUNNING snapshot, without redoing SSL55 passed checks. Latest work only on GitHub development:
