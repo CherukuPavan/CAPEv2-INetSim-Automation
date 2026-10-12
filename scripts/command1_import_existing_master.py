@@ -250,11 +250,15 @@ def apply(host,bundle,os_disk,vars_path,tpm_user):
              prefix=".command1-master-unfinished-",delete=False) as temp:
             temporary=Path(temp.name)
         os.chmod(temporary,0o600)
-        # QEMU convert must be from a cryptographically checked private
-        # bundle, not from the original SSL55 live disk.
-        golden.run("qemu-img","convert","-f","qcow2","-O","qcow2",
-                   str(Path(bundle)/golden.FILES["disk"]),str(temporary),
-                   timeout=7200)
+        # The golden source image is ALREADY independently flattened.
+        # Re-encoding QCOW2 with qemu-img convert would change its byte
+        # SHA despite preserving virtual sectors. Copy exact verified
+        # bytes instead, then check QCOW2 structural integrity.
+        with open(Path(bundle)/golden.FILES["disk"],"rb") as inp,\
+             open(temporary,"wb") as out:
+            shutil.copyfileobj(inp,out,4*1024*1024)
+            out.flush()
+            os.fsync(out.fileno())
         golden.run("qemu-img","check","-q","-f","qcow2",
                    str(temporary),timeout=3600)
         need(golden.sha(temporary)==
