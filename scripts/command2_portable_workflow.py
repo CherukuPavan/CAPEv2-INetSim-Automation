@@ -495,7 +495,7 @@ def graceful_shutdown_batch(args):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan","master-nat-attach","master-nat-media","master-nat-agents","master-nat-upload"))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan","master-nat-attach","master-nat-media","master-nat-agents","master-nat-upload","master-nat-execute"))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
@@ -533,6 +533,29 @@ def main():
             return approved_firstboot_batch(args)
         if args.phase==SHUTDOWN_BATCH_PHASE:
             return graceful_shutdown_batch(args)
+        if args.phase=="master-nat-execute":
+            host=canonical_host(args.approved_host)
+            need(os.geteuid()==0,
+                 "Root required for exact approved golden Windows setup receipt")
+            absolute(args.journal,"journal")
+            absolute(args.nat_media_dir,"nat_media_dir")
+            absolute(args.witness_dir,"witness_dir")
+            need(args.vm is not None and
+                 re.fullmatch(r"win11_([1-9]|1[0-6])",args.vm),
+                 "Exact reserved NAT Windows clone required")
+            if args.mode=="apply":
+                need(sys.stdin.isatty(),
+                     "Interactive separately typed benign guest execution approval required")
+            child=Path(__file__).resolve().with_name(
+                "command2_portable_nat_agent_execute.py")
+            need(child.is_file() and not child.is_symlink(),
+                 "Reviewed exact-guest Windows NAT execution helper absent")
+            iso=args.nat_media_dir/(args.vm+".master-nat.iso")
+            return subprocess.run([sys.executable,"-B",str(child),
+                "--mode","execute" if args.mode=="apply" else "plan",
+                "--approved-host",host,"--journal",str(args.journal),
+                "--vm",args.vm,"--nat-iso",str(iso),
+                "--evidence-dir",str(args.witness_dir)],check=False).returncode
         if args.phase=="master-nat-upload":
             host=canonical_host(args.approved_host)
             need(os.geteuid()==0,
