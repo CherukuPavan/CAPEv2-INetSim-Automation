@@ -34,6 +34,7 @@ import xml.etree.ElementTree as ET
 import command1_export_existing_master as golden
 
 LOCK=Path("/run/lock/cape-command1-master-import.lock")
+TPM_ROOT=Path("/var/lib/libvirt/swtpm")
 INTENT="command1-master-import-intent.json"
 MASTER="win11"
 class ImportBlocked(RuntimeError):pass
@@ -144,7 +145,7 @@ def check(host,bundle,os_disk,vars_path,tpm_user,*,staged=False):
     need(not os.path.samefile(bundle,os_disk.parent)
          if os.path.exists(os_disk.parent) else True,
          "Original master bundle must not be overwritten")
-    tpm_root=Path("/var/lib/libvirt/swtpm")
+    tpm_root=TPM_ROOT
     need(tpm_root.is_dir() and not tpm_root.is_symlink(),
          "Target swtpm service state root missing")
     dest_tpm=tpm_root/uid/"tpm2"
@@ -237,7 +238,7 @@ def apply(host,bundle,os_disk,vars_path,tpm_user):
              "Import bundle/NVRAM/target state changed after approval")
         os_disk=Path(os_disk)
         vars_path=Path(vars_path)
-        private=Path("/var/lib/libvirt/swtpm")/before["master_uuid"]
+        private=TPM_ROOT/before["master_uuid"]
         tpm=private/"tpm2"
         mutated=True
         # Intent is a non-overwritten witness. No automatic undo/retry.
