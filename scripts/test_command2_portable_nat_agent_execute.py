@@ -48,6 +48,7 @@ class GuestExecute(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             d=self.evidence(td)
             with patch.object(g.transport,"verified_evidence_folder",return_value=d),\
+                 patch.object(g,"trusted_stage_json",side_effect=lambda path: json.loads(path.read_text())),\
                  patch.object(g.transport,"inspect",return_value=BEFORE),\
                  patch.object(g.transport.attach,"virsh",return_value=""):
                 plan=g.authorized_stage("lab02",J,VM,Path("/root/ISO.iso"),d)
@@ -55,6 +56,7 @@ class GuestExecute(unittest.TestCase):
             self.assertFalse(plan["guest_powershell_executed"])
             self.assertFalse(plan["guest_hostname_ipv4_https_independently_verified"])
             with patch.object(g.transport,"verified_evidence_folder",return_value=d),\
+                 patch.object(g,"trusted_stage_json",side_effect=lambda path: json.loads(path.read_text())),\
                  patch.object(g.transport,"inspect",return_value=BEFORE),\
                  patch.object(g.transport.attach,"virsh",return_value="snapshot-ready"),\
                  self.assertRaisesRegex(g.GuestExecuteBlocked,"existing snapshots"):
@@ -66,6 +68,7 @@ class GuestExecute(unittest.TestCase):
             p=d/(VM+g.transport.STAGE_SUFFIX)
             p.write_text(json.dumps({**STAGE,"mac":"02:ca:22:00:00:99"}))
             with patch.object(g.transport,"verified_evidence_folder",return_value=d),\
+                 patch.object(g,"trusted_stage_json",side_effect=lambda path: json.loads(path.read_text())),\
                  patch.object(g.transport,"inspect",return_value=BEFORE),\
                  self.assertRaisesRegex(g.GuestExecuteBlocked,"does not match"):
                 g.authorized_stage("lab02",J,VM,Path("/tmp/x.iso"),d)
@@ -93,6 +96,7 @@ class GuestExecute(unittest.TestCase):
                 calls.append(x)
                 raise g.transport.TransportBlocked("connection dropped mid-request")
             with patch.object(g.transport,"verified_evidence_folder",return_value=d),\
+                 patch.object(g,"trusted_stage_json",side_effect=lambda path: json.loads(path.read_text())),\
                  patch.object(g.transport,"inspect",return_value=BEFORE),\
                  patch.object(g.transport.attach,"virsh",return_value=""),\
                  patch.object(g.sys.stdin,"isatty",return_value=True),\
@@ -107,6 +111,7 @@ class GuestExecute(unittest.TestCase):
             self.assertEqual(receipt.stat().st_mode & 0o777,0o600)
             self.assertTrue(json.loads(receipt.read_text())["no_retry_even_if_connection_lost"])
             with patch.object(g.transport,"verified_evidence_folder",return_value=d),\
+                 patch.object(g,"trusted_stage_json",side_effect=lambda path: json.loads(path.read_text())),\
                  patch.object(g.transport,"inspect",return_value=BEFORE),\
                  patch.object(g.transport.attach,"virsh",return_value=""),\
                  self.assertRaisesRegex(g.GuestExecuteBlocked,"already journaled"):
