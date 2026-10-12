@@ -1,5 +1,15 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 07:12 UTC — POST-BLOCKPULL STILL PASS; RECOVERY CAPACITY REPORT STILL PENDING
+
+Uploaded `CAPE_Command2_PostBlockpull_20261012_071208.txt` (NOT the requested `CAPE_Command2_RecoveryPlan_*.txt`). Existing post-blockpull read-only acceptance remained `SSL55_POST_BLOCKPULL_READONLY_ACCEPTED`:
+- `win11_1` running, CAPE Agent 0.23 admin-positive, isolated NIC unchanged, live AND saved backing chains empty; original master image FDs all closed, original protected win11 and trial shut off.
+- Clone allocated 29.97 GiB, free 94.69 GiB, QEMU PID 16439.
+- No cold boot, cold backup, swtpm/UEFI restore, running snapshot/revert or negative guest egress test. Original images must remain unchanged, no malware.
+- GitHub developer-only read-only `scripts/command2_ssl55_recovery_capacity_plan.py` committed to `development` (source blob 917ea44e435538f35cbd02908f7b073d4a7c7718). Its read-only acceptance report has NOT yet been uploaded. Added basic offline XML fixture tests to CI. The report computes actual apparent QCOW2 bytes plus 40GiB shared-host reserve + 5GiB overhead, and inventories TPM/NVRAM filenames/sizes without reading TPM secret bytes.
+- NEXT: Execute exact SHA-pinned recovery capacity plan and upload `CAPE_Command2_RecoveryPlan_*.txt`. Do not repeat blockpull. Until backup and restore validated do not reboot/shutdown/snapshot/revert win11_1.
+
+
 ## 2026-10-12 — LIVE WIN11_1 BLOCKPULL ACTUALLY SUCCEEDED; POST-ACCEPTANCE NEXT
 
 User uploaded `CAPE_Command2_Blockpull_Apply_20261012_064653.txt`. All facts below refer to REAL SSL55 host output.
