@@ -22,8 +22,10 @@ of approved media remains to be implemented and tested in Command 2.
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet("Install","Run")][string]$Mode="Run",
+    [ValidateSet("Install","Verify","Run")][string]$Mode="Run",
     [string]$ExpectedTemplateUuid,
+    [string]$ExpectedRunnerSha256,
+    [string]$ExpectedPersonalizerSha256,
     [switch]$ApproveInstall
 )
 Set-StrictMode -Version Latest
@@ -75,6 +77,42 @@ function CopyVerified([string]$from,[string]$to) {
         Deny "Installed script did not match approved local source"
     }
 }
+function AssertPinnedSha([string]$file,[string]$expected,[string]$what) {
+    if ($expected -cnotmatch "^[0-9a-fA-F]{64}$") {
+        Deny ("Missing reviewed 64-hex SHA256 for "+$what)
+    }
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+        Deny ("Bootstrap file missing: "+$what)
+    }
+    $actual=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+    if ($actual -ine $expected) {
+        Deny ("Bootstrap file differs from reviewed SHA256: "+$what)
+    }
+}
+function ExactBootTask {
+    $existing=Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if ($null -eq $existing) { Deny "Windows SYSTEM bootstrap scheduled task missing" }
+    if ($existing.State -eq "Disabled" -or -not $existing.Settings.Enabled) {
+        Deny "Windows SYSTEM bootstrap scheduled task disabled"
+    }
+    if ([string]$existing.Principal.UserId -notin @("SYSTEM","NT AUTHORITY\\SYSTEM") -or
+        [string]$existing.Principal.RunLevel -ne "Highest" -or
+        [string]$existing.Principal.LogonType -ne "ServiceAccount") {
+        Deny "Bootstrap scheduled task principal differs from privileged SYSTEM"
+    }
+    $expectedArgs='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+
+                  $LocalRunner+'" -Mode Run'
+    $actions=@($existing.Actions)
+    $triggers=@($existing.Triggers)
+    if ($actions.Count -ne 1 -or
+        [string]$actions[0].Execute -ine "powershell.exe" -or
+        [string]$actions[0].Arguments -cne $expectedArgs -or
+        $triggers.Count -ne 1 -or
+        $triggers[0].CimClass.CimClassName -cne "MSFT_TaskBootTrigger" -or
+        -not $triggers[0].Enabled) {
+        Deny "Bootstrap scheduled task action or startup trigger differs"
+    }
+}
 function OpticalConfig {
     # Wait for optical media after boot; this is a local read-only scan.
     for ($attempt=0; $attempt -lt 8; $attempt++) {
@@ -109,20 +147,40 @@ function CallPersonalizer([string]$mode,[string]$conf,[string]$digest,[bool]$iso
 
 RequireAdmin
 
+if ($Mode -eq "Install" -or $Mode -eq "Verify") {
+    if ($ExpectedTemplateUuid -notmatch
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") {
+        Deny "Exact expected Windows template UUID required for installation or verification"
+    }
+    if ((UUID) -ne [guid]$ExpectedTemplateUuid) {
+        Deny "Windows template UUID differs from authorized source"
+    }
+    $installerDir=Split-Path -Parent $PSCommandPath
+    $sourcePersonalizer=Join-Path $installerDir "command2_guest_personalize.ps1"
+    AssertPinnedSha $PSCommandPath $ExpectedRunnerSha256 "bootstrap runner"
+    AssertPinnedSha $sourcePersonalizer $ExpectedPersonalizerSha256 "guest personalizer"
+}
+if ($Mode -eq "Verify") {
+    # Read-only installed source and scheduled-task acceptance: verify that the
+    # exact separately reviewed source hashes match installed ProgramData files.
+    AssertPinnedSha $LocalRunner $ExpectedRunnerSha256 "installed runner"
+    AssertPinnedSha $LocalPersonalize $ExpectedPersonalizerSha256 "installed personalizer"
+    ExactBootTask
+    [pscustomobject]@{result="COMMAND1_WINDOWS_BOOTSTRAP_READONLY_VERIFIED"
+        source_uuid=[string](UUID);task=$TaskName
+        installed_runner_sha256=$ExpectedRunnerSha256.ToLowerInvariant()
+        installed_personalizer_sha256=$ExpectedPersonalizerSha256.ToLowerInvariant()
+        boot_trigger_verified=$true;system_principal_verified=$true
+        auto_guest_network_executed_here=$false;no_changes_made=$true
+        source_master_clone_ready_by_this_check_alone=$false} | ConvertTo-Json -Compress
+    exit 0
+}
+
 if ($Mode -eq "Install") {
     if (-not $ApproveInstall) {
         Deny "Explicit operator approval required to install startup automation"
     }
-    if ($ExpectedTemplateUuid -notmatch
-        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") {
-        Deny "Explicit Windows source/clone UUID required"
-    }
-    if ((UUID) -ne [guid]$ExpectedTemplateUuid) {
-        Deny "Wrong Windows VM for authorized startup-task installation"
-    }
-    $installerDir=Split-Path -Parent $PSCommandPath
-    $sourcePersonalizer=Join-Path $installerDir "command2_guest_personalize.ps1"
-    if (-not (Test-Path -LiteralPath $Root -PathType Container)) {
+     if (-not (Test-Path -LiteralPath $Root -PathType Container)) {
         New-Item -Path $Root -ItemType Directory -Force -ErrorAction Stop | Out-Null
     }
     CopyVerified $PSCommandPath $LocalRunner
@@ -138,6 +196,9 @@ if ($Mode -eq "Install") {
     $principal=New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
     $settings=New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -ErrorAction Stop | Out-Null
+    # Verify the newly registered task rather than assuming creation implies
+    # an effective SYSTEM startup trigger.
+    ExactBootTask
     [pscustomobject]@{result="COMMAND2_GUEST_STARTUP_TASK_INSTALLED"
         vm_uuid=[string](UUID);network_changed=$false
         guest_identity_changed=$false;task=$TaskName} | ConvertTo-Json -Compress
