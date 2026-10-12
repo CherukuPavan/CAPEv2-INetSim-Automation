@@ -41,6 +41,7 @@ PHASES={
     "firmware-sidecar":("command2_disposable_nvram_qcow2_prepare.py","prepare","plan"),
     "firmware-activate":("command2_disposable_nvram_qcow2_activate.py","apply","plan"),
     "snapshot-capture":("command2_running_cape_snapshot_gate.py","capture","plan"),
+    "snapshot-revert-once":("command2_disposable_snapshot_revert_probe.py","revert-once","plan"),
     "snapshot-batch":("command2_running_snapshot_batch_gate.py",None,None),
     "cape-register":("command2_cape_registration_gate.py","apply","plan"),
 }
@@ -183,6 +184,13 @@ def choose(args):
             argv+=["--witness",absolute(args.firmware_restore_witness,
                                          "firmware_restore_witness"),
                    "--xml-backup-dir",absolute(args.xml_backup_dir,"xml_backup_dir")]
+    elif phase=="snapshot-revert-once":
+        if args.mode=="apply":
+            need(args.acknowledge_revert=="I-ACCEPT-DISPOSABLE-REVERT-RISK",
+                 "Explicit disposable snapshot-revert risk acknowledgment required")
+        argv+=["--journal",str(args.journal),
+               "--recovery-bundle",absolute(args.recovery_bundle,"recovery_bundle"),
+               "--manifest-sha256",args.manifest_sha256 or ""]
     elif phase=="snapshot-capture":
         argv+=["--expected-uuid",uuid,"--expected-mac",mac,
                "--guest-ip",ip,"--subnet",subnet]
@@ -221,6 +229,7 @@ def main():
     p.add_argument("--firmware-restore-witness",type=Path)
     p.add_argument("--xml-backup-dir",type=Path)
     p.add_argument("--acknowledge-restore")
+    p.add_argument("--acknowledge-revert")
     args=p.parse_args()
     try:
         script,argv,details=choose(args)
