@@ -51,7 +51,7 @@ class InternetTopology(unittest.TestCase):
             if a==("snapshot-list",NAME,"--name"):return c.SNAP
             if a[0]=="dumpxml":return DOMAIN
             if a==("net-dumpxml",c.NET):return NETWORK
-            if a==("net-list","--all","--name"):return "default\\ncape-analysis-isolated"
+            if a==("net-list","--all","--name"):return "default\ncape-analysis-isolated"
             if a==("net-dumpxml","default"):
                 return ('<network><name>default</name><forward mode="nat"/>'
                         '<ip address="192.168.122.1"><dhcp><range '
