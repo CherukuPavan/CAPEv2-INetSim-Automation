@@ -208,7 +208,10 @@ def capture():
              before["qemu_internal_images"]==again["qemu_internal_images"],
              "Snapshot guest/network metadata changed after approval")
         attempted=True
-        dual.virsh("snapshot-create-as","--domain",VM,"--name",SNAP,
+        # Important: dual.virsh(*args) does NOT accept timeout=.
+        # post.virsh(*args,timeout=) is the bounded wrapper successfully
+        # exercised by the prior real post-NAT snapshot capture.
+        post.virsh("snapshot-create-as","--domain",VM,"--name",SNAP,
                    "--atomic",timeout=1800)
         after=check(True)
         return {**after,
