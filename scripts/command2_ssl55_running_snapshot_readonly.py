@@ -134,7 +134,7 @@ def perform():
       "running_snapshot_ready_for_cape":False,
       "native_snapshot_blockers":[
           *([] if not raw else ["RAW_PFLASH_VARIABLE_STORE"]),
-          "SWTMP2_ATOMIC_CAPTURE_AND_REVERT_UNPROVEN",
+          "SWTPM2_ATOMIC_CAPTURE_AND_REVERT_UNPROVEN",
           "NO_VERIFIED_RUNNING_REVERT_CYCLE",
       ],
       "next_safe_step":"Prototype full-state recovery and running snapshot "
