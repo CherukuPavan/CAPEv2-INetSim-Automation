@@ -117,7 +117,13 @@ class AttachTests(unittest.TestCase):
                  patch.object(a,"safe_root_file"), \
                  patch.object(a,"media_contents",return_value=(raw,
                      a.sha(raw).encode())), \
-                 patch.object(a,"virsh",return_value="shut off"):
+                 patch.object(a,"virsh",side_effect=lambda *args:
+                    UID if args==("domuuid",VM) else
+                    "shut off" if args==("domstate",VM) else
+                    xml(ent) if args==("dumpxml","--inactive",VM) else
+                    "UNEXPECTED"), \
+                 patch.object(a.os,"statvfs",return_value=SimpleNamespace(
+                     f_bavail=100*a.GIB//4096,f_frsize=4096)):
                 with self.assertRaisesRegex(a.AttachBlocked,"artifact exists"):
                     a.plan(HOST,VM,journal)
             self.assertEqual(target.read_bytes(),b"ORIGINAL")
