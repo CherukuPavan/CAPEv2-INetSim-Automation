@@ -119,7 +119,7 @@ class BenignTransport(unittest.TestCase):
         self.assertEqual(a["remote_path"],"C:/CAPE_NAT2/nat-config.json")
         self.assertEqual(b["remote_path"],
                          "C:/CAPE_NAT2/command2_guest_master_nat.ps1")
-        with self.assertRaisesRegex(g.TransportBlocked,"only reviewed"):
+        with self.assertRaisesRegex(g.TransportBlocked,"Only reviewed"):
             g.store("192.168.122.201","192.168.122.1",
                     "unreviewed.exe",b"BAD")
 
@@ -142,6 +142,7 @@ class BenignTransport(unittest.TestCase):
                  patch("builtins.input",return_value=(
                    "UPLOAD-ONLY-TRUSTED-NAT-WINDOWS-SETUP-WIN11_1")),\
                  patch.object(g,"inspect",return_value=before),\
+                 patch.object(g,"verified_evidence_folder",return_value=evidence),\
                  patch.object(g,"iso_profile",return_value=meta),\
                  patch.object(g,"store",side_effect=lambda ip,src,name,data:
                      {"remote_path":"C:/CAPE_NAT2/"+name,"bytes":len(data)}),\
@@ -157,6 +158,7 @@ class BenignTransport(unittest.TestCase):
                  patch("builtins.input",return_value=(
                    "UPLOAD-ONLY-TRUSTED-NAT-WINDOWS-SETUP-WIN11_1")),\
                  patch.object(g,"inspect",return_value=before),\
+                 patch.object(g,"verified_evidence_folder",return_value=evidence),\
                  patch.object(g.os,"geteuid",return_value=0),\
                  self.assertRaisesRegex(g.TransportBlocked,"stage witness"):
                 g.stage("lab02",JOURNAL,VM,iso,evidence)
