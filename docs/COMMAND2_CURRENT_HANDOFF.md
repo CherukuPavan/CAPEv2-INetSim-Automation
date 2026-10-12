@@ -1,5 +1,17 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 — NEW EXPLICIT OPERATOR REQUIREMENT: EVERY VM GETS A VERIFIED RUNNING CAPE SNAPSHOT *LAST*
+
+User explicitly requires running CAPE snapshot on each Command2 analysis guest after identity/network isolation, as standard CAPE KVM machinery reverts running snapshot for each analysis; no Command3 deployment until full Command2 work is sufficiently complete.
+
+Commits on GitHub development (no SSL55 host modifications):
+- `scripts/command2_running_snapshot_batch_gate.py` plus offline regression suite `scripts/test_command2_running_snapshot_batch_gate.py`: read-only OTHER-host 1..16 VM audit bound to root-private canonical reservation. For each named `win11_N`, validate exact running libvirt UUID, single isolated NIC/MAC, QCOW2 OS disk, private OVMF VARS, swtpm2, libvirt `cape_ready_win11_N` snapshot XML state RUNNING + internal RAM + internal disk, and separate root-private operator witness recording real repeated benign reverts/TPM/UEFI state/network/agent recovery. Every VM must pass; one pass does not hide another failure. The audit is not a snapshot creator, witness evidence is NOT cryptographically self-authenticating, and runtime production readiness remains false regardless of metadata alone. Windows/original master untouched.
+- `scripts/command2_portable_sequence_model.py` requires new `RUNNING_CAPE_SNAPSHOT_REVERT_VERIFIED` stage before simulation readiness, after cold restore; tests verify no bypass. Original `command2_running_cape_snapshot_gate.py` CLI plan now honors nondefault target `--subnet`, regression test.
+- Official CAPE guest snapshot guide requires Windows running agent ready when snapshot captured; libvirt virsh revert starts from chosen snapshot and is destructive; libvirt historical swtpm integration limitations documented. RAW OVMF pflash + swtpm2 on SSL55 pilot is NOT an approved coherent snapshot state. Do not try destructive generic `virsh snapshot-create-as/revert` on protected SSL55; plan to evaluate on disposable second machine after verified safe cold restore and operator approval.
+- Added final snapshot release policy section `docs/COMMAND2_20261012_IMPLEMENTATION_AND_RELEASE_GATES.md`. CI run `38234513569` PASSED both offline and Windows parser at branch commit `59260036694ea8881ee6331e0c918005a08c800e`. Any later tests CI as branch HEAD advances.
+- REAL OTHER HOST NOT YET PROVIDED/TESTED. Need secure master Windows SYSTEM bootstrap actual install, per guest identity ISO, network approval media+NIC, CAPE Agent registration, coherent per VM snapshot/revert, 2 parallel benign jobs, target-host tests. Do not mark Command2 complete merely by code tests. No more SSL55 full clones due to 64.77GiB remaining and 40GiB shared-host reserve.
+
+
 ## 2026-10-12 — USER CONFIRMED SECOND MACHINE FOR TWO-VM COMMAND2 ACCEPTANCE
 
 Operator has access to another Ubuntu/KVM machine for a TWO Windows analysis VM acceptance test. Preference: complete and offline-test all remaining Command 2 implementation, then proceed to Command 3 development, then physically test integrated command sequence. Do NOT say Command 2 production complete until real machine passes; physical validation is not optional and can expose hardware/firmware/CAPE constraints. Do not require the operator to redo already verified SSL55 audit: report `CAPE_Command2_HostBridgeL2_Fixed_20261012_092812.txt` PASSED, 64.77 GiB free.
