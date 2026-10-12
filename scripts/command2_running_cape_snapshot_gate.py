@@ -128,6 +128,20 @@ def saved_xml_checks(name, expected_uuid, expected_mac, expected_ip, subnet):
     network_status = virsh("net-info", "cape-analysis-isolated")
     require(re.search(r"^Active:\s+yes\s*$", network_status, re.M|re.I) is not None,
             "Isolated libvirt network is not active")
+    # Trusted benign Internet setup must END before final CAPE capture.
+    # A matching network name alone is insufficient; verify actual XML.
+    netxml=ET.fromstring(virsh("net-dumpxml","cape-analysis-isolated"))
+    port=netxml.find("port")
+    dns=netxml.find("dns")
+    require(netxml.tag=="network" and
+            netxml.findtext("name")=="cape-analysis-isolated" and
+            netxml.find("forward") is None and
+            port is not None and port.get("isolated")=="yes" and
+            dns is not None and dns.get("enable")=="no" and
+            not netxml.findall(".//dhcp") and
+            not netxml.findall(".//route"),
+            "FINAL CAPE SNAPSHOT BLOCKED: live analysis network must "
+            "be isolated with NO forwarding/NAT/DNS/DHCP")
     try:
         network = ipaddress.IPv4Network(subnet, strict=True)
         assigned = ipaddress.IPv4Address(expected_ip)
