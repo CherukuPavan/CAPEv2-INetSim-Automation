@@ -178,7 +178,9 @@ def main():
                     help="Inspect exact existing SSL-55 win11_1 only")
     ap.add_argument("--guest",action="append",default=[],
                     help="Other-host strict VM=UUID (repeat for all reserved VMs)")
-    ap.add_argument("--journal",type=Path,\n                    help="Other-host count-driven root-private reservation journal")\n    a=ap.parse_args()
+    ap.add_argument("--journal",type=Path,
+                    help="Other-host count-driven root-private reservation journal")
+    a=ap.parse_args()
     try:
         host=socket.gethostname().split(".",1)[0].lower()
         if a.reference_ssl55:
