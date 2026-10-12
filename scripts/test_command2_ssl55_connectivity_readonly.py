@@ -51,6 +51,13 @@ class InternetTopology(unittest.TestCase):
             if a==("snapshot-list",NAME,"--name"):return c.SNAP
             if a[0]=="dumpxml":return DOMAIN
             if a==("net-dumpxml",c.NET):return NETWORK
+            if a==("net-list","--all","--name"):return "default\\ncape-analysis-isolated"
+            if a==("net-dumpxml","default"):
+                return ('<network><name>default</name><forward mode="nat"/>'
+                        '<ip address="192.168.122.1"><dhcp><range '
+                        'start="192.168.122.2" end="192.168.122.254"/>'
+                        '</dhcp></ip></network>')
+            if a==("net-info","default"):return "Active: yes"
             raise AssertionError(a)
         def command(*a):
             if a[:4]==("nft","-j","list","table"):return json.dumps(NFT)
@@ -67,6 +74,10 @@ class InternetTopology(unittest.TestCase):
         self.assertTrue(result["fix_requires_separate_approved_benign_provisioning_profile"])
         self.assertFalse(result["network_or_firewall_modified"])
         self.assertEqual(result["snapshot"],c.SNAP)
+        self.assertTrue(result["trusted_setup_nat_candidate_inventory"]
+                        ["default_network_is_nat"])
+        self.assertFalse(result["trusted_setup_nat_candidate_inventory"]
+                         ["approved_internet_attachment"])
 
     def test_no_vm_or_host_mutators(self):
         src=Path(c.__file__).read_text()
