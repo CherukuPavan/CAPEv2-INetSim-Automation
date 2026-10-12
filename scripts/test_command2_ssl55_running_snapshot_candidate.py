@@ -98,6 +98,7 @@ class Candidate(unittest.TestCase):
                                          f_frsize=4096)
             def size(path):
                 return statfs
+            real_stat=Path.stat
             with patch.object(s.socket,"gethostname",return_value="CSE-SSL-55"),\
                  patch.object(s.os,"geteuid",return_value=0),\
                  patch.object(s,"virsh",side_effect=virsh),\
@@ -114,7 +115,6 @@ class Candidate(unittest.TestCase):
                      "format":"qcow2"})),\
                  patch.object(s.Path,"stat",autospec=True) as fake_stat,\
                  patch.object(s.os,"statvfs",side_effect=size):
-                real_stat=Path.stat
                 fake_stat.side_effect=lambda path,*a,**k:(
                     file if Path(path)==backup else real_stat(path,*a,**k))
                 result=s.inspect()
