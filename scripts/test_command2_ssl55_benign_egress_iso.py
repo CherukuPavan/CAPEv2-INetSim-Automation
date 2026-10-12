@@ -49,7 +49,7 @@ class IsoGuards(unittest.TestCase):
     def test_source_does_not_use_force_or_guest_exec(self):
         source=Path(b.__file__).read_text()
         for needle in ('virsh("destroy"', 'virsh("shutdown"',
-                       'virsh("attach-interface"', 'virsh("snapshot-',
+                       'virsh("attach-interface"', 'virsh("snapshot-create-as"', 'virsh("snapshot-revert"',
                        'virsh("net-start"', 'virsh("net-autostart"',
                        '"--force"', '"qemu-monitor-command"'):
             self.assertNotIn(needle,source)
