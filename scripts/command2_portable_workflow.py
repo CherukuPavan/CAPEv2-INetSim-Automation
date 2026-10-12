@@ -51,6 +51,7 @@ PHASES={
     "snapshot-capture":("command2_running_cape_snapshot_gate.py","capture","plan"),
     "snapshot-revert-once":("command2_disposable_snapshot_revert_probe.py","revert-once","plan"),
     "snapshot-batch":("command2_running_snapshot_batch_gate.py",None,None),
+    "agent-batch":("command2_portable_agent_batch_gate.py",None,None),
     "cape-register":("command2_cape_registration_gate.py","apply","plan"),
 }
 VM_RE=re.compile(r"win11_([1-9]|1[0-6])\Z")
@@ -458,6 +459,14 @@ def main():
             return identity_boot_batch(args)
         if args.phase==APPROVED_BOOT_BATCH_PHASE:
             return approved_firstboot_batch(args)
+        if args.phase=="agent-batch":
+            need(args.mode=="plan",
+                 "Read-only agent batch cannot apply changes")
+            host=canonical_host(args.approved_host)
+            need(os.geteuid()==0,"Root required for private guest journal")
+            absolute(args.journal,"journal")
+            import command2_portable_agent_batch_gate as agentbatch
+            return agentbatch.main_from_workflow(host,args.journal)
         script,argv,details=choose(args)
         # The delegated helper performs a fresh live safety revalidation
         # and requires its own typed approval before EVERY mutation.
