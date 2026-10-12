@@ -25,8 +25,8 @@ def xml(chain=None, wrong_network=False):
 
 def fake_virsh(*args):
     if args[:1] == ("domuuid",):
-        return dict((s.VM, s.UUID), (s.MASTER[0], s.MASTER[1]),
-                    (s.TRIAL[0], s.TRIAL[1]))[args[1]]
+        return {s.VM:s.UUID, s.MASTER[0]:s.MASTER[1],
+                s.TRIAL[0]:s.TRIAL[1]}[args[1]]
     if args[:1] == ("domstate",):
         return "running" if args[1] == s.VM else "shut off"
     if args == ("snapshot-list", s.VM, "--name"):return ""
