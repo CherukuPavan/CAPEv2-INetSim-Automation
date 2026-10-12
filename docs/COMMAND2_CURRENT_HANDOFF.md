@@ -1,5 +1,17 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 ~09:16 local — WINDOWS BENIGN V2 TARGETED EGRESS PASS (REAL EVIDENCE)
+
+User attached screenshot of Windows `CAPE_Command2_GuestEgressProbe_V2.txt` plus HOST report `CAPE_Command2_EgressV2_20261012_091450.txt`. Host report proves the corrected v2 ISO was approved, installed onto CDROM sdb live and saved without guest execution, previous ISO untouched, win11_1 stayed RUNNING: `BENIGN_EGRESS_V2_ISO_INSERTED_NO_GUEST_EXECUTION`.
+Windows user-visible screenshot exact verified fields:
+- `RESULT_TYPE=BENIGN_GUEST_IPV4_IPV6_EGRESS_PROBES_V2`; `WINDOWS_HOSTNAME=WIN11-1`.
+- `PHYSICAL_NIC_COUNT=1`, `CONNECTED_PHYSICAL_NIC_COUNT=1`, `ONE_PHYSICAL_NIC=TRUE`; expected MAC `02-0A-30-6A-3F-50` TRUE; expected static `192.168.240.101/24` TRUE; exactly one nonloopback IPv4.
+- `IPv4_ROUTE_QUERY=SUCCESS`, `IPv4_DEFAULT_ROUTE_COUNT=0`, `IPv6_ROUTE_QUERY=SUCCESS`, `IPv6_DEFAULT_ROUTE_COUNT=0`, `GUEST_DEFAULT_ROUTE_GUARD=PASS`.
+- 1.1.1.1:443 (IPv4), 8.8.8.8:53 (IPv4), 2606:4700:4700::1111:443 (IPv6), 2001:4860:4860::8888:443 (IPv6) all `SOCKET_FAILED_NetworkUnreachable`; `ALL_FOUR_BENIGN_CONNECTIONS_DENIED=True`; `GUEST_NEGATIVE_PROBE_RESULT=PASS_TARGETED_PROBES_ONLY`.
+- `REAL_L2_LATERAL_TEST=NOT_PERFORMED`, `FULL_HOST_EGRESS_GUARANTEE=NOT_PROVEN`, `WINDOWS_NETWORK_CHANGES=NONE`.
+DO NOT conflate these four bounded route-based connection denials with any host nft external packet-path negative proof; guest-to-guest lateral L2 still NOT tested; no permission to run malware. Latest free host storage in prior post-coldboot report 64.8 GiB; don't make further ~30GiB copies on shared host before rechecking 40GiB reserve. Independent cold boot and CAPE Agent have passed; cold RESTORE and running memory/disk/UEFI/swtpm snapshot revert are not yet verified. Next recommended low-impact evidence is read-only host nft rules+bridge port runtime inventory, no host or guest writes, then decide L2 negative tests using disposable peer only after separate approval and resource gate. Preserve both V1/V2 ISO and report; DO NOT rerun egress probe unless debugging required.
+
+
 ## 2026-10-12 ~09:05 UTC — V1 EGRESS OPTICAL ISO SUCCESS; GUEST ROUTE QUERY CIM ERROR; V2 FIX CI GREEN
 
 Actual uploaded `CAPE_Command2_EgressISO_Retry_20261012_090358.txt` proves operator-approved installation of `win11_1.command2_benign_egress.iso` onto existing sdb live and saved: result `BENIGN_EGRESS_ISO_INSERTED_NO_GUEST_EXECUTION`, VM still running, previous safe_fix ISO untouched. Windows screenshot of resulting `CAPE_Command2_GuestEgressProbe.txt` shows v1 PS1 executed and collected WIN11-1 hostname, single physical UP NIC MAC 02-0A-30-6A-3F-50, exact static 192.168.240.101/24 true, then `GUEST_NEGATIVE_PROBE_RESULT=FAIL_OR_INCONCLUSIVE`, `PROBE_ERROR_KIND=CimJobException` BEFORE default-route results/TCP probe results. This is guest Windows PowerShell route query failure, not a positive external egress finding, and not proof of denial. No guest networking changes, malware or snapshots.
