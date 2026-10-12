@@ -161,7 +161,7 @@ def plan(host,journal):
         status=run("virsh","-c","qemu:///system","domstate",vm).lower()
         need(status=="shut off","Guard replay install requires all clones shut off")
         info=run("virsh","-c","qemu:///system","dominfo",vm)
-        need(re.search(r"(?mi)^Autostart:\\s+disable\\s*$",info) is not None,
+        need(re.search(r"(?mi)^Autostart:\s+disable\s*$",info) is not None,
              "Clone autostart enabled; safe guard replay requires guest autostart off")
     bridge_ip=str(ipaddress.IPv4Address(
                   int(ipaddress.IPv4Network(subnet).network_address)+1))
