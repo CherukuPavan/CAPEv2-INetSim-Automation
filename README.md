@@ -1,5 +1,15 @@
 # CAPEv2 + INetSim Automation
 
+> **2026-10-12 development integration:** Windows startup now supports
+> approved first boot with ONE pre-attached isolated NIC after exact trusted
+> source-master bootstrap + independent host isolation receipt. The clone
+> verifies guest UUID/MAC and optical hashes, performs Windows hostname
+> rename/restart before applying static IPv4 with NO default route. The
+> guarded `approved-firstboot-batch` checks N separate receipts/VMs and
+> aggregate RAM, then executes approved starts sequentially. This is not
+> Windows execution evidence or snapshot completion.
+> [Details](docs/COMMAND2_UNIFIED_OPERATOR_WORKFLOW.md).
+>
 > **Current Command 2 snapshot status (2026-10-12): NOT PHYSICALLY COMPLETE.**
 > SSL-55 `win11_1` is running with **one isolated NIC** and a verified CAPE Agent,
 > but has **NO running snapshot**. Its RAW OVMF pflash and swtpm2 state
@@ -49,13 +59,13 @@
 > subnet overlap and discovers the host uplink dynamically. It is
 > **read-only**, not a VM installer or isolation certification.
 
-Private **development** work toward a portable **four-command** malware-analysis lab:
-1. **Host + first Windows master:** discover/bootstrap the host, configure CAPEv2 prerequisites and one Windows `win11` guest through its ready-to-clone snapshot.
-2. **Clone N:** ask the count, produce `win11_1`…`win11_N` with unique guest IPs and identities, verify ping/CAPE agent and per-clone snapshots.
-3. **CAPE finalization/UI:** update machinery and CAPE configuration, validate/restart services, verify the web UI and analysis readiness.
-4. **INetSim:** separately configure the isolated network simulation components.
+**Canonical operator target (2026-10-12): THREE externally invoked commands.**
+1. **Command 1:** supported fresh Ubuntu + CAPEv2/INetSim prerequisites, usable CAPE service and one fully provisioned, verified Windows master with an installed trusted SYSTEM bootstrap.
+2. **Command 2:** ask total desired Windows VM count, create independent `win11_1`…`win11_N`, automatically configure exact unique identity/static IP with proven isolated host networking and CAPE Agent, then create and **physically verify** each own CAPE running-memory/disk snapshot plus safe UEFI/swtpm restore. The VM must be SHUT OFF when handed to standard CAPE for running-snapshot revert.
+3. **Command 3:** operator-supplied final CAPE configuration/file changes, then validate complete integration. The precise INetSim application phase must be reconciled to the operator's verified manual installation and must NOT silently disappear.
 
-**[Current four-command design and actual completion gates](docs/FOUR_COMMAND_ARCHITECTURE.md).**
+**Not achieved:** the repository is still a guarded development toolkit, not three complete executable commands. In particular, Command 1 lacks automated Windows master provisioning; Command 2 lacks end-to-end Windows guest acceptance and coherent TPM/UEFI running snapshot proof, including the existing SSL-55 `win11_1` snapshot. GitHub Actions synthetic PASS is NOT a fresh-machine acceptance.
+[Historical four-command architecture](docs/FOUR_COMMAND_ARCHITECTURE.md) is retained only as an earlier design record, not the current operator-approved interface.
 **[Reference guide reconciliation for Commands 1–2](docs/COMMANDS_1_2_REFERENCE_RECONCILIATION.md)** records which steps from the operator's supplied PDF are substantiated, and identifies Windows 10 vs Windows 11 differences. The new acceptance report script is [`audit_command12_acceptance.py`](scripts/audit_command12_acceptance.py).
 
 **CURRENT STATUS: NOT A COMPLETED INSTALLER. Do not use for live malware.**
