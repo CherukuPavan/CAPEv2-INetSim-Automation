@@ -24,6 +24,7 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 import command2_cape_agent_probe as agentprobe
+import command2_snapshot_recovery_preflight as recovery
 
 SENTINEL = Path("/var/backups/cape-win11-preservation/win11-state-92POdfNc")
 LOCK = Path("/run/lock/cape-command2-running-snapshot.lock")
@@ -214,10 +215,15 @@ def plan(name, target_host, expected_uuid, expected_mac, guest_ip, receipt=None,
     }
 
 
-def capture(name, target_host, expected_uuid, expected_mac, guest_ip, receipt, subnet="192.168.240.0/24"):
+def capture(name, target_host, expected_uuid, expected_mac, guest_ip,
+            receipt, subnet="192.168.240.0/24",
+            recovery_bundle=None, reviewed_manifest_sha=None):
     target_guard(target_host)
     require(os.geteuid() == 0, "Root required for guarded capture")
     require(sys.stdin.isatty(), "Direct interactive terminal required")
+    require(recovery_bundle is not None and reviewed_manifest_sha is not None,
+            "Verified, explicitly SHA-pinned full cold recovery bundle required")
+    cold = recovery.inspect(name,expected_uuid,recovery_bundle,reviewed_manifest_sha)
     pre = plan(name,target_host,expected_uuid,expected_mac,guest_ip,receipt,subnet)
     require(pre["receipt_sha256"] is not None,
             "Prior separate-host acceptance evidence required")
@@ -233,6 +239,10 @@ def capture(name, target_host, expected_uuid, expected_mac, guest_ip, receipt, s
                 "Unsafe snapshot lock metadata")
         fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
         again = plan(name,target_host,expected_uuid,expected_mac,guest_ip,receipt,subnet)
+        rechecked = recovery.inspect(name,expected_uuid,recovery_bundle,reviewed_manifest_sha)
+        require(rechecked["manifest_sha256"] == cold["manifest_sha256"] and
+                rechecked["members"] == cold["members"],
+                "Cold full-state recovery source changed before snapshot capture")
         # A signed/recorded acceptance receipt alone is not live proof.
         # Check that the *running* guest actually serves the CAPE agent
         # with administrator privileges before taking memory snapshot.
@@ -251,11 +261,12 @@ def capture(name, target_host, expected_uuid, expected_mac, guest_ip, receipt, s
         root = ET.fromstring(info)
         memory = root.find("memory")
         disks = root.findall("./disks/disk")
-        require(memory is not None and
-                memory.get("snapshot") == "internal" and
-                len(disks) == 1 and
-                disks[0].get("snapshot") == "internal",
-                "CAPE running snapshot must have exactly one INTERNAL disk and INTERNAL memory; no disk-only fallback")
+        require(root.tag == "domainsnapshot" and
+                root.findtext("name") == pre["snapshot_name"] and
+                root.findtext("state") == "running" and
+                memory is not None and memory.get("snapshot") == "internal" and
+                len(disks) == 1 and disks[0].get("snapshot") == "internal",
+                "CAPE snapshot must have RUNNING state, one INTERNAL disk and INTERNAL memory; no disk-only fallback")
         require(virsh("domstate", name) == "running",
                 "Guest stopped unexpectedly during snapshot")
         return {
@@ -264,6 +275,9 @@ def capture(name, target_host, expected_uuid, expected_mac, guest_ip, receipt, s
             "memory_and_disk_metadata_present":True,
             "guest_still_running":True,"capture_receipt_sha256":pre["receipt_sha256"],
             "guest_agent_http_verified_before_capture":True,
+            "reviewed_complete_cold_bundle_verified":True,
+            "recovery_manifest_sha256":cold["manifest_sha256"],
+            "actual_cold_restore_boot_tested":False,
             "snapshot_revert_tested":False,"tpm_uefi_revert_tested":False,
             "cape_cycle_tested":False,"production_ready":False,
         }
@@ -281,18 +295,24 @@ def main():
     parser.add_argument("--guest-ip", required=True)
     parser.add_argument("--subnet", default="192.168.240.0/24")
     parser.add_argument("--receipt", type=Path)
+    parser.add_argument("--recovery-bundle",type=Path,
+                        help="Full stopped-state disk+OVMF+swtpm bundle on disposable host")
+    parser.add_argument("--reviewed-manifest-sha",
+                        help="Previously reviewed SHA256 of cold manifest")
     args = parser.parse_args()
     try:
         if args.mode == "capture":
             require(args.receipt is not None, "Acceptance receipt is mandatory")
             report = capture(args.vm,args.approved_host,args.expected_uuid,
-                             args.expected_mac,args.guest_ip,args.receipt,args.subnet)
+                             args.expected_mac,args.guest_ip,args.receipt,args.subnet,
+                             args.recovery_bundle,args.reviewed_manifest_sha)
         else:
             report = plan(args.vm,args.approved_host,args.expected_uuid,
                           args.expected_mac,args.guest_ip,args.receipt,args.subnet)
         print(json.dumps(report,indent=2,sort_keys=True))
         return 0
-    except (SnapshotBlocked,OSError,ValueError,ET.ParseError) as exc:
+    except (SnapshotBlocked,recovery.RecoveryBlocked,OSError,
+            ValueError,TypeError,ET.ParseError) as exc:
         print("BLOCKED: "+str(exc),file=sys.stderr)
         return 2
 
