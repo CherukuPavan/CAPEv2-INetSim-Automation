@@ -328,19 +328,55 @@ def setup_session(minutes):
             "CAPE_READY":False,
             "final_snapshot_taken":False}
 
+def cleanup_abandoned():
+    """Idempotent manual recovery after lost terminal/SIGKILL.
+
+    ONLY detaches the pinned temporary network adapter from the exact
+    clone, verifying preserved snapshot, original protected VMs and
+    isolated analysis bridge. Refuses if another active session owns
+    the exclusive file lock. Never touches the original CAPE NIC.
+    """
+    need(not LOCK.is_symlink(),"Unsafe setup cleanup lock")
+    fd=os.open(LOCK,os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
+    try:
+        st=os.fstat(fd)
+        need(stat.S_ISREG(st.st_mode) and st.st_uid==0 and
+             st.st_nlink==1 and stat.S_IMODE(st.st_mode)==0o600,
+             "Root-only cleanup lock metadata differs")
+        try:
+            fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise SessionBlocked("Live Internet setup session still owns lock") from exc
+        guard_exact()
+        expected_saved={"network":ANALYSIS,"mac":SAVED_MAC,"model":"e1000e"}
+        need(nics_of(virsh("dumpxml","--inactive",VM))==[expected_saved],
+             "Persistent offline NIC configuration drift; refuse cleanup")
+        found=detach_live()
+        guard_exact()
+        check_domain_views(False)
+        return {"result":"SSL55_TRUSTED_SETUP_NAT_CLEANUP_VERIFIED",
+                **found,"snapshot_preserved":SNAP,
+                "guest_windows_ip_config_reviewed":False,
+                "new_final_snapshot_created":False,
+                "safe_for_malware_analysis_proven":False}
+    finally:
+        os.close(fd)
+
 def handle_signal(_signum,_frame):
     raise SessionInterrupted("Operator terminal closed/termination requested")
 
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--mode",choices=("plan","session"),default="plan")
+    p.add_argument("--mode",choices=("plan","session","cleanup"),default="plan")
     p.add_argument("--minutes",type=int,default=90)
     a=p.parse_args()
     try:
         if a.mode=="session":
             signal.signal(signal.SIGTERM,handle_signal)
             signal.signal(signal.SIGHUP,handle_signal)
-        report=before() if a.mode=="plan" else setup_session(a.minutes)
+        report=(before() if a.mode=="plan" else
+                cleanup_abandoned() if a.mode=="cleanup" else
+                setup_session(a.minutes))
         print(json.dumps(report,indent=2,sort_keys=True),flush=True)
         return 0
     except (SessionBlocked,OSError,ValueError,TypeError,ET.ParseError,
