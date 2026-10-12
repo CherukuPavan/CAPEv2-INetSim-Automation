@@ -56,7 +56,7 @@ class WindowsStartupBootstrapTests(unittest.TestCase):
 
     def test_verified_task_must_be_system_startup_and_exact_action(self):
         for s in ("ServiceAccount","MSFT_TaskBootTrigger",
-                  "Settings.Enabled","NT AUTHORITY\\\\SYSTEM",
+                  "Settings.Enabled",r"NT AUTHORITY\SYSTEM",
                   "expectedArgs","$triggers.Count -ne 1",
                   "$actions.Count -ne 1",
                   "boot_trigger_verified=$true",
