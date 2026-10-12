@@ -1,5 +1,14 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 08:22 UTC — BENIGN EGRESS ISO PREFLIGHT FALSE NETWORK INACTIVE; FIXED
+
+Actual user-uploaded `CAPE_Command2_EgressISO_20261012_082242.txt` has only Python syntax pass followed by `BLOCKED_EGRESS_ISO`, reason `Analysis network not active`, `no_guest_execution_performed: true`. The isolated guest media was NOT changed, no guest tests run. Previous live cold boot had `win11_1` running and CAPE agent good. No reason to force power/network cycle.
+
+Root cause in `scripts/command2_ssl55_benign_egress_iso.py`: compared each stripped libvirt output line *literally* against `active: yes`. Real `virsh net-info` has colon then alignment spaces (`Active:         yes`), leading to false refusal. Fixed by strict pure key/value parser normalizing whitespace, with explicit active yes, persistent yes, autostart no and exact cape-lab0 bridge checks. If genuinely inactive, still refuse; never blindly start network or VM. Also now catches installed nft guard structural `AuditBlocked` into operator-safe refusal. Tests include realistic spaced virsh output, valid full offline preflight and actual-inactive refusal; CI Python offline + Windows PowerShell syntax passed in GitHub run 38223707905.
+
+Retry Step 1 ONLY using pinned commit, exact script blob, original benign PS1/CMD blob IDs. It still requires a local TTY exact phrase before optically replacing the **existing** sdb safe_fix ISO and validates running and saved CD-ROM XML after change, retaining previous source. If any other mismatch (unexpected optical media, firewall, etc) fail closed and inspect result. Only if `BENIGN_EGRESS_ISO_INSERTED_NO_GUEST_EXECUTION` returned, use Windows GUI to double-click `RUN_EGRESS_CHECK.cmd` on CAPE_EGRESS CD-ROM, photograph Notepad `C:\\Users\\Public\\Documents\\CAPE_Command2_GuestEgressProbe.txt` and upload host installer report. Windows guest TCP probes are bounded benign IPv4/IPv6; **not** full egress or L2 isolation proof. No malware, snapshots/revert or additional VM clones authorized.
+
+
 ## 2026-10-12 ~08:06 UTC — INDEPENDENT WIN11_1 COLD BOOT VERIFIED; NEXT BENIGN EGRESS PROBES
 
 User uploaded `CAPE_Command2_NetworkColdBoot_20261012_080646.txt`. REAL evidence:
