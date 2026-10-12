@@ -30,6 +30,7 @@ import command2_portable_guest_identity_iso as identity
 import command2_windows_guest_config as windows
 
 BATCH_PHASE="identity-batch"
+BOOT_BATCH_PHASE="identity-boot-batch"
 
 PHASES={
     "stage":("command2_portable_zero_nic_entrypoint.py","stage","plan"),
@@ -283,9 +284,73 @@ def identity_batch(args):
           sort_keys=True),flush=True)
     return 0
 
+def identity_boot_batch(args):
+    """Ordered count-driven guarded ZERO-NIC first boots; no Windows claim.
+
+    Performs a complete read-only preflight of all attached identity-only
+    guest media and stopped guests before any actual start. Each real VM
+    start remains an individually typed, separately revalidated child
+    operation. No automatic guest shutdown, NIC addition, Windows network
+    mutation, or sample submission; preserve the first failing VM state.
+    """
+    import command2_portable_identity_boot as firstboot
+    host=canonical_host(args.approved_host)
+    need(os.geteuid()==0,"Root needed for ordered private Command2 journal")
+    need(args.vm is None,"Batch first-boot phase cannot select only one VM")
+    need(args.journal is not None and args.journal.is_absolute() and
+         args.journal.name=="command2-identity-reservation.json",
+         "Absolute canonical private reservation journal required")
+    if args.mode=="apply":
+        need(sys.stdin.isatty(),"Real operator TTY required for each boot approval")
+    snapshotgate.private_evidence_folder(args.journal.parent)
+    rows=snapshotgate.reservation_rows(args.journal,host)
+    need(bool(rows),"Empty ordered Command2 journal")
+    original=hashlib.sha256(args.journal.read_bytes()).hexdigest()
+    preflight=[]
+    for row in rows:
+        vm=row["libvirt_name"]
+        info=firstboot.checked_plan(host,args.journal,vm)
+        preflight.append({"vm":vm,"uuid":row["libvirt_uuid_candidate"],
+                          "boot_preflight":info["result"],
+                          "guest_booted":False,
+                          "windows_identity_accepted":False})
+    print(json.dumps({"result":"COMMAND2_IDENTITY_BOOT_BATCH_PREFLIGHT",
+          "host":host,"journal_sha256":original,
+          "vm_count":len(rows),"ordered_guests":preflight,
+          "mode":args.mode,"all_guest_boostraps_verified_in_windows":False,
+          "all_static_ips_set":False,"no_host_mutations_during_preflight":True,
+          "running_snapshots_created":False,
+          "command2_complete":False},sort_keys=True,indent=2),flush=True)
+    if args.mode=="plan":
+        return 0
+    for row in rows:
+        vm=row["libvirt_name"]
+        need(hashlib.sha256(args.journal.read_bytes()).hexdigest()==original,
+             "Reserved guest identities changed during first-boot batch; STOP")
+        one=argparse.Namespace(**vars(args))
+        one.phase="identity-boot"
+        one.vm=vm
+        child,argv,_=choose(one)
+        proc=subprocess.run([sys.executable,"-B",str(child),*argv],check=False)
+        if proc.returncode!=0:
+            print(json.dumps({"result":"COMMAND2_IDENTITY_BOOT_BATCH_HALTED",
+                  "vm":vm,"returncode":proc.returncode,
+                  "guest_may_be_running_or_paused":True,
+                  "stop_for_independent_state_review":True,
+                  "automatic_retry_or_cleanup_performed":False},
+                  sort_keys=True),file=sys.stderr,flush=True)
+            return 2
+    print(json.dumps({"result":"COMMAND2_ZERO_NIC_FIRST_BOOT_REQUESTED_ALL_GUESTS",
+          "vm_count":len(rows),"windows_hostnames_verified":False,
+          "windows_system_tasks_verified_on_real_host":False,
+          "safe_guest_shutdown_and_static_ipv4_pending":True,
+          "cape_snapshot_ready":False,"command2_complete":False},
+          sort_keys=True),flush=True)
+    return 0
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
@@ -312,6 +377,8 @@ def main():
     try:
         if args.phase==BATCH_PHASE:
             return identity_batch(args)
+        if args.phase==BOOT_BATCH_PHASE:
+            return identity_boot_batch(args)
         script,argv,details=choose(args)
         # The delegated helper performs a fresh live safety revalidation
         # and requires its own typed approval before EVERY mutation.
