@@ -279,6 +279,53 @@ class Workflow(unittest.TestCase):
                                           vm=None))
                 run.assert_not_called()
 
+    def test_count_identity_boot_batch_checks_all_guests_without_starting(self):
+        import command2_portable_identity_boot as firstboot
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td,n=3)
+            inspected=[]
+            def read(host,journal,vm):
+                inspected.append(vm)
+                return {"result":"COMMAND2_ZERO_NIC_IDENTITY_BOOT_PLAN_ONLY"}
+            with patch.object(w,"canonical_host",return_value=HOST),\
+                 patch.object(w.os,"geteuid",return_value=0),\
+                 patch.object(w.snapshotgate,"private_evidence_folder"),\
+                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\
+                 patch.object(firstboot,"checked_plan",side_effect=read),\
+                 patch.object(w.subprocess,"run") as child:
+                rc=w.identity_boot_batch(args("identity-boot-batch",journal=j,
+                                              vm=None))
+            self.assertEqual(rc,0)
+            self.assertEqual(inspected,["win11_1","win11_2","win11_3"])
+            child.assert_not_called()
+
+    def test_count_identity_boot_batch_stops_after_failed_child(self):
+        import command2_portable_identity_boot as firstboot
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td,n=3)
+            invoked=[]
+            def choose_child(a):
+                invoked.append(a.vm)
+                self.assertEqual(a.phase,"identity-boot")
+                return Path("/private/command2_portable_identity_boot.py"),[
+                    "--vm",a.vm],{}
+            answers=iter([0,4])
+            def mock_child(*args,**kwargs):
+                return type("Child",(),{"returncode":next(answers)})()
+            with patch.object(w,"canonical_host",return_value=HOST),\
+                 patch.object(w.os,"geteuid",return_value=0),\
+                 patch.object(w.sys.stdin,"isatty",return_value=True),\
+                 patch.object(w.snapshotgate,"private_evidence_folder"),\
+                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\
+                 patch.object(firstboot,"checked_plan",
+                              return_value={"result":"COMMAND2_ZERO_NIC_IDENTITY_BOOT_PLAN_ONLY"}),\
+                 patch.object(w,"choose",side_effect=choose_child),\
+                 patch.object(w.subprocess,"run",side_effect=mock_child):
+                rc=w.identity_boot_batch(args("identity-boot-batch","apply",
+                                              journal=j,vm=None))
+            self.assertEqual(rc,2)
+            self.assertEqual(invoked,["win11_1","win11_2"])
+
     def test_reference_host_never_delegates_even_plan(self):
         with patch.object(w.socket,"gethostname",return_value="CSE-SSL-55"):
             with self.assertRaisesRegex(w.WorkflowBlocked,"Protected SSL-55"):
