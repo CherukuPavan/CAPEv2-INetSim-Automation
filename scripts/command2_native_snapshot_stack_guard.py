@@ -50,7 +50,7 @@ def command(*args):
          "Read-only tool returned error or excessive output: "+args[0])
     return p.stdout.strip()
 
-def inspect(vm):
+def inspect(vm,*,require_capture_headroom=True):
     """Require firmware QCOW2 on disk and modern libvirt, before risky capture."""
     need(type(vm) is str and re.fullmatch(r"win11_([1-9]|1[0-6])",vm),
          "Only approved disposable Command2 clone identity allowed")
@@ -95,8 +95,15 @@ def inspect(vm):
     need(not disk.is_symlink() and disk.is_file(),"Clone disk missing")
     free=os.statvfs(disk.parent)
     available=free.f_bavail*free.f_frsize
-    need(available>RESERVE+memory*2+2*GIB,
-         "Insufficient headroom for 40GiB host reserve and running-memory snapshot")
+    need(type(require_capture_headroom) is bool,
+         "Snapshot capacity admission must specify a strict boolean")
+    # Before CAPTURE reserve memory space for a new QEMU checkpoint.
+    # After CAPTURE do not falsely fail verification merely because the
+    # snapshots used the planned space; still enforce hard host reserve.
+    threshold=(RESERVE+memory*2+2*GIB if require_capture_headroom else RESERVE)
+    need(available>threshold,
+         "Insufficient protected storage for snapshot "+
+         ("capture" if require_capture_headroom else "verification"))
     return {"result":"COMMAND2_NATIVE_SNAPSHOT_EXPERIMENT_STACK_ADMITTED",
             "vm":vm,**versions,
             "uefi_variable_store_real_format":"qcow2",
@@ -104,6 +111,8 @@ def inspect(vm):
             "swtpm2_present":True,
             "guest_ram_bytes":memory,
             "available_storage_gib":round(available/GIB,2),
+            "new_snapshot_capture_space_required":require_capture_headroom,
+            "enforced_available_bytes":threshold,
             "snapshot_created":False,
             "real_swtpm_rollback_tested":False,
             "physical_cape_ready":False,
