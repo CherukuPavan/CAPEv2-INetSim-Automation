@@ -111,9 +111,12 @@ def expected_guest(row, subnet):
 def live_domain(name,row):
     need(virsh("domuuid",name).lower()==row["libvirt_uuid_candidate"],
          "Libvirt UUID changed")
-    need(virsh("domstate",name).lower()=="running",
-         "CAPE snapshot requires a RUNNING guest for each VM")
-    root=ET.fromstring(virsh("dumpxml",name))
+    # Standard CAPE LibVirtMachinery.start() refuses already-running VMs.
+    # Snapshot METADATA must indicate running capture, but final guest
+    # MUST be stopped so CAPE can revert it into that running state.
+    need(virsh("domstate",name).lower()=="shut off",
+         "CAPE must receive a shut-off guest for running-snapshot revert")
+    root=ET.fromstring(virsh("dumpxml","--inactive",name))
     need(root.findtext("name")==name and
          root.findtext("uuid")==row["libvirt_uuid_candidate"],
          "Running XML guest identity differs")
@@ -139,7 +142,7 @@ def live_domain(name,row):
     need(not root.findall("./devices/hostdev") and
          not root.findall("./devices/filesystem"),
          "Unexpected host passthrough")
-    return {"running":True,"isolated_nic":True,
+    return {"shut_off_for_cape":True,"snapshot_capture_was_running_required":True,\n            "isolated_nic":True,
             "single_qcow2_disk":True,"swtpm2_present":True,
             "nvram_format":firmware.get("format","raw")}
 
