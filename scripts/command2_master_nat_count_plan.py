@@ -121,7 +121,10 @@ def allocate(audit,rows,*,start_offset=201):
             "windows_guest_static_ipv4_applied":False,
             "cape_guest_machine_ip_registered":False,
             "live_guest_https_tested":False,
-            "guest_nic_port_isolated":True,
+            # The source master's existing default NAT interface has no
+            # per-NIC L2 port-isolation guarantee. Never label it isolated
+            # merely because it is a private RFC1918 NAT subnet.
+            "guest_nic_port_isolated":False,
             "malware_public_internet_allowed":False,
         })
         occupied_ip.add(ip)
