@@ -64,6 +64,39 @@ SSL-55 snapshot **cannot be claimed** until the operator actually
 executes a reviewed host-side controlled transition and captures/tests
 the snapshot.
 
+## Running Windows first boot passed; snapshot candidate gated (2026-10-12)
+
+The REAL report `CAPE_SSL55_QCOW2_FirstBoot_20261012_154607.txt` independently
+confirmed `win11_1` **RUNNING**, exact QCOW2 UEFI boot, CAPE Agent HTTP admin
+response `0.23` on `192.168.240.101:8000`, and both original master/trial
+SHUT OFF. Only snapshot and consistent restore remain for this clone's CAPE
+readiness. The previous RAW-to-QCOW2 conversion/activation and first boot
+MUST NOT be repeated.
+
+New `scripts/command2_ssl55_running_snapshot_candidate.py` offers
+`--mode plan` (READ-ONLY compatibility + full cold recovery checks) and
+a distinctly **experimental** `--mode capture-candidate` (real libvirt
+running disk+memory snapshot attempt with exact typed approval).
+The running snapshot is deliberately called **`cape_candidate_win11_1`**,
+*not* `cape_ready_win11_1`: the separate swtpm2 state is not an atomic
+libvirt internal memory+disk snapshot constituent and libvirt-based
+restoration of that TPM state has not been proved.
+
+The experiment checks canonical root host/exact clone UUID, unchanged
+original NVRAM/raw and XML recovery, saved/live disk/UEFI/NIC/TPM identities,
+QEMU+libvirt floor, existing isolated network guard, live CAPE Agent,
+private full stopped-state cold recovery, no existing snapshots, and
+minimum 40GiB host reserve. The default plan invokes only
+`virsh snapshot-create-as --print-xml` (a preview, NOT a capture).
+Actual `capture-candidate` requires a separate user-approved operation.
+After an attempted snapshot, no automatic retry, snapshot delete, running
+revert, guest destruction, or malware is authorized. Even if memory+disk
+metadata appears correctly, the separate Windows TPM restoration remains
+an engineering blocker for production CAPE.
+
+Source rationale: [CAPE running snapshot guide](https://capev2.readthedocs.io/en/latest/installation/guest/saving.html)
+and [oVirt libvirt swtpm state limitation](https://www.ovirt.org/develop/release-management/features/virt/tpm-device.html).
+
 ## Verified technical constraints
 
 Libvirt v10.9 added internal live snapshots for UEFI guests with **QCOW2
