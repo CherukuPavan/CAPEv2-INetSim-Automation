@@ -137,9 +137,12 @@ def plan(powershell,launcher):
         import command2_ssl55_existing_guard_readonly as guard
     except ImportError as exc:
         raise Blocked("Installed CAPE firewall verifier unavailable") from exc
-    guard.guard_policy_structure(
-        command("nft","-j","list","table","inet","cape_analysis_guard"),
-        command("nft","list","table","inet","cape_analysis_guard"))
+    try:
+        guard.guard_policy_structure(
+            command("nft","-j","list","table","inet","cape_analysis_guard"),
+            command("nft","list","table","inet","cape_analysis_guard"))
+    except guard.AuditBlocked as exc:
+        raise Blocked("CAPE nft guard policy structure not accepted: "+str(exc)) from exc
     need(DIR.is_dir() and not DIR.is_symlink() and
          not NEW.exists() and not NEW.is_symlink() and
          OLD.is_file() and not OLD.is_symlink(),
