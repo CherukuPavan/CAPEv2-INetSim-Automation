@@ -495,13 +495,15 @@ def graceful_shutdown_batch(args):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan","master-nat-attach"))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan","master-nat-attach","master-nat-media"))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
     p.add_argument("--count",type=int)
     p.add_argument("--journal",type=Path)
     p.add_argument("--journal-dir",type=Path)
+    p.add_argument("--nat-media-dir",type=Path,
+                   help="Existing root-owned 0700 guest NAT ISO output folder")
     p.add_argument("--disk-dir",type=Path)
     p.add_argument("--nvram-dir",type=Path)
     p.add_argument("--template",type=Path)
@@ -531,6 +533,23 @@ def main():
             return approved_firstboot_batch(args)
         if args.phase==SHUTDOWN_BATCH_PHASE:
             return graceful_shutdown_batch(args)
+        if args.phase=="master-nat-media":
+            host=canonical_host(args.approved_host)
+            need(os.geteuid()==0,
+                 "Root required for immutable Windows NAT guest media")
+            absolute(args.journal,"journal")
+            absolute(args.nat_media_dir,"nat_media_dir")
+            if args.mode=="apply":
+                need(sys.stdin.isatty(),
+                     "Direct operator TTY required for Windows NAT media")
+            child=Path(__file__).resolve().with_name(
+                "command2_portable_master_nat_media.py")
+            need(child.is_file() and not child.is_symlink(),
+                 "Pinned Windows NAT master media helper missing")
+            return subprocess.run([sys.executable,"-B",str(child),
+                   "--mode","build" if args.mode=="apply" else "plan",
+                   "--approved-host",host,"--journal",str(args.journal),
+                   "--output-dir",str(args.nat_media_dir)],check=False).returncode
         if args.phase=="master-nat-attach":
             host=canonical_host(args.approved_host)
             need(os.geteuid()==0,
