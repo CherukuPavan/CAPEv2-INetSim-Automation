@@ -158,9 +158,9 @@ BOOTSTRAP_FIRST_PROOF_FIELDS = (
     "one_nic_firstboot_pending",
     "zero_guest_default_gateway_in_config_verified",
 )
-BOOTSTRAP_PIN_RE=re.compile(r"[0-9a-f]{64}\\Z")
+BOOTSTRAP_PIN_RE=re.compile(r"[0-9a-f]{64}\Z")
 CANONICAL_UUID_RE=re.compile(
-    r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\\Z")
+    r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\Z")
 
 PROOF_FIELDS = ("host_ipv4_external_egress_negative_test",
                 "host_ipv6_external_egress_negative_test",
