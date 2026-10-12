@@ -183,5 +183,24 @@ class RunningSnapshotTests(unittest.TestCase):
             self.assertNotIn(needle,source)
 
 
+
+class CustomSubnetCLIRegression(unittest.TestCase):
+    def test_readonly_cli_forwards_nondefault_auto_selected_subnet(self):
+        from unittest.mock import patch
+        import sys
+        args=[
+            "snapshot.py","--mode","plan","--vm","win11_1",
+            "--approved-host",HOST,"--expected-uuid",UUID,
+            "--expected-mac",MAC,"--guest-ip","172.28.240.101",
+            "--subnet","172.28.240.0/24",
+        ]
+        report={"result":"COMMAND2_RUNNING_CAPE_SNAPSHOT_PLAN_ONLY",
+                "snapshot_created":False}
+        with patch.object(sys,"argv",args), \
+             patch.object(s,"plan",return_value=report) as simulated:
+            self.assertEqual(s.main(),0)
+        self.assertEqual(simulated.call_args.args[-1],"172.28.240.0/24")
+
+
 if __name__=="__main__":
     unittest.main()
