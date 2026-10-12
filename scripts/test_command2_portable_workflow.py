@@ -293,6 +293,53 @@ class Workflow(unittest.TestCase):
                                           vm=None))
                 run.assert_not_called()
 
+    def test_vetted_one_nic_firstboot_batch_all_n_receipts_and_ram(self):
+        import command2_portable_approved_firstboot as firstboot
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td,n=3)
+            receipt_dir=Path(td)/"receipts"
+            receipt_dir.mkdir()
+            calls=[]
+            def mock_plan(host,journal,vm,receipt):
+                calls.append((vm,receipt))
+                return {"guest_ram_mib":2048,"host_receipt_sha256":"a"*64}
+            with patch.object(w,"canonical_host",return_value=HOST),\
+                 patch.object(w.os,"geteuid",return_value=0),\
+                 patch.object(w.snapshotgate,"private_evidence_folder"),\
+                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\
+                 patch.object(firstboot,"checked_plan",side_effect=mock_plan),\
+                 patch.object(firstboot.bootbase,"free_memory_mib",return_value=13000),\
+                 patch.object(w.subprocess,"run") as execute:
+                data=args("approved-firstboot-batch",journal=j,vm=None)
+                data.network_receipt_dir=receipt_dir
+                rc=w.approved_firstboot_batch(data)
+            self.assertEqual(rc,0)
+            self.assertEqual([x[0] for x in calls],
+                             ["win11_1","win11_2","win11_3"])
+            for vm,receipt in calls:
+                self.assertEqual(receipt,receipt_dir/(vm+".firstboot-network-receipt.json"))
+            execute.assert_not_called()
+
+    def test_vetted_one_nic_firstboot_batch_blocks_ram_shortfall_before_boot(self):
+        import command2_portable_approved_firstboot as firstboot
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td,n=3)
+            evidence=Path(td)/"receipts"
+            evidence.mkdir()
+            with patch.object(w,"canonical_host",return_value=HOST),\
+                 patch.object(w.os,"geteuid",return_value=0),\
+                 patch.object(w.snapshotgate,"private_evidence_folder"),\
+                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\
+                 patch.object(firstboot,"checked_plan",
+                     return_value={"guest_ram_mib":4096,"host_receipt_sha256":"b"*64}),\
+                 patch.object(firstboot.bootbase,"free_memory_mib",return_value=9000),\
+                 patch.object(w.subprocess,"run") as run:
+                data=args("approved-firstboot-batch",journal=j,vm=None)
+                data.network_receipt_dir=evidence
+                with self.assertRaisesRegex(w.WorkflowBlocked,"memory"):
+                    w.approved_firstboot_batch(data)
+                run.assert_not_called()
+
     def test_count_identity_boot_batch_checks_all_guests_without_starting(self):
         import command2_portable_identity_boot as firstboot
         with TemporaryDirectory() as td:
