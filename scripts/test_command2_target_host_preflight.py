@@ -42,6 +42,50 @@ def evaluate(count=5, **changes):
     return p.evaluate(profile(**changes), count, DISK_DIR, NVRAM_DIR, NET)
 
 
+class AutomaticSubnetSelection(unittest.TestCase):
+    def test_default_uses_first_unoccupied_private_network(self):
+        self.assertEqual(
+            p.select_analysis_subnet(profile(), "auto"),
+            "192.168.240.0/24")
+
+    def test_falls_back_when_campus_route_overlaps(self):
+        self.assertEqual(
+            p.select_analysis_subnet(
+                profile(kernel_ipv4_routes=["192.168.240.0/23"]), "auto"),
+            "192.168.242.0/24")
+
+    def test_falls_back_when_libvirt_or_address_overlaps(self):
+        self.assertEqual(
+            p.select_analysis_subnet(
+                profile(kernel_ipv4_addresses=["192.168.240.2/24"],
+                        libvirt_ipv4_networks=["192.168.241.0/24"]), "auto"),
+            "192.168.242.0/24")
+
+    def test_all_candidate_subnets_busy_fails_closed(self):
+        all_occupied=list(p.CANDIDATE_ISOLATED_SUBNETS)
+        with self.assertRaisesRegex(p.count_plan.PortablePlanBlocked,
+                                    "AUTO_SUBNET_UNAVAILABLE"):
+            p.select_analysis_subnet(
+                profile(kernel_ipv4_routes=all_occupied), "auto")
+
+    def test_unknown_or_malformed_inventory_does_not_guess(self):
+        for bad in (None, ["garbage"], ["0.0.0.0/0"]):
+            with self.subTest(bad=bad):
+                with self.assertRaises(p.count_plan.PortablePlanBlocked):
+                    p.select_analysis_subnet(
+                        profile(kernel_ipv4_routes=bad), "auto")
+
+    def test_manual_selected_subnet_retained_for_strict_overlap_check(self):
+        chosen=p.select_analysis_subnet(
+            profile(kernel_ipv4_routes=["192.168.240.0/24"]),
+            "192.168.240.0/24")
+        self.assertEqual(chosen, "192.168.240.0/24")
+        report=p.evaluate(profile(kernel_ipv4_routes=["192.168.240.0/24"]),
+                          1,DISK_DIR,NVRAM_DIR,chosen)
+        self.assertFalse(report["preflight_pass"])
+        self.assertIn("ANALYSIS_SUBNET_OVERLAPS_ROUTES",report["errors"])
+
+
 class PurePreflight(unittest.TestCase):
     def test_good_target_host_is_still_not_authorized(self):
         result = evaluate()
