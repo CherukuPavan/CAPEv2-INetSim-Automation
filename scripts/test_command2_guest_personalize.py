@@ -13,10 +13,13 @@ class GuestWindowsPersonalizeContract(unittest.TestCase):
     def setUpClass(cls):
         cls.s=SOURCE.read_text(encoding="utf-8")
 
-    def test_identity_is_zero_nic_only_and_exact_uuid(self):
+    def test_identity_is_no_nic_or_approved_one_nic_only_and_exact_uuid(self):
         for t in (
             'if ($Mode -eq "Identity")',
             'if ($adapters.Count -ne 0)',
+            'if (-not $HostIsolationVerified -or $adapters.Count -ne 1)',
+            'Identity NIC MAC differs from exact reservation',
+            '$identityV4.Count -ne 0 -or $identityV6.Count -ne 0',
             'Rename-Computer',
             'Restart-Computer',
             'Win32_ComputerSystemProduct',
