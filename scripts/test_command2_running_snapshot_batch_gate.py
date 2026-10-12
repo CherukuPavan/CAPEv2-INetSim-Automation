@@ -36,8 +36,8 @@ def fake_virsh(rows, with_snap=True, memory="internal"):
         name=cmd[1]
         r=indexed[name]
         if cmd[0]=="domuuid":return r["libvirt_uuid_candidate"]
-        if cmd[0]=="domstate":return "running"
-        if cmd[0]=="dumpxml":return domain(r)
+        if cmd[0]=="domstate":return "shut off"
+        if cmd[0]=="dumpxml" and cmd[1]=="--inactive":return domain(r)
         if cmd[0]=="snapshot-list":
             return f"cape_ready_{name}" if with_snap else ""
         if cmd[0]=="snapshot-dumpxml":
@@ -128,6 +128,13 @@ class SnapshotBatch(unittest.TestCase):
                  patch.object(g.os,"stat",wraps=g.os.stat):
                 with self.assertRaisesRegex(g.GateBlocked,"Root private"):
                     g.private_evidence_folder(root)
+
+    def test_running_vm_even_with_running_snapshot_not_ready_for_cape(self):
+        r=row(1)
+        with patch.object(g,"virsh",side_effect=lambda *args:
+            r["libvirt_uuid_candidate"] if args[0]=="domuuid" else "running"):
+            with self.assertRaisesRegex(g.GateBlocked,"shut-off guest"):
+                g.live_domain("win11_1",r)
 
     def test_nonsequential_reservation_fails(self):
         rows=[row(2),row(1)]
