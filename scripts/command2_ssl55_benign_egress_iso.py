@@ -180,6 +180,9 @@ def apply(powershell,launcher):
                 "guest_egress_negative_tested":False,
                 "operator_action":"Open Windows CD drive and double-click RUN_EGRESS_CHECK.cmd"}
 
+    finally:
+        os.close(fd)
+
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--mode",choices=("plan","apply"),default="plan")
