@@ -80,8 +80,8 @@ class BenignTransport(unittest.TestCase):
                    return_value={"ipv4":{
                        "subnet":"192.168.122.0/24",
                        "gateway":"192.168.122.1"}}),\
-                 patch.object(g,"agent_get",return_value={
-                     "ip":"192.168.122.201","agent_version":"0.23"}),\
+                 patch.object(g,"agent_get",side_effect=lambda ip,gateway:{
+                     "ip":ip,"agent_version":"0.23"}),\
                  patch.object(g,"mac_of_neighbor",return_value=MAC):
                 report=g.inspect("lab02",JOURNAL,VM,iso)
             self.assertEqual(report["bootstrap_ip"],"192.168.122.201")
@@ -96,8 +96,8 @@ class BenignTransport(unittest.TestCase):
                    return_value={"ipv4":{
                        "subnet":"192.168.122.0/24",
                        "gateway":"192.168.122.1"}}),\
-                 patch.object(g,"agent_get",return_value={
-                     "ip":"192.168.122.201","agent_version":"0.23"}),\
+                 patch.object(g,"agent_get",side_effect=lambda ip,gateway:{
+                     "ip":ip,"agent_version":"0.23"}),\
                  patch.object(g,"mac_of_neighbor",return_value="02:ca:22:00:00:ff"),\
                  self.assertRaisesRegex(g.TransportBlocked,"unique elevated"):
                 g.inspect("lab02",JOURNAL,VM,iso)
