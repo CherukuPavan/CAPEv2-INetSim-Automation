@@ -158,11 +158,64 @@ def snapshot_metadata(name,snap):
          "Snapshot was not recorded as RUNNING")
     mem=root.find("memory");disks=root.findall("./disks/disk")
     need(mem is not None and mem.get("snapshot")=="internal" and
-         len(disks)==1 and disks[0].get("snapshot")=="internal",
-         "CAPE snapshot lacks BOTH internal running memory and OS disk")
+         sum(d.get("name")=="sda" and d.get("snapshot")=="internal"
+             for d in disks)==1 and
+         len({d.get("name") for d in disks})==len(disks),
+         "CAPE snapshot lacks BOTH internal running memory and OS disk sda")
+    # When libvirt stores a QCOW2 OVMF pflash device it may appear as a
+    # SECOND disk entry named sdb with snapshot='no'. The ACTUAL UEFI
+    # checkpoint must be verified separately in the QCOW2 file.
+    need(all(d.get("name")=="sda" or
+             (d.get("name")=="sdb" and d.get("snapshot")=="no")
+             for d in disks) and len(disks) in (1,2),
+         "Unexpected snapshot disk entries; require exact sda + optional sdb no")
     return {"snapshot_name":snap,"state":"running",
             "memory_snapshot":"internal","os_disk_snapshot":"internal",
+            "snapshot_disk_entries":len(disks),
+            "qcow2_uefi_checkpoint_independently_verified_by_metadata":False,
             "firmware_or_tpm_restored_by_metadata_alone":False}
+
+def image_snapshots(row,snap):
+    """Prove *both* exact guest QCOW2 files contain candidate snapshot.
+
+    Libvirt's snapshot XML alone does not prove that the firmware
+    variables QCOW2 checkpoint exists on disk. No QEMU snapshot repair,
+    revert, creation, deletion, or live-QMP execution is attempted.
+    """
+    disk=row.get("disk_target")
+    firmware=row.get("uefi_nvram_target")
+    need(type(disk) is str and disk.endswith(".qcow2") and
+         type(firmware) is str and firmware.endswith(".fd"),
+         "Canonical source disk and OVMF reservation paths missing")
+    uefi=firmware+".qcow2"
+    need(disk!=uefi,"Windows disk and UEFI image must remain separate")
+    proven={}
+    for label,raw in (("os_disk",disk),("uefi_vars",uefi)):
+        path=Path(raw)
+        need(path.is_absolute() and path.is_file() and not path.is_symlink(),
+             "Required separate QCOW2 image missing or symlinked: "+label)
+        st=path.stat()
+        need(stat.S_ISREG(st.st_mode) and st.st_nlink==1,
+             "QCOW2 image alias/hardlink not accepted: "+label)
+        try:
+            info=json.loads(run("qemu-img","info","--output=json",str(path)))
+        except (ValueError,TypeError) as exc:
+            raise GateBlocked("Cannot parse exact QCOW2 image metadata: "+label) from exc
+        need(type(info) is dict and info.get("format")=="qcow2" and
+             not info.get("backing-filename"),
+             "Storage is not independent QCOW2: "+label)
+        snapshots=info.get("snapshots",[])
+        need(type(snapshots) is list and len(snapshots)<=128 and
+             all(type(e) is dict and type(e.get("name")) is str
+                 for e in snapshots),
+             "Malformed image snapshot inventory: "+label)
+        need(sum(e["name"]==snap for e in snapshots)==1,
+             "Running snapshot label missing from image: "+label)
+        proven[label]={"present_once":True,"qcow2":True,
+                       "backing_file":False,"path":str(path)}
+    return {"os_disk_and_uefi_vars_have_named_checkpoint":True,
+            "matching_per_image_proof":proven,
+            "swtpm_checkpoint_or_rollback_proven":False}
 
 def witness_gate(path,name,row,snapshot,host):
     data=rootfile(path,64*1024)
@@ -204,6 +257,7 @@ def evaluate(rows,subnet,host,journal,witness_dir):
             guest,snap=expected_guest(row,subnet)
             result["runtime"]=live_domain(guest,row)
             result["snapshot"]=snapshot_metadata(guest,snap)
+            result["image_checkpoints"]=image_snapshots(row,snap)
             witness=Path(witness_dir)/(name+".running-snapshot-witness.json")
             result["revert_witness"]=witness_gate(witness,guest,row,snap,host)
             result["status"]="WITNESS_AND_LIVE_SNAPSHOT_GATES_RECORDED"
