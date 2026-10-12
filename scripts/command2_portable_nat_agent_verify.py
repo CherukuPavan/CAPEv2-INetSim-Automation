@@ -13,6 +13,7 @@ A previous durable Windows apply intent must exist; this is not a retry.
 from __future__ import annotations
 import argparse
 import base64
+import binascii
 import hashlib
 import json
 from pathlib import Path
@@ -126,7 +127,7 @@ def witness(ip,source,sha,vm):
              result.get("this_command_modified_guest") is False,
              "Windows returned incomplete/unsafe NAT acceptance fields")
     except (ValueError,TypeError,KeyError,UnicodeError,
-            json.JSONDecodeError) as exc:
+            binascii.Error,json.JSONDecodeError) as exc:
         raise GuestVerifyBlocked("Invalid CAPE Agent Windows read-only witness") from exc
     return {"guest_hostname_effective":True,
             "guest_only_expected_mac":True,
