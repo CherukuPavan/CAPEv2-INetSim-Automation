@@ -194,6 +194,38 @@ operator TTY and a separate per-guest approval and **is not** a completed
 unattended production Command 2. Do NOT synthesize receipt booleans.
 No real other-host guest or SSL-55 VM has been booted by this change.
 
+## SSL55 physical running snapshot achieved; full-state restore remains HOLD
+
+On 2026-10-12 the existing reference `win11_1` was safely migrated to
+independent QCOW2 OVMF and rebooted with host-verified CAPE Agent 0.23.
+The physical command created one **RUNNING internal RAM+OS disk** snapshot,
+`cape_candidate_win11_1`, under exactly its own UUID. The original
+`win11` master and `win11_trial_1` remained shut off. The saved XML,
+RAW OVMF and prior disk+UEFI+swtpm cold recovery are preserved.
+
+**Do not try another snapshot or revert on SSL55 now.** The snapshot was
+deliberately given a *candidate* name: the raw libvirt/QEMU disk+RAM
+snapshot metadata DOES NOT prove separate swtpm2 persistent state can
+be restored at the same logical instant. Standard libvirt revert can
+restart the guest and discard current RAM/disk state. Do not relabel
+this as `cape_ready_win11_1` or register it with CAPE until real
+Windows security/TPM/Secure Boot/BitLocker checks and repeated benign
+full-state revert verification pass.
+
+The next host step is READ-ONLY
+`scripts/command2_ssl55_snapshot_postcapture_audit.py`: require exact
+running clone, snapshot XML state `running`, internal memory and **Windows
+OS disk sda** checkpoint, original master/trial unchanged, root-private
+cold recovery still hash-valid, QEMU *image-level* snapshot inventories
+for OS disk AND independent OVMF QCOW2 file, metadata-only view of
+swtpm files, live CAPE Agent and guarded network. It always reports
+`release_for_cape_analysis=false`. If the firmware lacks a matching
+internal checkpoint, or the host's swtpm state has no coordinated
+restore, the reviewer must not assume the full VM reset path is safe.
+
+See [libvirt snapshot XML](https://libvirt.org/formatsnapshot.html) and
+[libvirt discussion of missing swtpm snapshot orchestration](https://lists.libvirt.org/archives/list/users%40lists.libvirt.org/message/QGU2EQQSUC6X6CGK4QPTHH2EIWMOXHOP/).
+
 ## Count-driven running snapshot capture bridge (EXPERIMENTAL only)
 
 After every Windows clone has independently passed the network, static-IP,
