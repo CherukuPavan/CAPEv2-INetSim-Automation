@@ -68,6 +68,36 @@ sudo python3 -B scripts/command2_portable_workflow.py \
   --nat-media-dir "/root/cape/nat-iso"
 \`\`\`
 
+
+After attaching each approved \`CAPE_NAT2\` ISO to its matching stopped
+VM and starting the guest (NOT done by the above phases), Windows
+Administrator should run the exact pinned script from that ISO with the
+\`nat-config.json\` file and its 64-hex SHA from \`nat-config.sha256\`,
+starting with \`-Mode Plan\`. Use \`-Mode Apply -ApproveBenignNat
+-ApproveRename\` only if all identities match and approved for benign
+provisioning, followed by a **manual** Windows reboot if the hostname
+changed. Then run \`-Mode Verify -RequireHTTPS\` after reboot. Keep
+Windows evidence per VM; a successful ISO builder alone is not Windows
+setup completion.
+
+The host can independently verify ALL running guests and their actual
+agent network addresses with:
+
+\`\`\`bash
+sudo python3 -B scripts/command2_portable_workflow.py \
+  --phase master-nat-agents --mode plan \
+  --approved-host "ACTUAL_NON_SSL55_HOST" \
+  --journal "/root/cape/command2-identity-reservation.json"
+\`\`\`
+
+This read-only stage checks exactly N running clones, saved+live
+\`default\` NAT e1000e MAC identity, exact active/persistent DHCP host
+reservation and observed lease, host route via virbr0, and each CAPE
+Agent's \`:8000\` HTTP JSON identity/admin. It still does NOT prove
+guest Windows HTTPS, TPM restoration, outbound sample containment or
+N simultaneous CAPE jobs. Only Windows \`-Mode Verify -RequireHTTPS\`
+can supply the separate per-guest HTTPS observation.
+
 The command paths above are *examples* for a newly prepared test host.
 Do not reuse a journal path that does not exist or guess a hostname;
 use the actual existing root-private host journal and verified clone
