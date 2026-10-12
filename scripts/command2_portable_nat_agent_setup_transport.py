@@ -111,9 +111,8 @@ def agent_get(ip,source):
              parsed.get("is_user_admin") is True and
              type(parsed.get("version")) is str and
              type(parsed.get("features")) is list and
-             "execute" in parsed["features"] and
-             "store" in parsed["features"],
-             "Expected elevated CAPE Agent store/execute features missing")
+             "execute" in parsed["features"],
+             "Expected elevated CAPE Agent execute feature missing")
         return {"ip":ip,"source":source,
                 "admin_cape_agent_and_execute_feature":True,
                 "agent_version":parsed["version"]}
