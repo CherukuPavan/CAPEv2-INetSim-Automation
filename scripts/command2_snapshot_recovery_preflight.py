@@ -47,7 +47,7 @@ def sha256_file(path):
             h.update(chunk)
     return h.hexdigest()
 
-def inspect(vm,uuid,folder):
+def inspect(vm,uuid,folder,expected_manifest_sha=None):
     """Verify offline artifact integrity; no guest state changes or external calls."""
     need(type(vm) is str and NAME.fullmatch(vm) is not None and
          type(uuid) is str and UUID.fullmatch(uuid) is not None,
@@ -61,6 +61,12 @@ def inspect(vm,uuid,folder):
     manifestpath=p/EXPECTED_MANIFEST
     stat_private_file(manifestpath,MAX_MANIFEST)
     raw=manifestpath.read_bytes()
+    manifest_sha=hashlib.sha256(raw).hexdigest()
+    if expected_manifest_sha is not None:
+        need(type(expected_manifest_sha) is str and
+             re.fullmatch(r"[0-9a-f]{64}",expected_manifest_sha) and
+             expected_manifest_sha==manifest_sha,
+             "Reviewed cold manifest SHA256 differs")
     data=json.loads(raw)
     need(type(data) is dict and
          data.get("kind")=="COMMAND2_FULL_COLD_BUNDLE_V1" and
@@ -74,6 +80,11 @@ def inspect(vm,uuid,folder):
          any(k.startswith("swtpm/") and k.endswith(".permall")
              for k in records),
          "Recovery bundle missing disk/OVMF/swtpm permanent state")
+    tpm_dir=p/"swtpm"
+    need(tpm_dir.is_dir() and not tpm_dir.is_symlink() and
+         tpm_dir.stat().st_uid==0 and
+         stat.S_IMODE(tpm_dir.stat().st_mode)&0o077==0,
+         "Expected private non-symlinked swtpm checkpoint folder")
     results={}
     for rel,expected in sorted(records.items()):
         allowed=(rel in ("disk.qcow2","UEFI_VARS.fd") or
@@ -94,7 +105,7 @@ def inspect(vm,uuid,folder):
     return {"result":"COMMAND2_FULL_COLD_RECOVERY_BYTES_VERIFIED",
             "vm":vm,"uuid":uuid,
             "bundle":str(p),
-            "manifest_sha256":hashlib.sha256(raw).hexdigest(),
+            "manifest_sha256":manifest_sha,
             "members":results,
             "all_member_hashes_recomputed":True,
             "original_master_unmodified_by_check":True,
