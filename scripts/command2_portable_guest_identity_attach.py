@@ -19,7 +19,6 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 
-import command2_guest_identity_blueprint as unused_blueprint  # schema imported from reservation helper
 import command2_portable_guest_identity_iso as identity
 
 GIB=1024**3
