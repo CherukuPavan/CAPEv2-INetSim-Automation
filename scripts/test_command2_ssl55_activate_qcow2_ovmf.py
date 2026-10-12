@@ -113,6 +113,12 @@ class SSL55Activate(unittest.TestCase):
         def safe_temp(*args,**kwargs):
             kwargs["dir"]=self.dir
             return original_tmp(*args,**kwargs)
+        real_stat=Path.stat
+        def simulate_metadata(path,*args,**kwargs):
+            if Path(path)==self.bkup:
+                return types.SimpleNamespace(st_uid=0,
+                    st_mode=stat.S_IFREG|0o600,st_nlink=1)
+            return real_stat(path,*args,**kwargs)
         with patch.object(m.sys.stdin,"isatty",return_value=True),\
              patch("builtins.input",
                    return_value="ACTIVATE-SSL55-WIN11_1-QCOW2-OVMF-ONLY"),\
@@ -120,13 +126,8 @@ class SSL55Activate(unittest.TestCase):
              patch.object(m,"LOCK",self.dir/"lock"),\
              patch.object(m.os,"fstat",return_value=types.SimpleNamespace(
                    st_mode=stat.S_IFREG|0o600,st_uid=0,st_nlink=1)),\
-             patch.object(m.Path,"stat",autospec=True) as pstat:
-            # Original XML backup is owned by root in a production run.
-            original_stat=Path.stat
-            pstat.side_effect=lambda path,*a,**kw:(
-                types.SimpleNamespace(st_uid=0,st_mode=stat.S_IFREG|0o600,
-                                      st_nlink=1)
-                if str(path)==str(self.bkup) else original_stat(path,*a,**kw))
+             patch.object(m.Path,"stat",autospec=True,
+                          side_effect=simulate_metadata):
             res=m.apply(self.dir)
         self.assertEqual(res["result"],"SSL55_WIN11_1_QCOW2_OVMF_SAVED_XML_VERIFIED_OFF")
         self.assertEqual(self.bkup.read_text(),BASE_XML)
