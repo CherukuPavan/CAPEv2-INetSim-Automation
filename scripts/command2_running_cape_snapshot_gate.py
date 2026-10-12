@@ -122,7 +122,8 @@ def saved_xml_checks(name, expected_uuid, expected_mac, expected_ip, subnet):
             tpm.find("backend").get("version") == "2.0",
             "Guest TPM not independently reviewed")
     require(root.findtext("./os/nvram", "").endswith(
-        "/" + name + ".command2_VARS.fd"),
+        ("/" + name + ".command2_VARS.fd.qcow2",
+         "/" + name + ".command2_VARS.fd")),
         "Guest UEFI variables path not independent")
     network_status = virsh("net-info", "cape-analysis-isolated")
     require(re.search(r"^Active:\s+yes\s*$", network_status, re.M|re.I) is not None,
