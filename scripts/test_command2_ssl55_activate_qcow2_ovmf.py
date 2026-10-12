@@ -115,10 +115,13 @@ class SSL55Activate(unittest.TestCase):
             return original_tmp(*args,**kwargs)
         real_stat=Path.stat
         def simulate_metadata(path,*args,**kwargs):
+            actual=real_stat(path,*args,**kwargs)
             if Path(path)==self.bkup:
+                # Before apply creates the backup, Path.exists() must
+                # still receive the real ENOENT rather than a fake stat.
                 return types.SimpleNamespace(st_uid=0,
                     st_mode=stat.S_IFREG|0o600,st_nlink=1)
-            return real_stat(path,*args,**kwargs)
+            return actual
         with patch.object(m.sys.stdin,"isatty",return_value=True),\
              patch("builtins.input",
                    return_value="ACTIVATE-SSL55-WIN11_1-QCOW2-OVMF-ONLY"),\
