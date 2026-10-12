@@ -1,5 +1,22 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-12 ~10:30 — USER REQUIRES SNAPSHOT FOR WIN11_1 AND ALL COMMAND2 CLONES: ACTIVE ENGINEERING, NOT YET PHYSICALLY COMPLETE
+
+User explicitly confirmed `win11_1` still has NO running snapshot, requests all needed fixes and full Command2 work before proceeding to Command3. **DO NOT CLAIM THIS IS SOLVED**. No current remote host terminal access; assistant has GitHub development connector only and must provide explicit guarded host command for actual evidence/changes. SSL55 master/trial off and immutable, independent clone RUNNING, previous full cold bundle captured but not restore-tested, ~64.77GiB available and 40GiB reserve.
+
+New primary research on official libvirt/QEMU/CAPE docs:
+- SSL55 VM RAW OVMF variable store incompatible with new native internal running pflash snapshots requiring QCOW2 NVRAM. An offline QCOW2 conversion by itself does NOT restore swtpm2 state atomically.
+- Libvirt TPM snapshot RFE `https://bugzilla.redhat.com/show_bug.cgi?id=1855367` now CLOSED WONTFIX; QEMU supports swtpm state migration, but vanilla libvirt snapshot metadata does not attest TPM restore.
+- QEMU `virsh save` alternative saves RUNNING VM RAM but NOT disk, then leaves VM shut off; candidate requires a complete disk+NVRAM+swtpm same-epoch image and custom, separately tested CAPE machinery adapter. Do not mislabel as native libvirt snapshot. Docs `docs/COMMAND2_RUNNING_SNAPSHOT_RESOLUTION_PLAN.md`.
+- Upstream current CAPE `LibVirtMachinery.start(label)` REFUSES already running VM; needs VM SHUT OFF at registration/start, with snapshot CAPTURED while running and `domainsnapshot state=running`. Corrected `scripts/command2_running_snapshot_batch_gate.py` to require each VM SHUT OFF at final CAPE registration and running internal memory+disk metadata, separately per-VM TPM/UEFI/witness. Synthetic test modified.
+GitHub development-only new code:
+- `scripts/command2_ssl55_running_snapshot_readonly.py` + `scripts/test_command2_ssl55_running_snapshot_readonly.py`: exact canonical host running clone + protected master/trial UUID/states, live/saved XML/NIC/QCOW2, raw vs qcow2 NVRAM, swtpm file metadata only, existing snapshot names, known cold bundle existence, free storage; READ ONLY, no snapshot/power/NVRAM change, reports incompatibility instead of force snapshot. CI passed at run 38236409671 (later wording update run pending). Needed single verified host evidence.
+- `scripts/register_cape_clones.py` supports distinct per-VM snapshot names; fixed accidental escaped newline, CI successful earlier run 38236888223/88215. `scripts/command2_cape_registration_gate.py` + tests: explicit OTHER-host snapshot witness gate for every VM, propose/approved backup-preserving kvm.conf only after each per-guest snapshot+TPM/UEFI revert cycle; never restart CAPE or execute samples. Original test suite green after fix.
+- `docs/COMMAND2_RUNNING_SNAPSHOT_RESOLUTION_PLAN.md` covers candidate standard native QCOW2 NVRAM+TPM physical compatibility and candidate save-state full-state adapter; both require disposable spare KVM machine and real repeat benign acceptance. No unsafe live pflash conversion or TPM removal on SSL55. New tests are offline only and NO real snapshot exists yet.
+- Any GitHub Actions latest results should be checked at development HEAD before reporting CI success; several intermediate CI failures due fixtures were corrected.
+- Run next only a pinned, verified READ-ONLY SSL55 snapshot compatibility audit and upload report, then prototype actual full-state snapshot on disposable second host, not original SSL55. Keep other-host two-VM testing separate and future Command3 blocked until real Command2 pass.
+
+
 ## 2026-10-12 — SUBSTANTIVE DEVELOPMENT: PER-VM RUNNING SNAPSHOT MANDATORY + APPROVED NETWORK MEDIA
 
 User reiterated: complete all Command2 parts; at the very END of each cloned VM's successful network/CAPE readiness, create a RUNNING analysis snapshot because standard CAPE KVM machinery reverts to it. Command3 follows after Command2 development and acceptance. User confirmed spare second KVM system for two-VM acceptance, but second machine NOT yet physically tested. Do not claim background work/automation or production readiness before accepted witness logs.
