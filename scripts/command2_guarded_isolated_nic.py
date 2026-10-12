@@ -147,6 +147,21 @@ def verify_clone_no_nic(vm, expected_uuid):
     return inactive
 
 
+# The legacy v1 acceptance route requires the guest Windows identity to
+# have already been witnessed on a ZERO-NIC boot. The optional v2 route is
+# explicitly for a separately approved, trusted Windows SYSTEM bootstrap
+# installed BEFORE cloning, with a single isolated NIC attached before
+# the first guest boot. The v2 route does NOT assert Windows renamed yet.
+BOOTSTRAP_FIRST_PROOF_FIELDS = (
+    "source_master_system_bootstrap_verified",
+    "source_master_shut_off_verified",
+    "one_nic_firstboot_pending",
+    "zero_guest_default_gateway_in_config_verified",
+)
+BOOTSTRAP_PIN_RE=re.compile(r"[0-9a-f]{64}\\Z")
+CANONICAL_UUID_RE=re.compile(
+    r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\\Z")
+
 PROOF_FIELDS = ("host_ipv4_external_egress_negative_test",
                 "host_ipv6_external_egress_negative_test",
                 "nft_guard_reboot_persistence_verified",
@@ -165,15 +180,38 @@ def read_acceptance_receipt(path, vm, uid, mac, guest_ip, host):
          stat.S_IMODE(s.st_mode)==0o600 and s.st_nlink==1 and s.st_size<65536,
          "Untrusted acceptance receipt ownership/mode")
     report=json.loads(p.read_text(encoding="utf-8"))
-    need(type(report)==dict and
-         report.get("kind")=="COMMAND2_SEPARATE_HOST_NETWORK_ACCEPTANCE_V1" and
+    need(type(report) is dict and
+         report.get("kind") in (
+             "COMMAND2_SEPARATE_HOST_NETWORK_ACCEPTANCE_V1",
+             "COMMAND2_SEPARATE_HOST_NETWORK_ACCEPTANCE_V2") and
          report.get("approved_host")==host and report.get("vm")==vm and
          report.get("uuid")==uid and report.get("mac")==mac and
          report.get("guest_ip")==guest_ip and
          type(report.get("operator")) is str and
          len(report["operator"])>=3 and
-         all(report.get(key) is True for key in PROOF_FIELDS),
+         all(report.get(key) is True for key in
+             PROOF_FIELDS if key != "windows_zero_nic_identity_verified"),
          "Acceptance receipt does not attest exact isolated VM/network")
+    if report["kind"]=="COMMAND2_SEPARATE_HOST_NETWORK_ACCEPTANCE_V1":
+        need(report.get("windows_zero_nic_identity_verified") is True,
+             "Legacy Windows zero-NIC identity witness required")
+    else:
+        need(all(report.get(key) is True for key in
+                 BOOTSTRAP_FIRST_PROOF_FIELDS) and
+             report.get("windows_zero_nic_identity_verified") is False and
+             type(report.get("source_master_uuid")) is str and
+             CANONICAL_UUID_RE.fullmatch(report["source_master_uuid"]) is not None
+             and report["source_master_uuid"] != uid and
+             all(type(report.get(key)) is str and
+                 BOOTSTRAP_PIN_RE.fullmatch(report[key]) is not None for key in
+                     ("source_master_runner_sha256",
+                      "source_master_personalizer_sha256")),
+             "One-NIC first-boot receipt requires independently verified "
+             "master task, exact source UUID/hashes, zero gateway, and "
+             "an explicit PENDING Windows identity (not invented proof)")
+    # This is human-supplied private evidence, NOT proof of physical
+    # isolation or task installation. The exact host/VM/network gate above
+    # is still mandatory and the Windows guest must later be checked.
     return True
 
 
