@@ -83,6 +83,68 @@ class Workflow(unittest.TestCase):
             self.assertEqual(argv[argv.index("--journal")+1],str(j))
             self.assertFalse(result["master_vm_mutations_authorized"])
 
+    def test_graceful_shutdown_routes_exact_journal_vm_and_timeout(self):
+        with TemporaryDirectory() as td:
+            journal,rows=self.makefixture(td)
+            script,argv,details=self.choose_fixture(
+                journal,rows,"graceful-shutdown","apply",shutdown_timeout=420)
+            self.assertEqual(script.name,"command2_graceful_shutdown.py")
+            self.assertEqual(argv[argv.index("--mode")+1],"shutdown")
+            self.assertEqual(argv[argv.index("--scope")+1],"portable-other")
+            self.assertEqual(argv[argv.index("--journal")+1],str(journal))
+            self.assertEqual(argv[argv.index("--timeout-seconds")+1],"420")
+            self.assertFalse(details["master_vm_mutations_authorized"])
+
+    def test_count_graceful_shutdown_preflights_all_and_never_mutates_in_plan(self):
+        import command2_graceful_shutdown as controlled
+        with TemporaryDirectory() as td:
+            journal,rows=self.makefixture(td,n=3)
+            audited=[]
+            def check(host,scope,vm,j):
+                audited.append(vm)
+                self.assertEqual(scope,"portable-other")
+                return {"state":"running","already_off":False,
+                        "capabilities":{"qga_channel":False,"acpi":True}}
+            data=args("graceful-shutdown-batch",journal=journal,vm=None)
+            data.shutdown_timeout=360
+            with patch.object(w,"canonical_host",return_value=HOST),\
+                 patch.object(w.os,"geteuid",return_value=0),\
+                 patch.object(w.snapshotgate,"private_evidence_folder"),\
+                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\
+                 patch.object(controlled,"inspect",side_effect=check),\
+                 patch.object(w.subprocess,"run") as call:
+                self.assertEqual(w.graceful_shutdown_batch(data),0)
+                call.assert_not_called()
+            self.assertEqual(audited,["win11_1","win11_2","win11_3"])
+
+    def test_count_shutdown_stops_on_failed_guest_without_continuing(self):
+        import command2_graceful_shutdown as controlled
+        with TemporaryDirectory() as td:
+            journal,rows=self.makefixture(td,n=3)
+            data=args("graceful-shutdown-batch","apply",
+                      journal=journal,vm=None)
+            data.shutdown_timeout=360
+            called=[]
+            def fake_choose(a):
+                called.append(a.vm)
+                return Path("/fake/command2_graceful_shutdown.py"),[
+                    "--vm",a.vm],{}
+            def fake_child(argv,check=False):
+                return type("Result",(),{"returncode":
+                            3 if called[-1]=="win11_2" else 0})()
+            with patch.object(w,"canonical_host",return_value=HOST),\
+                 patch.object(w.os,"geteuid",return_value=0),\
+                 patch.object(w.sys.stdin,"isatty",return_value=True),\
+                 patch.object(w.snapshotgate,"private_evidence_folder"),\
+                 patch.object(w.snapshotgate,"reservation_rows",return_value=rows),\
+                 patch.object(controlled,"inspect",return_value={
+                     "state":"running","already_off":False,
+                     "capabilities":{"qga_channel":False,"acpi":True}}),\
+                 patch.object(w,"choose",side_effect=fake_choose),\
+                 patch.object(w.subprocess,"run",side_effect=fake_child):
+                self.assertEqual(w.graceful_shutdown_batch(data),2)
+            self.assertEqual(called,["win11_1","win11_2"])
+
     def test_identity_first_boot_is_separate_explicit_other_host_phase(self):
         with TemporaryDirectory() as td:
             j,rows=self.makefixture(td)
