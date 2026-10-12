@@ -119,6 +119,28 @@ class Workflow(unittest.TestCase):
             self.assertEqual(argv[argv.index("--mode")+1],"restore")
             self.assertEqual(argv[argv.index("--manifest-sha256")+1],"a"*64)
 
+    def test_qcow2_firmware_prepare_and_activate_require_real_recovery_evidence(self):
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td)
+            script,argv,_=self.choose_fixture(j,rows,"firmware-sidecar","apply",
+                     recovery_bundle=Path("/private/cold"),
+                     manifest_sha256="a"*64)
+            self.assertEqual(script.name,"command2_disposable_nvram_qcow2_prepare.py")
+            self.assertEqual(argv[argv.index("--mode")+1],"prepare")
+            self.assertEqual(argv[argv.index("--reviewed-manifest-sha")+1],"a"*64)
+            with self.assertRaisesRegex(w.WorkflowBlocked,"firmware_restore_witness"):
+                self.choose_fixture(j,rows,"firmware-activate","apply",
+                        recovery_bundle=Path("/private/cold"),
+                        manifest_sha256="a"*64)
+            script,argv,_=self.choose_fixture(j,rows,"firmware-activate","apply",
+                        recovery_bundle=Path("/private/cold"),manifest_sha256="a"*64,
+                        firmware_restore_witness=Path("/private/restore-witness"),
+                        xml_backup_dir=Path("/private/xmlbackups"))
+            self.assertEqual(script.name,"command2_disposable_nvram_qcow2_activate.py")
+            self.assertEqual(argv[argv.index("--mode")+1],"apply")
+            self.assertIn("/private/restore-witness",argv)
+            self.assertIn("/private/xmlbackups",argv)
+
     def test_snapshot_capture_must_have_private_witness_and_full_backup(self):
         with TemporaryDirectory() as td:
             j,rows=self.makefixture(td)
