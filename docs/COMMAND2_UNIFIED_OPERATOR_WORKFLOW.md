@@ -35,6 +35,7 @@ revalidate libvirt, UUIDs, paths, networking and storage.
 | `cold-restore` | High-risk actual disposable-host cold restore, separate typed approval and restore-risk acknowledgement | Never on SSL55. Operator boots, verifies agent + TPM + UEFI and records real restore evidence. |
 | `firmware-sidecar` | Copies existing RAW pflash NVRAM into a separate, checked QCOW2 sidecar | Guest SHUT OFF, existing full cold backup SHA pinned. Original RAW unchanged. |
 | `firmware-activate` | Saved-only XML transition to QCOW2 sidecar with exclusive backup of original XML | Requires separate actual full disk/OVMF/swtpm restore witness. Boot/TPM/Secure Boot/BitLocker must be rechecked. |
+| `snapshot-capture-batch` | NEW: approved OTHER-host all-N preflight against **per-VM pinned full stopped-state cold recovery**, exact Windows/host acceptance receipts, running Agent/VM identity, QCOW2 OVMF, native snapshot version, aggregate RAM/storage reserve; then sequential separately typed-approved live RAM+disk capture | An experimental capture, **not** TPM/UEFI rollback proof, not SSL-55, not final CAPE registration. Stops on first failed child; no rollback/auto retry. |
 | `snapshot-capture` | Explicit, one-VM running internal disk+RAM snapshot attempt after full cold-backup and stack checks | Actual TPM/OVMF rollback is NOT established by successful snapshot creation. |
 | `snapshot-revert-once` | One **destructive but explicitly approved disposable-host** `virsh snapshot-revert` back into RUNNING saved RAM/disk state; requires exact shut-off VM UUID, hashed full cold bundle, present QCOW2 OVMF, live libvirt/nft isolation and typed per-VM consent | **No** automatic guest shutdown or retry, **no** TPM/UEFI proof from the host alone; repeat with separate approval after off-guest Windows/TPM baseline comparison and clean shutdown. |
 | `snapshot-batch` | Checks all recorded `cape_ready_win11_N` snapshots captured while RUNNING, with each VM SHUT OFF for CAPE and two real witnessed benign revert cycles | Read-only gate; does NOT perform the revert tests or prove witness cryptographically. |
@@ -190,6 +191,54 @@ checked BEFORE any guest boot. `--mode apply` still requires direct
 operator TTY and a separate per-guest approval and **is not** a completed
 unattended production Command 2. Do NOT synthesize receipt booleans.
 No real other-host guest or SSL-55 VM has been booted by this change.
+
+## Count-driven running snapshot capture bridge (EXPERIMENTAL only)
+
+After every Windows clone has independently passed the network, static-IP,
+agent and cold-backup gates **and** has been reconfigured offline with a
+QCOW2 OVMF sidecar, the new `snapshot-capture-batch` may plan all N
+snapshot captures from one parent invocation. It never treats RAW OVMF or
+a standalone running snapshot as proof of TPM rollback.
+
+Each root-private `--snapshot-evidence-dir` contains
+`snapshot-recovery-index.json` (0600; canonical format
+`COMMAND2_RUNNING_SNAPSHOT_BUNDLE_INDEX_V1`, exact host, guest_count,
+and one `entries` object per VM with *only* `manifest_sha256`), plus
+one root-private per-VM folder `win11_N/`. Each guest folder contains
+`cold/command2-cold-bundle.json` and associated unchanged full-state
+disk/UEFI/swtpm files, and an exact
+`snapshot-acceptance.json` private acceptance receipt. No automatic
+witness fabrication is permitted. Actual cold restoration, TPM handling
+and network acceptance must already have been independently reviewed.
+
+Example index *shape only* (SHA placeholder is NOT valid operator proof):
+```json
+{
+  "format":"COMMAND2_RUNNING_SNAPSHOT_BUNDLE_INDEX_V1",
+  "host":"approved-lab",
+  "guest_count":2,
+  "entries":{
+    "win11_1":{"manifest_sha256":"<64-HEX-REVIEWED-HASH-1>"},
+    "win11_2":{"manifest_sha256":"<64-HEX-REVIEWED-HASH-2>"}
+  }
+}
+```
+
+```bash
+# Other-host ONLY; read-only plan with all-N backup rehashing:
+sudo python3 -B scripts/command2_portable_workflow.py \
+  --phase snapshot-capture-batch --mode plan \
+  --approved-host approved-lab \
+  --journal /absolute/private/command2-identity-reservation.json \
+  --snapshot-evidence-dir /absolute/private/snapshot-evidence
+```
+
+The matching `--mode apply` has an interactive, separately guarded
+approval for EVERY VM and preserves any partial snapshot for review.
+After successful capture, repeated **benign** full-state snapshot reverts,
+TPM/OVMF/Secure Boot/BitLocker/Agent and IPv4/IPv6/L2 checks, final
+shutoff and CAPE machine registration are STILL REQUIRED. This is not
+the final two-command installer and has not run on physical lab VMs.
 
 ## All-N benign CAPE Agent reachability gate
 
