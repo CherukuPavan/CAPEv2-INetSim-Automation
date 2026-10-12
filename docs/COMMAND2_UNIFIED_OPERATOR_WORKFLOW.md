@@ -22,6 +22,7 @@ revalidate libvirt, UUIDs, paths, networking and storage.
 | `stage` | Count-driven 1..16 shut-off zero-NIC clones and per-guest reserved JSON | On a supported other Ubuntu/KVM host only; prerequisite Command 1 master+bootstrap. Initial clone firmware RAW. |
 | `network-install` | New dedicated `inet cape_analysis_cmd2_guard` nft rules and persistent libvirt `cape-analysis-isolated` network; start network, **autostart OFF** | Actual reboot persistence, IPv4+IPv6 packet negatives, peer L2 and host/CAPE/INetSim positive traffic NOT proven; no guest NICs attached. |
 | `guard-persistence` | Create-only root-pinned nft policy + independent CAPE-only systemd replay unit, **enable without starting** | Requires already active, checked network+nft policy, zero running/autostart guests, existing nftables.service disabled/inactive, and typed approval. Physical reboot persistence still NOT proved. |
+| `identity-batch` | NEW: one count-driven, all-guest zero-NIC identity ISO preflight, followed in apply mode by ordered per-VM identity ISO build + attach using existing safeguards | All VMs must be SHUT OFF and zero-NIC; each actual step keeps independent typed approval; **does not** install Windows task, boot Windows, set IP, attach NIC, snapshot, or complete Command 2. If any step fails, retain artifacts and stop without blind retry. |
 | `identity-build` | One SHA-verified, UUID-bound per-guest read-only optical configuration ISO | Windows SYSTEM startup bootstrap must be installed beforehand. |
 | `identity-attach` | Inserts the ISO into exactly one previously empty CD-ROM on a shut-off zero-NIC clone | Operator separately boots guest to perform hostname personalization and verifies identity; no automatic guest start. |
 | `nic-attach` | Adds exactly one isolated network NIC in saved XML, after root-private network acceptance receipt | The real packet-isolation/reboot evidence is operator-witnessed; the receipt cannot be invented by the software. |
@@ -71,6 +72,40 @@ packet-path tests pass**, NIC-attachment receipts must not be signed.
 
 The existing real SSL55 base VM is **not** a supported target for this
 portable entrypoint. Never run `--mode apply` there.
+
+## Count-driven Windows identity optical phase (new, NOT complete Command 2)
+
+After the separate-host `stage` phase has successfully reserved and created
+all N shut-off zero-NIC Windows clones, the operator need not type two
+different script commands for every VM merely to prepare their identity media.
+
+```bash
+# Read-only admission/preflight for ALL exact journal-reserved clones.
+sudo python3 -B scripts/command2_portable_workflow.py \
+  --phase identity-batch --mode plan \
+  --approved-host OTHERHOST \
+  --journal /absolute/private/command2-identity-reservation.json
+
+# Requires an interactive TTY, all-N guest preflight and per-VM typed
+# approvals. Builds and attaches ONLY identity ISOs to shut-off zero-NIC VMs.
+# sudo python3 -B scripts/command2_portable_workflow.py \
+#   --phase identity-batch --mode apply \
+#   --approved-host OTHERHOST \
+#   --journal /absolute/private/command2-identity-reservation.json
+```
+
+This is a sequential, fail-closed development bridge to the future **single
+Command 2 clone-and-configure operation**. The parent snapshots the existing
+journal digest and checks it before each child step. A failure stops before
+the next VM or phase; previously written ISOs or VM config changes are
+never automatically removed or overwritten. The parent does not bypass
+per-VM typed approvals, install the Command 1 Windows SYSTEM bootstrap,
+power on guests, assign static IPs, validate external/lateral isolation,
+perform TPM-consistent running snapshots, or register CAPE. The
+source Windows master must have been prepared beforehand.
+
+**Do not run apply on SSL-55.** This code is offline CI tested only. No
+separate-host physical deployment or end-to-end Windows integration is certified.
 
 ## Per-guest example once a signed reservation is present
 
