@@ -109,6 +109,7 @@ class Capture(unittest.TestCase):
             vars.unlink()
             vars.symlink_to(disk)
             with patch.object(m,"OS_DISK",disk),patch.object(m,"OVMF",vars),\
+                 patch.object(m,"cmd",return_value=qcow_reply(False)),\
                  self.assertRaisesRegex(m.CaptureBlocked,"missing"):
                 m.images(NEW,False)
 
@@ -131,6 +132,9 @@ class Capture(unittest.TestCase):
                  patch.object(m,"TPM",tpm),\
                  patch.object(m.os,"statvfs",return_value=spec),\
                  patch.object(m,"virsh",side_effect=virsh(False)),\
+                 patch.object(m,"domain_views",return_value={
+                     "saved_and_live_same_two_nics":True,
+                     "nat_is_persistent_in_guest_definition":True}),\
                  patch.object(m,"cmd",side_effect=query):
                 report=m.preflight(False)
             self.assertFalse(report["CAPE_READY"])
