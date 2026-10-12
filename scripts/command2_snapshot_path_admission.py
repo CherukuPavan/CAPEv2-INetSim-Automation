@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 from pathlib import Path
 import re
 import socket
@@ -108,6 +110,42 @@ def classify_xml(vm, expected_uuid, raw, state, names):
             "tpm_state_revert_proven_by_inventory":False,
             "snapshot_created":False}
 
+def rows_from_reserved_journal(path, host):
+    """Use the exact existing count-driven reservation; no regenerated IDs."""
+    p=Path(path)
+    require(p.is_absolute() and p.name=="command2-identity-reservation.json"
+            and p.is_file() and not p.is_symlink(),
+            "Exact existing absolute reservation journal required")
+    ds=p.parent.stat()
+    require(ds.st_uid==0 and stat.S_IMODE(ds.st_mode)&0o077==0 and
+            not p.parent.is_symlink(),
+            "Reservation directory must be root-private")
+    meta=p.stat()
+    require(meta.st_uid==0 and meta.st_nlink==1 and
+            stat.S_IMODE(meta.st_mode)&0o077==0 and
+            meta.st_size<=128*1024,
+            "Reservation file must be root-private and bounded")
+    data=json.loads(p.read_text(encoding="utf-8"))
+    require(type(data) is dict and
+            data.get("format")=="CAPE_COMMAND2_GUEST_IDENTITY_RESERVATION" and
+            data.get("version")==1 and data.get("host")==host and
+            data.get("host_network_modified") is False,
+            "Reservation schema or host mismatch")
+    entries=data.get("entries")
+    count=data.get("guest_count")
+    require(type(count) is int and 1<=count<=16 and
+            type(entries) is list and len(entries)==count,
+            "Invalid staged VM count")
+    result=[]
+    for index,entry in enumerate(entries,1):
+        require(type(entry) is dict and
+                entry.get("libvirt_name")==f"win11_{index}" and
+                type(entry.get("libvirt_uuid_candidate")) is str,
+                "Invalid ordered VM identity reservation")
+        result.append((entry["libvirt_name"],
+                       entry["libvirt_uuid_candidate"]))
+    return result
+
 def inventory(guest_expectations):
     seen=set()
     values=[]
@@ -140,11 +178,11 @@ def main():
                     help="Inspect exact existing SSL-55 win11_1 only")
     ap.add_argument("--guest",action="append",default=[],
                     help="Other-host strict VM=UUID (repeat for all reserved VMs)")
-    a=ap.parse_args()
+    ap.add_argument("--journal",type=Path,\n                    help="Other-host count-driven root-private reservation journal")\n    a=ap.parse_args()
     try:
         host=socket.gethostname().split(".",1)[0].lower()
         if a.reference_ssl55:
-            require(host=="cse-ssl-55" and not a.guest,
+            require(host=="cse-ssl-55" and not a.guest and a.journal is None,
                     "SSL55 reference request on wrong host or mixed target")
             require(virsh("domuuid","win11").lower()==MASTER_UUID and
                     virsh("domstate","win11").lower()=="shut off",
@@ -153,12 +191,19 @@ def main():
         else:
             require(host not in ("cse-ssl-55","ssl-55"),
                     "Reference host refuses other-host candidate operations")
-            require(bool(a.guest),"Explicit per-VM reserved UUIDs required")
-            rows=[]
-            for item in a.guest:
-                pair=item.split("=",1)
-                require(len(pair)==2,"Use --guest win11_N=reserved-uuid")
-                rows.append(tuple(pair))
+            require(not (a.guest and a.journal),
+                    "Choose --journal or explicit --guest, never both")
+            if a.journal is not None:
+                require(os.geteuid()==0,
+                        "Root required to read private count-driven journal")
+                rows=rows_from_reserved_journal(a.journal,host)
+            else:
+                require(bool(a.guest),"Explicit per-VM reserved UUIDs required")
+                rows=[]
+                for item in a.guest:
+                    pair=item.split("=",1)
+                    require(len(pair)==2,"Use --guest win11_N=reserved-uuid")
+                    rows.append(tuple(pair))
         print(json.dumps(inventory(rows),sort_keys=True,indent=2))
         return 0
     except (AdmissionBlocked,ET.ParseError,TypeError,ValueError) as exc:
