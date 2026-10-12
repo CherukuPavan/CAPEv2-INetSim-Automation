@@ -107,15 +107,15 @@ try {
         Record 'GUEST_DEFAULT_ROUTE_GUARD' 'INCONCLUSIVE'
     }
     $targets=@(
-      @('IPv4_1_1_1_1_443','1.1.1.1',443),
-      @('IPv4_8_8_8_8_53','8.8.8.8',53),
-      @('IPv6_2606_4700_4700__1111_443','2606:4700:4700::1111',443),
-      @('IPv6_2001_4860_4860__8888_443','2001:4860:4860::8888',443)
+      [pscustomobject]@{Key='IPv4_1_1_1_1_443';IP='1.1.1.1';Port=443},
+      [pscustomobject]@{Key='IPv4_8_8_8_8_53';IP='8.8.8.8';Port=53},
+      [pscustomobject]@{Key='IPv6_2606_4700_4700__1111_443';IP='2606:4700:4700::1111';Port=443},
+      [pscustomobject]@{Key='IPv6_2001_4860_4860__8888_443';IP='2001:4860:4860::8888';Port=443}
     )
     $blocked=0
     foreach ($t in $targets) {
-        $status=Probe-TCP ([string]$t[1]) ([int]$t[2])
-        Record ([string]$t[0]) $status
+        $status=Probe-TCP $t.IP $t.Port
+        Record $t.Key $status
         if ($status -eq 'CONNECTED_UNSAFE') {
             $unsafe=$true
         } elseif ($status -eq 'TIMEOUT' -or $status.StartsWith('SOCKET_FAILED_')) {
