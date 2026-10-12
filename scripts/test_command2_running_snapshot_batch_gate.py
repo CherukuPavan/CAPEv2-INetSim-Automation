@@ -64,6 +64,8 @@ class SnapshotBatch(unittest.TestCase):
                 (root/(r["libvirt_name"]+".running-snapshot-witness.json")).write_text(
                     json.dumps(witness(r)))
             with patch.object(g,"virsh",side_effect=fake_virsh(rows)), \
+                 patch.object(g,"image_snapshots",return_value={
+                     "os_disk_and_uefi_vars_have_named_checkpoint":True}), \
                  patch.object(g,"rootfile",side_effect=lambda p,limit=128*1024:
                        json.loads(Path(p).read_text())):
                 result=g.evaluate(rows,"192.168.241.0/24",HOST,root/"journal",root)
@@ -83,6 +85,8 @@ class SnapshotBatch(unittest.TestCase):
                 (root/(r["libvirt_name"]+".running-snapshot-witness.json")).write_text(
                     json.dumps(witness(r)))
             with patch.object(g,"virsh",side_effect=vm), \
+                 patch.object(g,"image_snapshots",return_value={
+                     "os_disk_and_uefi_vars_have_named_checkpoint":True}), \
                  patch.object(g,"rootfile",side_effect=lambda p,limit=128*1024:
                        json.loads(Path(p).read_text())):
                 result=g.evaluate(rows,"192.168.241.0/24",HOST,root/"journal",root)
@@ -106,6 +110,65 @@ class SnapshotBatch(unittest.TestCase):
              snapxml("win11_1",memory="no")):
             with self.assertRaisesRegex(g.GateBlocked,"BOTH"):
                 g.snapshot_metadata("win11_1","cape_ready_win11_1")
+
+    def test_real_ssl55_sda_os_plus_sdb_firmware_no_is_accepted(self):
+        vm="win11_1"
+        live=(f'<domainsnapshot><name>cape_ready_{vm}</name>'
+              '<state>running</state><memory snapshot="internal"/>'
+              '<disks><disk name="sda" snapshot="internal"/>'
+              '<disk name="sdb" snapshot="no"/></disks></domainsnapshot>')
+        with patch.object(g,"virsh",side_effect=lambda *argv:
+             "cape_ready_win11_1" if argv[0]=="snapshot-list" else live):
+            result=g.snapshot_metadata(vm,"cape_ready_"+vm)
+        self.assertEqual(result["snapshot_disk_entries"],2)
+        self.assertFalse(
+            result["qcow2_uefi_checkpoint_independently_verified_by_metadata"])
+        for unsafe in (
+            live.replace('name="sdb" snapshot="no"',
+                         'name="sdb" snapshot="internal"'),
+            live.replace('name="sdb" snapshot="no"',
+                         'name="sdc" snapshot="no"'),
+            live.replace('name="sdb" snapshot="no"',
+                         'name="sda" snapshot="no"'),
+        ):
+            with patch.object(g,"virsh",side_effect=lambda *argv:
+                 "cape_ready_win11_1" if argv[0]=="snapshot-list" else unsafe),\
+                 self.assertRaises(g.GateBlocked):
+                g.snapshot_metadata(vm,"cape_ready_"+vm)
+
+    def test_image_checkpoints_require_both_separate_qcow2_files(self):
+        with TemporaryDirectory() as td:
+            root=Path(td)
+            disk=root/"win11_1.command2.qcow2"
+            nvram=root/"win11_1.command2_VARS.fd.qcow2"
+            disk.write_bytes(b"stub")
+            nvram.write_bytes(b"stub")
+            record={"disk_target":str(disk),
+                    "uefi_nvram_target":str(nvram)[:-6]}
+            snap="cape_ready_win11_1"
+            info={"format":"qcow2","snapshots":[{"name":snap}]}
+            def get_info(*argv):
+                self.assertEqual(argv[:3],("qemu-img","info","--output=json"))
+                return json.dumps(info)
+            with patch.object(g,"run",side_effect=get_info):
+                found=g.image_snapshots(record,snap)
+            self.assertTrue(found["os_disk_and_uefi_vars_have_named_checkpoint"])
+            self.assertFalse(found["swtpm_checkpoint_or_rollback_proven"])
+            calls=[]
+            def missing_firmware(*argv):
+                calls.append(argv[-1])
+                data=dict(info)
+                if argv[-1]==str(nvram):data["snapshots"]=[]
+                return json.dumps(data)
+            with patch.object(g,"run",side_effect=missing_firmware),\
+                 self.assertRaisesRegex(g.GateBlocked,"uefi_vars"):
+                g.image_snapshots(record,snap)
+            self.assertEqual(calls,[str(disk),str(nvram)])
+            nvram.unlink()
+            nvram.symlink_to(disk)
+            with patch.object(g,"run",side_effect=get_info),\
+                 self.assertRaisesRegex(g.GateBlocked,"symlinked"):
+                g.image_snapshots(record,snap)
 
     def test_offline_snapshot_not_accepted(self):
         with patch.object(g,"virsh",side_effect=lambda *args:
