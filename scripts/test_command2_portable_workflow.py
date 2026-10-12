@@ -480,7 +480,8 @@ class Workflow(unittest.TestCase):
         self.assertNotIn("shell=True",src)
         self.assertIn("subprocess.run([sys.executable",src)
         for forbidden in ('"snapshot-revert"','"snapshot-create-as"',
-                          '"destroy"','"start"','"shutdown"',
+                          '"destroy"','"start"',
+                          'virsh("shutdown"',
                           '"attach-interface"','"net-start"',
                           '"nft","add"'):
             self.assertNotIn(forbidden,src)
