@@ -19,9 +19,10 @@ function Record([string]$key,[string]$value) {
     [void]$rows.Add(($key+'='+$value))
 }
 function Probe-TCP([string]$target,[int]$port) {
-    $client=New-Object System.Net.Sockets.TcpClient
+    $client=$null
     try {
         $ip=[System.Net.IPAddress]::Parse($target)
+        $client=New-Object System.Net.Sockets.TcpClient -ArgumentList @($ip.AddressFamily)
         $task=$client.BeginConnect($ip,$port,$null,$null)
         try {
             if (-not $task.AsyncWaitHandle.WaitOne(2500,$false)) { return 'TIMEOUT' }
@@ -37,7 +38,7 @@ function Probe-TCP([string]$target,[int]$port) {
     } catch {
         return 'ERROR_'+$_.Exception.GetType().Name
     } finally {
-        $client.Dispose()
+        if ($null -ne $client) { $client.Dispose() }
     }
 }
 $fail=$false
