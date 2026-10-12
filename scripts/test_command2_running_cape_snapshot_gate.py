@@ -31,6 +31,9 @@ def virsh_fake(*argv, **kwargs):
     if argv==("domuuid",NAME):return UUID
     if argv==("dumpxml",NAME):return domain()
     if argv==("net-info","cape-analysis-isolated"):return "Active: yes"
+    if argv==("net-dumpxml","cape-analysis-isolated"):
+        return ('<network><name>cape-analysis-isolated</name>'
+                '<port isolated="yes"/><dns enable="no"/></network>')
     if argv==("snapshot-list",NAME,"--name"):return ""
     if argv[:1]==("snapshot-create-as",):return "created"
     if argv==("snapshot-dumpxml",NAME,"cape_ready_win11_1"):
@@ -54,6 +57,24 @@ class RunningSnapshotTests(unittest.TestCase):
         self.assertFalse(report["snapshot_created"])
         self.assertFalse(report["restore_tested"])
         self.assertFalse(any("snapshot-create-as" in a for a in calls))
+
+    def test_final_snapshot_refuses_online_nat_or_unreviewed_guest_dns(self):
+        for bad in (
+            '<network><name>cape-analysis-isolated</name>'
+            '<port isolated="yes"/><dns enable="no"/>'
+            '<forward mode="nat"/></network>',
+            '<network><name>cape-analysis-isolated</name>'
+            '<port isolated="yes"/><dns enable="yes"/></network>',
+            '<network><name>cape-analysis-isolated</name>'
+            '<dns enable="no"/></network>',
+        ):
+            def v(*args):
+                if args==("net-dumpxml","cape-analysis-isolated"):return bad
+                return virsh_fake(*args)
+            with self.subTest(xml=bad),patch.object(s,"virsh",side_effect=v),\
+                 self.assertRaisesRegex(s.SnapshotBlocked,
+                                         "FINAL CAPE SNAPSHOT BLOCKED"):
+                s.saved_xml_checks(NAME,UUID,MAC,IP,"192.168.240.0/24")
 
     def test_reference_host_is_guarded_before_libvirt(self):
         with patch.object(s.socket,"gethostname",return_value="CSE-SSL-55"),\
