@@ -95,7 +95,26 @@ if ($Mode -eq "Plan") {
 }
 if ($Mode -eq "Identity") {
   GuestAdminRequired
-  if ($adapters.Count -ne 0) { Deny "Identity phase requires ZERO guest NICs" }
+  # Two supported first-boot paths:
+  #  (1) initial zero-NIC identity media, or
+  #  (2) one reserved NIC only AFTER verified host isolation + matching MAC.
+  # The latter permits a single authorized first boot, rename/restart,
+  # followed on the next startup by the static network assignment.
+  if ($adapters.Count -ne 0) {
+    if (-not $HostIsolationVerified -or $adapters.Count -ne 1) {
+      Deny "Identity with attached NIC requires independently approved isolation"
+    }
+    if ((CleanMac ([string]$adapters[0].MacAddress)) -ne
+        (CleanMac ([string]$cfg.nic_mac))) {
+      Deny "Identity NIC MAC differs from exact reservation"
+    }
+    $identityNic=$adapters[0]
+    $identityV4=@(Get-NetRoute -AddressFamily IPv4 -InterfaceIndex $identityNic.ifIndex -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue)
+    $identityV6=@(Get-NetRoute -AddressFamily IPv6 -InterfaceIndex $identityNic.ifIndex -DestinationPrefix "::/0" -ErrorAction SilentlyContinue)
+    if ($identityV4.Count -ne 0 -or $identityV6.Count -ne 0) {
+      Deny "An unconfigured attached NIC has an unexpected default route"
+    }
+  }
   if ($current -ieq [string]$cfg.hostname) {
     [pscustomobject]@{ result="COMMAND2_WINDOWS_HOSTNAME_ALREADY_SET"; changed=$false } | ConvertTo-Json -Compress
     exit 0
