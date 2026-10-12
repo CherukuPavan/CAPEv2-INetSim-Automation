@@ -91,7 +91,7 @@ def audit(host,journal):
             record["agent_version"]=detail["version"]
             record["status"]="AGENT_HTTP_ADMIN_VERIFIED"
             passed+=1
-        except (agent.AgentBlocked,OSError,ValueError,TypeError,KeyError) as err:
+        except (AgentBatchBlocked,agent.AgentBlocked,OSError,ValueError,TypeError,KeyError) as err:
             record["reason"]=str(err)
         result.append(record)
     return {"result":"COMMAND2_ALL_GUESTS_CAPE_AGENT_CHECK_READONLY",
