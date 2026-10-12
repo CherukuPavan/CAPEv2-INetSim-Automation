@@ -131,7 +131,7 @@ def mac_of_neighbor(ip):
          "Bootstrap Windows neighbor has no verified Ethernet MAC")
     return value
 
-def inspect(host,journal,vm,iso):
+def inspect(host,journal,vm,iso,evidence_dir=None):
     attach.workflow.canonical_host(host)
     need(os.geteuid()==0,"Root required for exact private golden clone data")
     need(VM_RE.fullmatch(vm) is not None,
@@ -146,8 +146,27 @@ def inspect(host,journal,vm,iso):
          "Master not off or target cloned VM identity/state differs")
     active=[x.strip() for x in attach.virsh("list","--name").splitlines()
             if x.strip()]
-    need(active==[vm],
-         "For benign firstboot, ONLY the single selected clone may run")
+    need(len(active)==len(set(active)) and active.count(vm)==1,
+         "Exactly the selected Windows clone must be running once")
+    # Earlier clones may stay running *only* when every one already has
+    # independently verified Windows hostname/DHCP/HTTPS evidence and
+    # current live NAT MAC+Agent bindings. This matches firstboot's
+    # sequential 1..N contract; simply allowing arbitrary running VMs
+    # would risk contacting the wrong inherited golden-master IP.
+    if len(active)>1:
+        need(evidence_dir is not None,
+             "Prior running clones require approved Windows evidence")
+        import command2_portable_master_nat_firstboot as firstboot
+        try:
+            previous=firstboot.completed_running_clones(
+                host,rows,vm,attach.profile.check_active_nat(),evidence_dir,
+                requested_is_running=True)
+        except firstboot.NatBootBlocked as exc:
+            raise TransportBlocked(
+                "Previous cloned guest Windows/NAT identity not verified") from exc
+        need(len(previous)==len(active)-1 and
+             {x["vm"] for x in previous}==set(active)-{vm},
+             "Unexpected unverified running guest on shared golden NAT")
     # The all-N attachment checker would reject any RUNNING clone; verify
     # only this exact saved+live permanent NIC and active NAT gateway.
     for arguments in (("dumpxml","--inactive",vm),("dumpxml",vm)):
@@ -275,7 +294,7 @@ def verified_evidence_folder(evidence):
 
 def stage(host,journal,vm,iso,evidence_dir):
     need(sys.stdin.isatty(),"Direct operator TTY required for guest file writes")
-    before=inspect(host,journal,vm,iso)
+    before=inspect(host,journal,vm,iso,evidence_dir)
     phrase="UPLOAD-ONLY-TRUSTED-NAT-WINDOWS-SETUP-"+vm.upper()
     need(input("Type "+phrase+" for only two reviewed guest files: ")==phrase,
          "Operator did not approve Windows NAT setup upload")
@@ -283,7 +302,7 @@ def stage(host,journal,vm,iso,evidence_dir):
     outcome=evidence/(vm+STAGE_SUFFIX)
     need(not outcome.exists() and not outcome.is_symlink(),
          "Guest provisioning already has a stage witness; do not retry")
-    checked=inspect(host,journal,vm,iso)
+    checked=inspect(host,journal,vm,iso,evidence_dir)
     need(checked==before,"Guest/ARP/Agent changed since upload consent")
     meta=iso_profile(vm,iso)
     started=False
@@ -332,7 +351,8 @@ def main():
     try:
         info=(stage(a.approved_host,a.journal,a.vm,a.nat_iso,
                     a.evidence_dir) if a.mode=="stage" else
-              inspect(a.approved_host,a.journal,a.vm,a.nat_iso))
+              inspect(a.approved_host,a.journal,a.vm,a.nat_iso,
+                      a.evidence_dir))
         print(json.dumps(info,sort_keys=True,indent=2),flush=True)
         return 0
     except (TransportBlocked,attach.NatAttachBlocked,
