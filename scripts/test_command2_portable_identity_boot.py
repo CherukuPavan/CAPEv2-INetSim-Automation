@@ -77,6 +77,7 @@ class IdentityBootTests(unittest.TestCase):
                                      st_uid=0,st_nlink=1)
             with patch.object(b,"LOCK",lock),\
                  patch.object(b,"checked_plan",return_value=mock_plan()),\
+                 patch.object(b.sys.stdin,"isatty",return_value=True),\
                  patch.object(b,"input",return_value="BOOT-ZERO-NIC-IDENTITY-WIN11_1"),\
                  patch.object(b,"virsh",side_effect=cmd),\
                  patch.object(b.workflow.snapshotgate,"reservation_rows",
@@ -102,6 +103,7 @@ class IdentityBootTests(unittest.TestCase):
                                      st_uid=0,st_nlink=1)
             with patch.object(b,"LOCK",lock),\
                  patch.object(b,"checked_plan",return_value=mock_plan()),\
+                 patch.object(b.sys.stdin,"isatty",return_value=True),\
                  patch.object(b,"input",return_value="BOOT-ZERO-NIC-IDENTITY-WIN11_1"),\
                  patch.object(b,"virsh",side_effect=cmd),\
                  patch.object(b.workflow.snapshotgate,"reservation_rows",
