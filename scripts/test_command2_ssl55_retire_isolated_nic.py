@@ -21,7 +21,9 @@ class Retire(unittest.TestCase):
         names=m.post.OLD+"\n"+m.post.NEW
         def query(*a):
             if a==("snapshot-list",VM,"--name"):return names
-            if a[:1]==("domuuid",):return UID
+            if a[:1]==("domuuid",):
+                return {VM:UID,m.dual.MASTER[0]:m.dual.MASTER[1],
+                        m.dual.TRIAL[0]:m.dual.TRIAL[1]}[a[1]]
             if a[:1]==("domstate",):return (
                 "running" if a[1]==VM else "shut off")
             if a[0]=="dumpxml":return DOMAIN
