@@ -495,7 +495,7 @@ def graceful_shutdown_batch(args):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan","master-nat-attach","master-nat-media","master-nat-agents","master-nat-upload","master-nat-execute"))
+    p.add_argument("--phase",required=True,choices=(*PHASES,BATCH_PHASE,BOOT_BATCH_PHASE,APPROVED_BOOT_BATCH_PHASE,CAPTURE_BATCH_PHASE,SHUTDOWN_BATCH_PHASE,"master-nat-plan","master-nat-attach","master-nat-media","master-nat-agents","master-nat-upload","master-nat-execute","master-nat-verify-windows"))
     p.add_argument("--mode",default="plan",choices=("plan","apply"))
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm")
@@ -533,6 +533,28 @@ def main():
             return approved_firstboot_batch(args)
         if args.phase==SHUTDOWN_BATCH_PHASE:
             return graceful_shutdown_batch(args)
+        if args.phase=="master-nat-verify-windows":
+            need(args.mode=="plan",
+                 "Independent Windows NAT verification is a read-only phase")
+            host=canonical_host(args.approved_host)
+            need(os.geteuid()==0,
+                 "Root required for exact Windows NAT Agent witness")
+            absolute(args.journal,"journal")
+            absolute(args.nat_media_dir,"nat_media_dir")
+            absolute(args.witness_dir,"witness_dir")
+            need(args.vm is not None and
+                 re.fullmatch(r"win11_([1-9]|1[0-6])",args.vm),
+                 "Exact count-driven Windows VM required")
+            child=Path(__file__).resolve().with_name(
+                "command2_portable_nat_agent_verify.py")
+            need(child.is_file() and not child.is_symlink(),
+                 "Reviewed Windows NAT Agent HTTPS witness helper missing")
+            iso=args.nat_media_dir/(args.vm+".master-nat.iso")
+            return subprocess.run([sys.executable,"-B",str(child),
+                "--mode","verify","--approved-host",host,
+                "--journal",str(args.journal),"--vm",args.vm,
+                "--nat-iso",str(iso),
+                "--evidence-dir",str(args.witness_dir)],check=False).returncode
         if args.phase=="master-nat-execute":
             host=canonical_host(args.approved_host)
             need(os.geteuid()==0,
