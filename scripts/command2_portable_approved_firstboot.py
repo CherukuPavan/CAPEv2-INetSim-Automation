@@ -100,7 +100,7 @@ def checked_plan(host,journal,vm,receipt):
     workflow.canonical_host(host)
     need(os.geteuid()==0,"Root required for private approved boot evidence")
     row,subnet,config=workflow.load_guest(journal,host,vm)
-    need(type(receipt) is Path and receipt.is_absolute(),
+    need(isinstance(receipt,Path) and receipt.is_absolute(),
          "Exact absolute network acceptance receipt required")
     # Validate the privileged receipt metadata/size before reading its bytes.
     need(nic.read_acceptance_receipt(str(receipt),vm,row["libvirt_uuid_candidate"],
