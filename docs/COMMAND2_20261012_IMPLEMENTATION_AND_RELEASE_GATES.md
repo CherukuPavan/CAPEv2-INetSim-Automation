@@ -207,3 +207,19 @@ NIC and Windows' SYSTEM-startup static-IP personalization:
   IPv4/IPv6 negative egress and L2 containment on the target host. The
   production release gate remains BLOCKED until those physical checks and
   repeated snapshot/revert with TPM/OVMF both pass for each guest.
+
+
+## Correct CAPE final VM power state (verified against upstream code)
+
+CAPE `LibVirtMachinery.start(label)` explicitly refuses a VM that is already
+running, then calls `vm.revertToSnapshot(snapshot, flags=0)` and waits for
+`running`. **The VM is RUNNING when the snapshot is taken but is SHUT OFF
+when handed to CAPE**. Do not leave analysis VMs running at final
+`kvm.conf` registration just because the saved snapshot is named "running".
+
+The `command2_running_snapshot_batch_gate.py` and per-VM CAPE registration
+now enforce this distinction: power state SHUT OFF in libvirt, separately
+recorded `<domainsnapshot><state>running</state>` with internal RAM/disk,
+and full TPM+OVMF repeat benign revert evidence. This is still not proof
+that any real swtpm+UEFI revert is supported on SSL55.
+Source: https://github.com/kevoreilly/CAPEv2/blob/master/lib/cuckoo/common/abstracts.py
