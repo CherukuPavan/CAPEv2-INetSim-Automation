@@ -106,6 +106,32 @@ def sha(p):
             b=f.read(4*1024*1024)
             if not b:return h.hexdigest()
             h.update(b)
+
+def stopped_process_guard():
+    # A shut-off libvirt state is not proof that the swtpm child has exited.
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdecimal():continue
+        try:
+            comm=(entry/"comm").read_text().strip().lower()
+            if not ("swtpm" in comm or "qemu" in comm):continue
+            args=(entry/"cmdline").read_bytes().decode("utf-8","replace").lower()
+        except (FileNotFoundError,ProcessLookupError):
+            continue
+        except PermissionError as exc:
+            raise Stop("Cannot inspect emulator state") from exc
+        if UID in args or "guest="+VM in args:
+            raise Stop("Clone QEMU or swtpm remains active")
+
+def disallow_shared_disks():
+    own={os.path.realpath(DISK),os.path.realpath(VARS)}
+    peers=set(virsh("list","--all","--name").splitlines())-{VM,""}
+    for name in sorted(peers):
+        root=ET.fromstring(virsh("dumpxml","--inactive",name))
+        sources=[d.get("file") for d in root.findall("./devices/disk/source")]
+        sources.append(root.findtext("./os/nvram"))
+        must(not any(p and os.path.realpath(p) in own for p in sources),
+             "Another guest references clone disk/UEFI VARS")
+
 def capture():
     must(sys.stdin.isatty(),"Interactive terminal required")
     before=plan()
@@ -123,6 +149,8 @@ def capture():
         must(plan()==before,"Preflight changed after locking")
         # No backup of active QEMU or swtpm data. Assert no running guests.
         must(not virsh("list","--name").strip(),"Other guest running")
+        stopped_process_guard()
+        disallow_shared_disks()
         cmd("qemu-img","check","-q","-f","qcow2",str(DISK))
         OUT.mkdir(mode=0o700,exist_ok=True)
         folder=OUT/(".incomplete-"+uuid.uuid4().hex)
