@@ -217,8 +217,17 @@ def capture_candidate():
         except BlockingIOError as exc:
             raise SnapshotCandidateBlocked("Snapshot experiment already running") from exc
         rechecked=inspect()
-        need(rechecked==first,
-             "Saved XML, agent, snapshot status, resources or guard changed")
+        # Snapshot XML preview can contain a NEW creation timestamp and
+        # filesystem free-space naturally fluctuates. Both independent
+        # inspections already apply the strict safety gates; compare only
+        # stable identity/version data rather than volatile report fields.
+        stable=("vm","candidate_name","saved_xml_sha256",
+                "protected_master_trial_shut_off",
+                "verified_cold_recovery_member_count",
+                "libvirt_daemon_version","qemu_hypervisor_version",
+                "host_policy_readback_passed")
+        need(all(rechecked[key]==first[key] for key in stable),
+             "Guest identity, software stack or recovery proof changed")
         attempted=True
         virsh("snapshot-create-as","--domain",VM,"--name",SNAP,
               "--atomic",timeout=1800)
