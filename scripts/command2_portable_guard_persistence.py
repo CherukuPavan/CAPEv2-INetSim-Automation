@@ -154,6 +154,15 @@ def plan(host,journal):
     for row in rows:
         _,other,_=flow.load_guest(journal,host,row["libvirt_name"])
         need(other==subnet,"Mixed guest subnet")
+    need(not run("virsh","-c","qemu:///system","list","--name").strip(),
+         "No running VM allowed while staging CAPE guard boot replay")
+    for row in rows:
+        vm=row["libvirt_name"]
+        status=run("virsh","-c","qemu:///system","domstate",vm).lower()
+        need(status=="shut off","Guard replay install requires all clones shut off")
+        info=run("virsh","-c","qemu:///system","dominfo",vm)
+        need(re.search(r"(?mi)^Autostart:\\s+disable\\s*$",info) is not None,
+             "Clone autostart enabled; safe guard replay requires guest autostart off")
     bridge_ip=str(ipaddress.IPv4Address(
                   int(ipaddress.IPv4Network(subnet).network_address)+1))
     try:nic.verify_network_live(subnet,bridge_ip)
@@ -171,12 +180,18 @@ def plan(host,journal):
     for f in (POLICY,BOOT,UNIT,ETC,HELPERS):
         need(not f.exists() and not f.is_symlink(),
              "Existing CAPE guard install path requires separate review")
-    for parent in (Path("/etc"),Path("/usr/local"),Path("/usr/local/libexec"),
+    for parent in (Path("/etc"),Path("/usr/local"),
                    Path("/etc/systemd/system")):
         st=parent.lstat()
         need(stat.S_ISDIR(st.st_mode) and st.st_uid==0 and
              st.st_mode & 0o022==0,
              "Unsafe/missing root-owned systemd/helper parent directory")
+    helper_parent=HELPERS.parent
+    if helper_parent.exists() or helper_parent.is_symlink():
+        st=helper_parent.lstat()
+        need(stat.S_ISDIR(st.st_mode) and st.st_uid==0 and
+             st.st_mode&0o022==0,
+             "Untrusted /usr/local/libexec parent")
     guard=nftplan.render_cape_egress_guard(subnet)
     payload=guard["ruleset_text"]
     helper=boot_source(guard["ruleset_sha256"],bridge_ip)
@@ -221,6 +236,9 @@ def install(host,journal):
         need(plan(host,journal)==before,
              "Host nft/libvirt/systemd state changed before approval")
         guard=nftplan.render_cape_egress_guard(before["subnet"])
+        if not HELPERS.parent.exists():
+            HELPERS.parent.mkdir(mode=0o755)
+            fsync_dir(HELPERS.parent.parent)
         ETC.mkdir(mode=0o700)
         HELPERS.mkdir(mode=0o700)
         write_exclusive(POLICY,guard["ruleset_text"].encode(),0o600)
