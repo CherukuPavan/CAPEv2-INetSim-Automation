@@ -56,12 +56,12 @@ class IsoGuards(unittest.TestCase):
 
 
 class RealisticVirshNetworkStatus(unittest.TestCase):
-    NETWORK_INFO=("Name:           cape-analysis-isolated\\n"
-                  "UUID:           aaaa-bbbb\\n"
-                  "Active:         yes\\n"
-                  "Persistent:     yes\\n"
-                  "Autostart:      no\\n"
-                  "Bridge:         cape-lab0\\n")
+    NETWORK_INFO=("Name:           cape-analysis-isolated\n"
+                  "UUID:           aaaa-bbbb\n"
+                  "Active:         yes\n"
+                  "Persistent:     yes\n"
+                  "Autostart:      no\n"
+                  "Bridge:         cape-lab0\n")
 
     def test_aligned_spaces_count_as_real_active_network(self):
         props=b.parse_network_info(self.NETWORK_INFO)
@@ -71,14 +71,14 @@ class RealisticVirshNetworkStatus(unittest.TestCase):
         self.assertEqual(props["bridge"],"cape-lab0")
 
     def test_multiple_spaces_and_tabs_are_accepted_as_whitespace(self):
-        text="Active:\\t yes\\nPersistent:     yes\\nAutostart: no\\nBridge: cape-lab0"
+        text="Active:\t yes\nPersistent:     yes\nAutostart: no\nBridge: cape-lab0"
         self.assertEqual(b.parse_network_info(text)["active"],"yes")
 
     def test_missing_or_duplicate_status_fails_closed(self):
         with self.assertRaisesRegex(b.Blocked,"Missing required"):
             b.parse_network_info("Active: yes")
         with self.assertRaisesRegex(b.Blocked,"Duplicate"):
-            b.parse_network_info(self.NETWORK_INFO+"Active: no\\n")
+            b.parse_network_info(self.NETWORK_INFO+"Active: no\n")
 
     def test_bad_boolean_format_refused(self):
         with self.assertRaisesRegex(b.Blocked,"Malformed"):
@@ -123,12 +123,12 @@ class RealisticVirshNetworkStatus(unittest.TestCase):
                 if args[:3]==("nft","-j","list"):return '{"nftables":[]}'
                 if args[:2]==("nft","list"):return 'table inet cape_analysis_guard'
                 self.fail("Unexpected / potentially modifying host command "+str(args))
-            with patch.object(b,"DIR",root),patch.object(b,"OLD",old), \\
-                 patch.object(b,"NEW",new),patch.object(b.os,"geteuid",return_value=0), \\
-                 patch.object(b.socket,"gethostname",return_value="CSE-SSL-55"), \\
-                 patch.object(b,"virsh",side_effect=fake_virsh), \\
-                 patch.object(b,"command",side_effect=fake_command), \\
-                 patch.object(b.shutil,"which",return_value="/usr/bin/genisoimage"), \\
+            with patch.object(b,"DIR",root),patch.object(b,"OLD",old), \
+                 patch.object(b,"NEW",new),patch.object(b.os,"geteuid",return_value=0), \
+                 patch.object(b.socket,"gethostname",return_value="CSE-SSL-55"), \
+                 patch.object(b,"virsh",side_effect=fake_virsh), \
+                 patch.object(b,"command",side_effect=fake_command), \
+                 patch.object(b.shutil,"which",return_value="/usr/bin/genisoimage"), \
                  patch.object(guard,"guard_policy_structure",return_value={}):
                 if active=="yes":
                     result=b.plan(ps1,launcher)
