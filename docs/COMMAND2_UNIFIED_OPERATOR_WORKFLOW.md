@@ -25,6 +25,8 @@ revalidate libvirt, UUIDs, paths, networking and storage.
 | `identity-batch` | NEW: one count-driven, all-guest zero-NIC identity ISO preflight, followed in apply mode by ordered per-VM identity ISO build + attach using existing safeguards | All VMs must be SHUT OFF and zero-NIC; each actual step keeps independent typed approval; **does not** install Windows task, boot Windows, set IP, attach NIC, snapshot, or complete Command 2. If any step fails, retain artifacts and stop without blind retry. |
 | `identity-build` | One SHA-verified, UUID-bound per-guest read-only optical configuration ISO | Windows SYSTEM startup bootstrap must be installed beforehand. |
 | `identity-attach` | Inserts the ISO into exactly one previously empty CD-ROM on a shut-off zero-NIC clone | Operator separately boots guest to perform hostname personalization and verifies identity; no automatic guest start. |
+| `approved-firstboot` | NEW: one specifically approved Windows firstboot with an **already-attached** isolated NIC and V2 receipt verifying the trusted source-master SYSTEM task; checks exact disk/UEFI/swtpm/ISO and live paused guest NIC before resume | Does not claim Windows rename, static IPv4, CAPE Agent readiness, or snapshots; default is no-write plan and apply requires per-guest approval. |
+| `approved-firstboot-batch` | NEW: count-driven read-only all-N verified one-NIC preflight with per-VM private V2 receipts, aggregate RAM capacity check, then ordered individually authorized first boots | No physical real-host acceptance yet. Stops on any failure without cleaning/starting other guests. Source Windows bootstrap must be independently confirmed, network containment physically proven, and post-Windows proofs remain. |
 | `identity-boot-batch` | NEW: one count-driven **all-VM** preflight of already attached zero-NIC identity media, then orderly guarded per-VM paused boots with separate typed approval | Stops on first error and preserves any running/paused guest; does NOT verify Windows rename, shut down guests, attach NICs, assign IPs or create snapshots. Requires adequate RAM for each actual boot. |
 | `identity-boot` | NEW: explicit separate-host **one-VM** zero-NIC first Windows boot, starting PAUSED, checking live clone disk/UEFI/TPM/CD-ROM and no NIC/passthrough, then resuming | Requires the source golden Windows SYSTEM startup task already installed and reviewed. May trigger Windows hostname rename/reboot but cannot independently attest it. The guest must be safely shut off and its changed identity verified before later NIC phases. Never starts SSL-55's clone. |
 | `nic-attach` | Adds exactly one isolated network NIC in saved XML, after root-private network acceptance receipt | The real packet-isolation/reboot evidence is operator-witnessed; the receipt cannot be invented by the software. |
@@ -132,6 +134,61 @@ Do not run `apply` on SSL-55. This is NOT unattended two-command
 completion: Windows guest identity must be independently verified, each
 guest later safely shut off and pass network isolation before NIC
 attachment. No real physical N-clone Windows boots are yet accepted.
+
+## Alternative direct first boot with already isolated NIC (one boot, no intervening shutdown)
+
+The old identity-only path required a zero-NIC Windows first boot/hostname
+rename, clean guest shutdown, NIC attachment, new ISO, then another Windows
+boot to apply the static IP. This was an unnecessary **manual intermediate
+boot** for the user's desired two-command installation. Development now
+also supports a separately guarded, firstboot-with-NIC path:
+
+1. The Command1 Windows source must actually contain the reviewed,
+   SHA-256-pinned SYSTEM startup task and the matching guest personalization
+   script before the template was captured; software existence alone does
+   **not** prove the Windows task has been installed.
+2. Physical isolated-network IPv4/IPv6 negative traffic, peer L2 rejection,
+   host-to-guest positive path (which may use separate benign probes),
+   reboot persistence, and preservation of unrelated host rules are mandatory
+   before making the firstboot-V2 receipt. The existing production isolation
+   gate is not bypassed. A V2 receipt is for the exact host/clone UUID,
+   NIC MAC, reserved IPv4 and the actual source-master libvirt UUID; the
+   human must record the SHA-256 pins of both reviewed Windows scripts,
+   attest the master is shut off, and **explicitly record that the Windows
+   identity has NOT yet been verified**.
+3. Existing media and isolated-NIC setup stages can attach one approved
+   interface and replace the identity-only optical ISO with the
+   `CAPE_CMD2` host-approved optical config while the guest is SHUT OFF.
+   `approved-firstboot` validates those **real saved objects**, current
+   isolated libvirt/nft readback, master identity, host RAM and independent
+   disk/OVMF/TPM. Only after per-VM typed authorization does it issue
+   `virsh start --paused`, reject unsafe live devices, and resume.
+4. Windows SYSTEM startup task validates the approved optical hash/UUID/MAC
+   and host-approved proof. If the Windows hostname differs, it invokes
+   *Identity* in approved one-NIC mode, refuses any existing IPv4/IPv6
+   default route, then requests restart. On the next successful startup it
+   can apply/verify the unique static IPv4 **without a gateway**. Host code
+   **does not** claim the actual Windows rename/reboot/static-IP succeeded:
+   proper guest and CAPE Agent measurements remain mandatory.
+
+There is an ordered all-VM bridge for this path:
+
+```bash
+# READ-ONLY and for a fully prepared, approved OTHER host only.
+sudo python3 -B scripts/command2_portable_workflow.py \
+  --phase approved-firstboot-batch --mode plan \
+  --approved-host OTHERHOST \
+  --journal /absolute/private/command2-identity-reservation.json \
+  --network-receipt-dir /absolute/private/receipt-directory
+```
+
+Every private V2 receipt MUST be named
+`win11_N.firstboot-network-receipt.json` and pass the real VM-bound
+bootstrap, master, and network gates; the all-N memory requirement is
+checked BEFORE any guest boot. `--mode apply` still requires direct
+operator TTY and a separate per-guest approval and **is not** a completed
+unattended production Command 2. Do NOT synthesize receipt booleans.
+No real other-host guest or SSL-55 VM has been booted by this change.
 
 ## Guarded first zero-NIC identity boot
 
