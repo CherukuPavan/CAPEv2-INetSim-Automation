@@ -40,15 +40,19 @@ def script_command(sha):
         "-ExpectedSha256 "+sha+
         " -Mode Apply -ApproveBenignNat -ApproveRename")
 
-def authorized_stage(host,journal,vm,nat_iso,evidence_dir):
-    folder=transport.verified_evidence_folder(evidence_dir)
-    stage=folder/(vm+transport.STAGE_SUFFIX)
+def trusted_stage_json(stage):
+    """Admit exact private receipt file, including real ownership."""
     need(stage.is_file() and not stage.is_symlink() and
          stage.stat().st_size<32*1024 and
          stage.stat().st_nlink==1 and
          stage.stat().st_uid==0 and stage.stat().st_mode&0o777==0o600,
          "Exact root-private verified per-VM upload receipt missing")
-    data=json.loads(stage.read_text(encoding="utf-8"))
+    return json.loads(stage.read_text(encoding="utf-8"))
+
+def authorized_stage(host,journal,vm,nat_iso,evidence_dir):
+    folder=transport.verified_evidence_folder(evidence_dir)
+    stage=folder/(vm+transport.STAGE_SUFFIX)
+    data=trusted_stage_json(stage)
     before=transport.inspect(host,journal,vm,nat_iso)
     need(data.get("format")==
          "COMMAND2_TRUSTED_WINDOWS_NAT_UPLOAD_ONLY_V1" and
