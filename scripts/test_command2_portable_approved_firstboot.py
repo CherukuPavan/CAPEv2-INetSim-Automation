@@ -92,7 +92,9 @@ class ApprovedBootTests(unittest.TestCase):
             commands=[]
             def virsh(*args,**kwargs):
                 commands.append(args)
-                if args[0]=="start":states["clone"]="paused"
+                if args[0]=="start":
+                    states["clone"]="paused"
+                    return ""
                 if args[0]=="domstate":
                     return "shut off" if args[1]=="win11" else states["clone"]
                 if args[0]=="dumpxml":return xml(net="default")
