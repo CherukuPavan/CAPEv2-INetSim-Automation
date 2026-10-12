@@ -82,6 +82,12 @@ def make(report):
           "bridge":"virbr0",
           "addressing":"libvirt_dhcp_reservation",
           "expected_nic_count":1,
+          # Physical SSL55 win11 reference was configured with a static
+          # 192.168.122.125 address. Every untouched exact disk clone
+          # initially inherits that address; preserve it only as a
+          # STRICT one-time approved bootstrap/transition exception.
+          # If the real Windows guest differs, do NOT guess or overwrite.
+          "exact_golden_windows_bootstrap_ip":"192.168.122.125",
           "benign_https_proof_needed":True,
           "network_isolation_proved_by_this_profile":False,
           "malware_public_internet_authorized":False})
