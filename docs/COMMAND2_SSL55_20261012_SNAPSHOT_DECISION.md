@@ -115,3 +115,23 @@ with existing backup protection. No live OVMF format conversion,
 no force snapshot/revert on SSL-55, and never touch original master.
 Command 2 is NOT production-ready until the end-to-end two-VM
 CAPE + INetSim benign analysis and reset acceptance is witnessed.
+
+## Status of implementation/tests for this decision
+
+Development reference as of 2026-10-12: GitHub Actions workflow run
+**38241761244** passed **both** the full Python offline test suite and
+Windows PowerShell syntax, after hardening the disposable XML transition.
+The tested code does **not** create a snapshot, boot any VM or change the
+SSL-55 host. No second-host hardware validation has yet taken place.
+
+The saved-XML transition now durably fsyncs its original XML backup
+directory, uses `virsh define --validate`, and checks afterward that
+the exact clone disk, isolated NIC, swtpm2 and shut-off state are retained.
+Its recovery witness is operator-recorded evidence rather than a
+cryptographically authenticated hardware TPM snapshot. Neither the
+sidecar conversion nor XML switch is a substitute for real revert tests.
+
+The portable count-driven initial stager still emits RAW NVRAM. This
+requires intentional integration of QCOW2 from the beginning for
+compatible disposable target hosts *after* physical validation.
+Do not represent individual helper scripts as completed Command 2.
