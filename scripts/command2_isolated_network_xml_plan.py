@@ -46,6 +46,7 @@ def plan(network_name, bridge_name, subnet, reserved_ips=()):
     network = ET.Element("network")
     ET.SubElement(network, "name").text = network_name
     ET.SubElement(network, "bridge", {"name":bridge_name,"stp":"off","delay":"0"})
+    ET.SubElement(network, "port", {"isolated":"yes"})
     ET.SubElement(network, "dns", {"enable":"no"})
     ET.SubElement(network, "ip", {"address":str(host_ip),
                                  "netmask":str(net.netmask)})
@@ -53,7 +54,8 @@ def plan(network_name, bridge_name, subnet, reserved_ips=()):
     parsed = ET.fromstring(text)
     need(parsed.find("forward") is None and parsed.find(".//route") is None
          and parsed.find(".//dhcp") is None and
-         parsed.find("./dns").get("enable") == "no",
+         parsed.find("./dns").get("enable") == "no" and
+         parsed.find("./port").get("isolated") == "yes",
          "Generated network is not a completely isolated no-DHCP design")
     return {"result":"COMMAND2_ISOLATED_NETWORK_XML_PLAN_ONLY",
             "network":network_name, "bridge":bridge_name,
@@ -61,6 +63,8 @@ def plan(network_name, bridge_name, subnet, reserved_ips=()):
             "libvirt_network_xml":text,
             "libvirt_forward_present":False,
             "dns_enabled":False,"dhcp_enabled":False,
+            "all_future_guest_tap_ports_must_be_kernel_isolated":True,
+            "l2_actual_peer_packet_tested":False,
             "guest_ipv6_disabled_or_blocked_verified":False,
             "nftables_guard_installed":False,
             "nftables_guard_reboot_verified":False,
