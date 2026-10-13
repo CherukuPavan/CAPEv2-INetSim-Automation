@@ -130,18 +130,37 @@ def run(mode,host,bundle,disk_dir,nvram_dir,journal_dir,iso_dir,count):
         disk_dir=config["disk_dir"],nvram_dir=config["nvram_dir"],
         template=config["template"],template_sha256=config["disk_sha"],
         subnet="auto",journal_dir=config["journal_dir"],mode="stage")
-    need(staged["result"]=="COMMAND2_ZERO_NIC_GROUP_STAGE_RETURNED",
-         "Zero-NIC clone source-stage incomplete; STOP")
+    need(staged.get("result")=="COMMAND2_ZERO_NIC_GROUP_STAGE_RETURNED" and
+         staged.get("names")==report["names"],
+         "Zero-NIC clone source-stage incomplete or wrong N guest names; STOP")
+    # Verify actual per-guest subordinate receipts, not merely the wrapper
+    # result. The inner clone controller generates fresh random UUID/MAC on
+    # its own guarded invocation, so use its real receipt, not the first
+    # read-only proposal's randomized identities.
+    clones.assert_complete_staging_receipt(
+        staged.get("staging"),
+        [{"libvirt_name":n} for n in report["names"]],count)
+    need(type(staged.get("guest_configuration_files")) is list and
+         [r.get("name") for r in staged["guest_configuration_files"]]==
+         report["names"],
+         "Missing or misordered Windows personalization input media; STOP")
     journal=config["journal_dir"]/"command2-identity-reservation.json"
     # The NAT operations require all N currently shut off / zero NIC.
     attached=nat.apply(host,journal)
-    need(attached["result"]==
-         "COMMAND2_ALL_N_MASTER_NAT_NICS_AND_DHCP_APPLIED_VERIFIED",
+    need(attached.get("result")==
+         "COMMAND2_ALL_N_MASTER_NAT_NICS_AND_DHCP_APPLIED_VERIFIED" and
+         attached.get("count")==count and
+         type(attached.get("dhcp_hosts")) is list and
+         len(attached["dhcp_hosts"])==count,
          "One-NAT-per-VM or unique DHCP lease reservation incomplete; STOP")
     made=media.build(host,journal,config["iso_dir"])
-    need(made["result"]==
-         "COMMAND2_ALL_N_WINDOWS_NAT_ISOS_BUILT_NOT_ATTACHED",
-         "NAT guest provisioning media incomplete, review status")
+    need(made.get("result")==
+         "COMMAND2_ALL_N_WINDOWS_NAT_ISOS_BUILT_NOT_ATTACHED" and
+         made.get("count")==count and
+         type(made.get("created_paths")) is list and
+         [Path(p).name for p in made["created_paths"]]==
+         [n+".master-nat.iso" for n in report["names"]],
+         "NAT guest provisioning media incomplete or wrong guest order; review status")
     return {**report,
         "result":"COMMAND2_EXACT_MASTER_ALL_N_COLD_STAGE_NAT_MEDIA_READY",
         "zero_nic_stage_receipt":staged["result"],
