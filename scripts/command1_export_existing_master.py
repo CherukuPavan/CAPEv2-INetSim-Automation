@@ -65,7 +65,9 @@ def regular(path,*,owner_root=False):
          "Required exact source file absent, symlinked or untrusted")
     st=p.stat()
     need(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_size>0,
-         "Source artifact is not an independent nonempty regular file")
+         "Source artifact must be regular, nonempty, single-link: " + str(p)
+         + " (size=" + str(st.st_size) + ", links=" + str(st.st_nlink)
+         + ", regular=" + str(stat.S_ISREG(st.st_mode)) + ")")
     if owner_root:
         need(st.st_uid==0 and not(st.st_mode&0o022),
              "Source must be root-owned and not writable by others")
