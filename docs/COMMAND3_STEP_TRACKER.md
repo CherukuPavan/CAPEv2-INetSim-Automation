@@ -176,6 +176,130 @@ aliases, unwanted sections, or unrelated settings.
 No restarts, samples, tests on reference snapshots, nor network edits
 were performed by this development-only GitHub work.
 
+## Step 4 — `kvm.conf` master and all additional Windows analysis VMs
+
+**Manual reference completed (operator confirmation, 2026-10-13):**
+`/opt/CAPEv2/conf/kvm.conf`. The screenshot of the guide shows a
+`win10` example; **DO NOT use that machine**, `snapshot1`, or the
+guide's `192.168.122.100`. User's actual master on SSL-55:
+
+```ini
+[kvm]
+machines = win11
+interface = virbr0
+dsn = qemu:///system
+
+[win11]
+label = win11
+platform = windows
+ip = 192.168.122.125
+tags = win11
+snapshot = Afterfull
+interface = virbr0
+resultserver_ip = 192.168.122.1
+arch = x64
+reserved = no
+```
+
+- `tags = win11` is the automation's default. If the operator
+  explicitly selects the alternative `22H2`, use **only one** of
+  `win11` or `22H2`, not both in the tag field.
+- The master `Afterfull` is the **user-reported exact snapshot name on
+  SSL-55**, not a portable assumption that the new-machine imported
+  master already has it. Before accepting the target config, match the
+  named libvirt running-state RAM **and disk** snapshot metadata.
+  A snapshot's existence still **does not certify swtpm2 consistency or
+  CAPE-safe restore**.
+- The documented `192.168.122.125` belongs to the **existing SSL-55**
+  Windows master. A new machine must supply the actual guest master IP,
+  and the script checks it is a private address on the verified NAT
+  subnet but cannot inspect the shut-off guest OS to independently prove
+  its effective static IP. That is an acceptance blocker until tested.
+- The `192.168.122.1` `resultserver_ip` is the **address each NAT
+  analysis guest uses to reach the host**, not the `[resultserver]`
+  **bind** value `0.0.0.0` in `cuckoo.conf`. The host resultserver
+  wildcard bind is subject to strong firewall/network isolation.
+
+### Count-driven Command 3 behavior
+
+After Commands 1 and 2 have produced a correctly imported master,
+unique guest VM identities, permanent DHCP reservations and candidate
+running-state snapshot metadata, Command 3 must produce:
+
+```ini
+[kvm]
+machines = win11,win11_1,win11_2,win11_3
+interface = virbr0
+dsn = qemu:///system
+
+[win11]
+# ... original master fields above ...
+
+[win11_1]
+label = win11_1
+platform = windows
+ip = <actual verified unique clone 1 IPv4>
+tags = win11
+snapshot = cape_one_nat_win11_1
+interface = virbr0
+resultserver_ip = <verified NAT host gateway IPv4>
+arch = x64
+reserved = no
+
+# ... matching [win11_2], [win11_3] sections, one for each requested VM
+```
+
+The independent clone IPs are **derived from Command 2's actual,
+persistently registered `default`/virbr0 NAT DHCP MAC reservations**,
+not from the sample documentation, and not from the old isolated-network
+placeholder or presumed +1 IPs. Current candidate clone snapshot names
+are `cape_one_nat_win11_N`. Older repo helpers also contain
+`cape_ready_win11_N` and `snapshot1` speculative examples: these
+**must not** be used for the current master-NAT flow without an actual
+matching snapshot and validated new design.
+
+### Development automation (completed offline, not host accepted)
+
+- `scripts/command3_cape_kvm.py` is read-only in `--mode plan` and
+  supports an explicitly approved root-only, **other-host-only**
+  `--mode apply`. Inputs include `--approved-host`, canonical
+  `--journal`, `--master-ip`, `--master-snapshot` and optional
+  `--tag win11|22H2`. The script checks the canonical count-driven
+  private journal, libvirt domain identity, saved DHCP assignments,
+  guest OS/UEFI QCOW2 snapshot metadata, and the master RAM + disk
+  snapshot metadata. It refuses missing/misnamed/misordered VMs and
+  ambiguous configuration sections.
+- It **replaces** a recognized inactive legacy `[cuckoo1]` example
+  when `[kvm] machines = cuckoo1`; alternatively it updates the
+  already configured `[win11]` master without duplicates. Other
+  sections, comments and unrelated attributes remain intact.
+- It lists `win11,win11_1,...,win11_N` in `[kvm] machines`, creates
+  one machine stanza per VM, sets `interface = virbr0`, host gateway
+  resultserver address, one selected tag, real IP, per-VM named
+  checkpoint, `arch = x64` and `reserved = no`.
+- File apply requires direct typed consent and makes a new root-private
+  `0600` backup before a hash-rechecked atomic replacement. Repeating
+  a completed configuration is a no-op. It never executes a service
+  restart, VM boot/revert, storage deletion or analysis job, and refuses
+  automatic apply to reference SSL-55.
+- `scripts/test_command3_cape_kvm.py` exercises the old
+  `cuckoo1` fixture, operator's existing `[win11]` scenario,
+  `1..16` independently rendered clone sections, alternative
+  single tags, unexpected names, duplicate keys, CRLF, missing
+  master snapshot RAM/disk, unchanged plan, explicit approval,
+  backup/readback/repeat and SSL-55 refusal.
+
+### Acceptance still required
+
+A **CAPE KVM config write does not prove a working CAPE VM**. The
+hardware-independent offline tests cannot prove live Agent TCP access,
+guest IP uniqueness after start, swtpm2/UEFI/disk+RAM coherent snapshot
+restore, CAPE task cycle or malware egress isolation. Keep the
+documented deferred new-machine benign tests as hard release gates.
+As an additional consequence, the script does **not** declare CAPE_READY
+and must not be mistaken for the full single-command Command 3
+orchestrator/service restart.
+
 ## Pending operator steps
 
 Await the next supplied configuration-file edit. For each step, document
