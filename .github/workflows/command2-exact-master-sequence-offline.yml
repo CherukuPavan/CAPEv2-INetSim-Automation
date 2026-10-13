@@ -1,0 +1,49 @@
+name: Command 2 exact master one-invocation N-clone sequence offline
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command2_exact_master_full_sequence.py"
+      - "scripts/test_command2_exact_master_full_sequence.py"
+      - "docs/COMMAND2_FULL_SEQUENCE_HANDOFF.md"
+      - ".github/workflows/command2-exact-master-sequence-offline.yml"
+  pull_request:
+    branches: [development]
+    paths:
+      - "scripts/command2_exact_master_full_sequence.py"
+      - "scripts/test_command2_exact_master_full_sequence.py"
+      - ".github/workflows/command2-exact-master-sequence-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sequence-synthetic:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Syntax check
+        run: |
+          python -B - <<'PY'
+          from pathlib import Path
+          import ast
+          for leaf in ("command2_exact_master_full_sequence.py",
+                       "test_command2_exact_master_full_sequence.py"):
+              path=Path("scripts")/leaf
+              ast.parse(path.read_text(encoding="utf-8"),filename=str(path))
+              print("SYNTAX_OK",path)
+          PY
+      - name: Run staged all-N delegation and no-retry safety tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -B -m unittest discover -s scripts -p 'test_command2_exact_master_full_sequence.py' -v
