@@ -98,7 +98,11 @@ class ControllerTests(unittest.TestCase):
                      "f15ce036-e6e6-4bd4-955a-8b502ecf9581",Path("/firmware_VARS.fd"))), \
                  patch.object(c.stager,"execute",return_value={
                      "result":"PORTABLE_COMMAND2_ZERO_NIC_STAGED_NOT_PERSONALIZED",
-                     "created":[{"name":"win11_1"},{"name":"win11_2"}]}) as stage_mock:
+                     "created":[
+                         {"name":"win11_1","status":"SHUT_OFF_ZERO_NICS_STAGED",
+                          "nic_count":0,"network_attached":False},
+                         {"name":"win11_2","status":"SHUT_OFF_ZERO_NICS_STAGED",
+                          "nic_count":0,"network_attached":False}]}) as stage_mock:
                 outcome=c.execute(**args(mode="stage",journal_dir=state))
             self.assertEqual(outcome["result"],"COMMAND2_ZERO_NIC_GROUP_STAGE_RETURNED")
             self.assertFalse(outcome["production_ready"])
@@ -149,6 +153,31 @@ class ControllerTests(unittest.TestCase):
                 clone_mock.assert_not_called()
             self.assertEqual(checks,["template"])
             self.assertFalse(folder.exists())
+
+    def test_nat_handoff_requires_all_guest_clone_receipts_not_just_wrapper_success(self):
+        rows=sample_blueprint(3)["candidates"]
+        def good(row):
+            return {"name":row["libvirt_name"],
+                    "status":"SHUT_OFF_ZERO_NICS_STAGED",
+                    "nic_count":0,"network_attached":False}
+        correct={"result":"PORTABLE_COMMAND2_ZERO_NIC_STAGED_NOT_PERSONALIZED",
+                 "created":[good(r) for r in rows]}
+        self.assertTrue(c.assert_complete_staging_receipt(correct,rows,3))
+        bad=[
+            {**correct,"result":"PORTABLE_COMMAND2_ZERO_NIC_STAGE_PLAN_ONLY"},
+            {**correct,"created":correct["created"][:2]},
+            {**correct,"created":correct["created"][::-1]},
+            {**correct,"created":[good(rows[0]),good(rows[0]),good(rows[2])]},
+            {**correct,"created":[{**good(rows[0]),"network_attached":True},
+                                  *correct["created"][1:]]},
+            {**correct,"created":[{**good(rows[0]),"nic_count":1},
+                                  *correct["created"][1:]]},
+            None,
+        ]
+        for partial in bad:
+            with self.subTest(receipt=partial),self.assertRaisesRegex(
+                    c.Command2Blocked,"Partial/unverified"):
+                c.assert_complete_staging_receipt(partial,rows,3)
 
     def test_master_memory_requirements_cannot_assume_four_gib(self):
         self.assertEqual(c.vm_memory_mib('<domain><memory unit="KiB">8388608</memory></domain>'),8192)
