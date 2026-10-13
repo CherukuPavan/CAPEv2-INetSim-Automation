@@ -49,9 +49,13 @@ jobs:
         run: |
           python -B - <<'PY'
           from pathlib import Path
-          script = Path("scripts/command3_cape_api_ratelimit.py").read_text()
-          for dangerous in ("shell=True", "systemctl restart", "sudo service",
-                            "subprocess.run(", '"virsh"', "'virsh'"):
-              assert dangerous not in script, dangerous
-          print("NO_SERVICE_RESTART_AND_NO_VM_MUTATION_PASS")
+          reviewed = sorted(Path("scripts").glob("command3_cape_*.py"))
+          assert reviewed, "Missing reviewed Command3 configuration scripts"
+          for file in reviewed:
+              script = file.read_text(encoding="utf-8")
+              for dangerous in ("shell=True", "systemctl restart",
+                                "sudo service", "subprocess.run(",
+                                '"virsh"', "'virsh'"):
+                  assert dangerous not in script, (str(file), dangerous)
+          print("NO_SERVICE_RESTART_AND_NO_VM_MUTATION_PASS", len(reviewed))
           PY
