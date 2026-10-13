@@ -14,6 +14,10 @@ CONFIGURE: approved OTHER host, root + direct TTY, all five plans must pass
           each existing guarded apply in operator order. Each helper still
           asks its own exact typed approval and makes its own atomic backup.
           Does not silently alter router/firewall, restart services or VMs.
+RESTART : a separately approved OTHER-host stage that refuses incomplete
+          five-config targets, checks actual tmpfs and routing reference,
+          and restarts only the operator's five systemd units with receipts.
+          No automatic invocation after CONFIGURE and no sample execution.
 VERIFY  : reads same config plans, routing/tmpfs admission and the exact five
           systemd units; never claims ready while routing/TPM gates remain.
 
@@ -169,6 +173,8 @@ def review(args, verify=False):
         "configuration_only_apply_supported": True,
         "routing_auto_apply_supported": False,
         "service_auto_restart_supported": False,
+        "approved_five_service_restart_mode_supported": True,
+        "routing_auto_apply_still_unsupported": True,
         "host_modified": False,
         "VMs_modified": False,
         "CAPE_READY": False,
