@@ -9,6 +9,7 @@ import unittest
 from unittest import mock
 
 import command1_worldwide_drive_reader as m
+import command1_private_drive_bundle as downloader
 
 
 class WorldReaderTests(unittest.TestCase):
@@ -126,6 +127,11 @@ class WorldReaderTests(unittest.TestCase):
         self.assertIn("root_folder_id = ABCDefghi_123456789", c)
         self.assertNotIn("existing-crypt-password", c)
         self.assertNotIn("token =", c)
+        # Ensure our worldwide reader config is directly accepted by the
+        # existing manifest-checked private crypt downloader.
+        checked = downloader.read_crypt_settings(self.args.config, "cape_crypt")
+        self.assertTrue(checked["crypt_content_and_names_enabled"])
+        self.assertEqual(checked["underlying_provider"], "personal_google_drive")
         with self.assertRaises(m.ReaderBlocked):
             m.plan(self.args)
 
