@@ -48,17 +48,19 @@ class BlueprintTests(unittest.TestCase):
         self.assertIn("inetsim.service",report)
 
     def test_git_records_commit_and_boolean_dirty_without_filenames(self):
-        def fake(*arg):
-            if "rev-parse" in arg:return "a"*40
-            if "status" in arg:return " M conf/cuckoo-SENSITIVE-API.conf"
-            return None
-        with patch.object(m.CAPE,"is_dir",return_value=True), \
-             patch.object(m.CAPE,"is_symlink",return_value=False), \
-             patch.object(m,"query",side_effect=fake):
-            result=m.repository()
-        self.assertTrue(result["uncommitted_changes_present"])
-        self.assertEqual(result["CAPE_commit_SHA40"],"a"*40)
-        self.assertNotIn("SENSITIVE",str(result))
+        with tempfile.TemporaryDirectory() as td:
+            repo=Path(td)/"CAPEv2"
+            repo.mkdir()
+            def fake(*arg):
+                if "rev-parse" in arg:return "a"*40
+                if "status" in arg:return " M conf/cuckoo-SENSITIVE-API.conf"
+                return None
+            with patch.object(m,"CAPE",repo), \
+                 patch.object(m,"query",side_effect=fake):
+                result=m.repository()
+            self.assertTrue(result["uncommitted_changes_present"])
+            self.assertEqual(result["CAPE_commit_SHA40"],"a"*40)
+            self.assertNotIn("SENSITIVE",str(result))
 
     def test_full_report_is_readonly_without_configuration_contents(self):
         base={"OS":{"ID":"ubuntu"},"arch":"x86_64","CPU_count":16,
