@@ -85,7 +85,10 @@ class RestartStepTests(unittest.TestCase):
             self.assertFalse(result["CAPE_READY"])
             self.assertFalse(result["services_have_just_been_restarted_verified"])
             self.assertTrue(result["all_services_active_now"])
-            self.assertIn("Internet", str(result["blocking_issues"])+"Internet")
+            self.assertTrue(any("external egress" in issue
+                                for issue in result["blocking_issues"]))
+            self.assertTrue(any("virbr0" in issue
+                                for issue in result["blocking_issues"]))
             self.assertNotIn("SHOULD_NOT_BE_IN_REPORT", str(result))
 
     def test_verify_reports_readonly_state_does_not_imply_restart_succeeded(self):
