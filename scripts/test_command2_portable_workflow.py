@@ -107,13 +107,14 @@ class Workflow(unittest.TestCase):
                          "420")
         self.assertNotIn("snapshot-revert",str(captured[0]))
         captured.clear()
-        with patch.object(w.sys,"argv",argv[:]),\
+        apply_argv=argv[:]
+        apply_argv[apply_argv.index("plan")]="apply"
+        with patch.object(w.sys,"argv",apply_argv),\
              patch.object(w,"canonical_host",return_value=HOST),\
              patch.object(w.os,"geteuid",return_value=0),\
              patch.object(w,"absolute",return_value=None),\
              patch.object(w.subprocess,"run",side_effect=sub),\
              patch.object(w.sys.stdin,"isatty",return_value=False):
-            argv[argv.index("plan")]="apply"
             self.assertEqual(w.main(),2)
         self.assertEqual(captured,[])
 
