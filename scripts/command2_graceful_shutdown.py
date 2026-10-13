@@ -105,6 +105,15 @@ def guard(host,scope,vm,journal):
              saved.findtext("state")=="running" and
              memory is not None and memory.get("snapshot")=="internal",
              "NAT final snapshot has no proven RUNNING RAM checkpoint")
+        # Direct invocations of this helper must not bypass the final
+        # all-N wrapper's full RAM + Windows disk + QCOW2 UEFI admission.
+        import command2_portable_master_nat_running_snapshots as verified
+        verified.libvirt_snapshot(vm,True)
+        verified.images(row,True)
+        all_domains=nat.virsh("list","--all","--name").splitlines()
+        if "win11_trial_1" in all_domains:
+            need(state("win11_trial_1")=="shut off",
+                 "Protected Windows trial must remain shut off")
         return {"uuid":row["libvirt_uuid_candidate"],
                 "disk":row["disk_target"],
                 "nvram":row["uefi_nvram_target"],
