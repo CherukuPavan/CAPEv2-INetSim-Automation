@@ -140,6 +140,67 @@ class Shutdown(unittest.TestCase):
             v.assert_not_called()
         self.assertTrue(report["no_shutdown_request_needed"])
 
+    def test_master_nat_scope_requires_snapshot_identity_and_reserved_dhcp(self):
+        # All local mocks: real host, Windows and libvirt remain untouched.
+        import command2_portable_master_nat_attach as nat
+        import command2_portable_workflow as workflow
+        from xml.etree import ElementTree as ET
+        row={"libvirt_name":VM,"libvirt_uuid_candidate":UUID,
+             "disk_target":EXPECT["disk"],"uefi_nvram_target":EXPECT["nvram"],
+             "mac_candidate":EXPECT["mac"]}
+        net={"nat_network":"default","bridge":"virbr0",
+             "ipv4":{"subnet":"192.168.122.0/24"}}
+        reservation=(EXPECT["mac"],"192.168.122.201","WIN11-1")
+        view=ET.fromstring("<network><ip><dhcp><host mac='"+EXPECT["mac"]+
+              "' ip='192.168.122.201' name='WIN11-1'/>"
+              "</dhcp></ip></network>")
+        snapshot=("<domainsnapshot><name>cape_one_nat_win11_1</name>"
+                  "<state>running</state><memory snapshot='internal'/>"
+                  "</domainsnapshot>")
+        with patch.object(s.os,"geteuid",return_value=0),\\
+             patch.object(s.socket,"gethostname",return_value="lab02"),\\
+             patch.object(workflow,"canonical_host",return_value="lab02"),\\
+             patch.object(nat,"journal_rows",return_value=[row]),\\
+             patch.object(nat,"check_network_references",
+                          return_value=(net,[view,view])),\\
+             patch.object(s,"state",return_value="shut off"),\\
+             patch.object(s,"virsh",side_effect=lambda *a:
+                 "cape_one_nat_win11_1" if a[0]=="snapshot-list"
+                 else snapshot if a[0]=="snapshot-dumpxml"
+                 else (_ for _ in ()).throw(AssertionError(a))):
+            got=s.guard("lab02","portable-master-nat",VM,
+                        Path("/root/private/command2-identity-reservation.json"))
+            self.assertEqual(got["network"],"default")
+            self.assertEqual(got["reserved_nat_ipv4"],"192.168.122.201")
+            self.assertEqual(got["nic_model"],"e1000e")
+            self.assertEqual(nat.reservations(view),[reservation])
+            with patch.object(s,"virsh",return_value=""):
+                with self.assertRaisesRegex(s.ShutdownBlocked,"running snapshot"):
+                    s.guard("lab02","portable-master-nat",VM,
+                            Path("/root/private/command2-identity-reservation.json"))
+            with patch.object(nat,"reservations",return_value=[]):
+                with self.assertRaisesRegex(s.ShutdownBlocked,"DHCP reservation"):
+                    s.guard("lab02","portable-master-nat",VM,
+                            Path("/root/private/command2-identity-reservation.json"))
+
+    def test_master_nat_device_model_is_exactly_e1000e(self):
+        expected={**EXPECT,"network":"default","nic_model":"e1000e"}
+        good=(xml().replace("cape-analysis-isolated","default")
+                    .replace('<mac address=', '<model type="e1000e"/><mac address='))
+        self.assertTrue(s.capabilities(good,VM,expected)["acpi"])
+        for altered in (
+            good.replace('type="e1000e"','type="virtio"'),
+            good.replace('<model type="e1000e"/>',''),
+            good.replace('source network="default"',
+                         'source network="cape-analysis-isolated"'),
+            good.replace('address="'+EXPECT["mac"]+'"',
+                         'address="02:de:ad:00:00:01"'),
+        ):
+            with self.assertRaisesRegex(s.ShutdownBlocked,"NIC/MAC/model"):
+                s.capabilities(altered,VM,expected)
+        with self.assertRaises(s.ShutdownBlocked):
+            s.capabilities(good,VM,EXPECT)
+
     def test_no_hard_poweroff_or_firmware_write_actions(self):
         source=Path(s.__file__).read_text(encoding="utf-8")
         for forbidden in ('virsh("destroy"', 'virsh("reset"',
