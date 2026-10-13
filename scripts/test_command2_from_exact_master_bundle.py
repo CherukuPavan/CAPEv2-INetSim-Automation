@@ -74,11 +74,24 @@ class GoldenWizard(unittest.TestCase):
              patch("builtins.input",
                    return_value="STAGE-2-EXACT-MASTER-WINDOWS-CLONES"),\
              patch.object(m.clones,"execute",return_value={
-                 "result":"COMMAND2_ZERO_NIC_GROUP_STAGE_RETURNED"}) as stager,\
+                 "result":"COMMAND2_ZERO_NIC_GROUP_STAGE_RETURNED",
+                 "names":["win11_1","win11_2"],
+                 "staging":{"result":"PORTABLE_COMMAND2_ZERO_NIC_STAGED_NOT_PERSONALIZED",
+                            "created":[
+                         {"name":"win11_1","status":"SHUT_OFF_ZERO_NICS_STAGED",
+                          "nic_count":0,"network_attached":False},
+                         {"name":"win11_2","status":"SHUT_OFF_ZERO_NICS_STAGED",
+                          "nic_count":0,"network_attached":False}]},
+                 "guest_configuration_files":[
+                     {"name":"win11_1"},{"name":"win11_2"}]}) as stager,\
              patch.object(m.nat,"apply",return_value={
-                 "result":"COMMAND2_ALL_N_MASTER_NAT_NICS_AND_DHCP_APPLIED_VERIFIED"}) as nic,\
+                 "result":"COMMAND2_ALL_N_MASTER_NAT_NICS_AND_DHCP_APPLIED_VERIFIED",
+                 "count":2,"dhcp_hosts":[{"name":"WIN11-1"},{"name":"WIN11-2"}]}) as nic,\
              patch.object(m.media,"build",return_value={
-                 "result":"COMMAND2_ALL_N_WINDOWS_NAT_ISOS_BUILT_NOT_ATTACHED"}) as media:
+                 "result":"COMMAND2_ALL_N_WINDOWS_NAT_ISOS_BUILT_NOT_ATTACHED",
+                 "count":2,
+                 "created_paths":["/root/isomedia/win11_1.master-nat.iso",
+                                  "/root/isomedia/win11_2.master-nat.iso"]}) as media:
             o=m.run("stage",*args)
         stager.assert_called_once()
         nic.assert_called_once()
