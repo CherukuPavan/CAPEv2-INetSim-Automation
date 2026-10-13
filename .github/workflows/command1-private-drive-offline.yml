@@ -6,14 +6,19 @@ on:
     paths:
       - "scripts/command1_private_drive_bundle.py"
       - "scripts/test_command1_private_drive_bundle.py"
+      - "scripts/command1_private_master_stage.py"
+      - "scripts/test_command1_private_master_stage.py"
       - "scripts/command1_export_existing_master.py"
       - "docs/COMMAND1_PRIVATE_DRIVE_TRANSFER.md"
+      - "docs/COMMAND1_PRIVATE_MASTER_STAGE_HANDOFF.md"
       - ".github/workflows/command1-private-drive-offline.yml"
   pull_request:
     branches: [development]
     paths:
       - "scripts/command1_private_drive_bundle.py"
       - "scripts/test_command1_private_drive_bundle.py"
+      - "scripts/command1_private_master_stage.py"
+      - "scripts/test_command1_private_master_stage.py"
       - ".github/workflows/command1-private-drive-offline.yml"
   workflow_dispatch:
 
@@ -38,7 +43,9 @@ jobs:
           import ast
           from pathlib import Path
           for leaf in ("command1_private_drive_bundle.py",
-                       "test_command1_private_drive_bundle.py"):
+                       "test_command1_private_drive_bundle.py",
+                       "command1_private_master_stage.py",
+                       "test_command1_private_master_stage.py"):
               path = Path("scripts") / leaf
               ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
               print("SYNTAX_OK", path)
@@ -47,7 +54,7 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
-          python -B -m unittest discover -s scripts -p 'test_command1_private_drive_bundle.py' -v
+          python -B -m unittest discover -s scripts -p 'test_command1_private_*.py' -v
       - name: Confirm no public plaintext Drive fallback or VM actions
         run: |
           python -B - <<'PY'
