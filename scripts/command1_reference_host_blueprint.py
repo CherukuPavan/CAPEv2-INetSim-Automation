@@ -28,7 +28,7 @@ CONF=("api.conf","auxiliary.conf","cuckoo.conf","kvm.conf",
 
 def query(*args):
     # Whitelist FULL read-only argument patterns, not just program names.
-    # Otherwise a caller could accidentally execute systemctl restart,
+    # Otherwise a caller could accidentally perform mutating service operations,
     # git checkout or a mutable mount operation under this blueprint.
     approved = (
         len(args) == 4 and args[:3] ==
