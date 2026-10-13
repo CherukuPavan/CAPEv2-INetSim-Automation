@@ -237,7 +237,15 @@ def apply(conf, host):
     # We intentionally leave files for operator inspection on any partial
     # failure instead of attempting an unsafe unmount/recursive rollback.
     try:
-        MOUNT_POINT.mkdir(mode=0o750, exist_ok=False)
+        # Preflight intentionally permits an existing EMPTY mountpoint
+        # directory. Handle that legal state identically to a missing path.
+        # Never mount over non-empty content, existing files or a symlink.
+        if MOUNT_POINT.exists():
+            need(MOUNT_POINT.is_dir() and not MOUNT_POINT.is_symlink()
+                 and not any(MOUNT_POINT.iterdir()),
+                 "Existing mountpoint became unsafe after approval")
+        else:
+            MOUNT_POINT.mkdir(mode=0o750, exist_ok=False)
         dropin_dir = SERVICE_DROPIN.parent
         dropin_dir.mkdir(mode=0o755, exist_ok=True)
         need(not dropin_dir.is_symlink(), "Unexpected symlinked drop-in folder")
