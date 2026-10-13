@@ -267,6 +267,23 @@ def execute(*, count,approved_host,disk_dir,nvram_dir,template,
         mode="stage",approved_host=approved_host,journal_dir=folder,
         template=Path(template),template_sha256=template_sha256,
         master_nvram=master_nvram,master_uuid=master_uuid,subnet=effective_subnet)
+    # A successful helper return value is not enough. Never give the NAT
+    # controller a superficially "STAGED" receipt if a future stager
+    # implementation returns a plan, a partial clone set or wrong names.
+    expected=[r["libvirt_name"] for r in candidates["candidates"]]
+    created=stage_report.get("created") if type(stage_report) is dict else None
+    require(type(stage_report) is dict and
+            stage_report.get("result")==
+            "PORTABLE_COMMAND2_ZERO_NIC_STAGED_NOT_PERSONALIZED" and
+            type(created) is list and len(created)==count and
+            [v.get("name") if type(v) is dict else None
+             for v in created]==expected and
+            all(v.get("status")=="SHUT_OFF_ZERO_NICS_STAGED" and
+                v.get("nic_count")==0 and
+                v.get("network_attached") is False
+                for v in created),
+            "Partial/unverified clone stage result: stop before NAT media or "
+            "interface changes; review durable journal and all target VMs")
     return {"result":"COMMAND2_ZERO_NIC_GROUP_STAGE_RETURNED",
             "reservation_status":recorded["status"],
             "staging":stage_report,
