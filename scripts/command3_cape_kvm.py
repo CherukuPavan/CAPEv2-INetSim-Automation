@@ -244,37 +244,92 @@ def find_master_snapshot(master_snapshot):
     return True
 
 def discover(host, journal, master_snapshot):
-    """Read actual host, root-only reservation and libvirt NAT snapshots."""
+    """Read-only CURRENT post-snapshot discovery: never use NAT's pre-snapshot gate.
+
+    Command2's nat.build(..., True) calls check_exact_guest(), which correctly
+    refuses ALL pre-existing VM snapshots during NIC attachment. Reusing it at
+    Command3 registration is a phase error: these guests MUST ALREADY have
+    named running-state checkpoints. Verify DHCP and saved VM identity here,
+    then verify the checkpoint via the dedicated post-snapshot guards.
+    """
     import command2_portable_master_nat_attach as nat
     import command2_portable_master_nat_running_snapshots as snapshots
     nat.workflow.canonical_host(host)
     need(os.geteuid() == 0, "Root needed to read private Command2 VM journal")
-    journal = Path(journal)
-    rows = nat.journal_rows(host, journal)
-    report = nat.build(host, journal, True)  # all N off; active+saved NAT reservations
-    need(report["count"] == len(rows) and
-         report.get("guest_saved_nics_attached") is True and
-         report.get("host_nat_dhcp_config_applied") is True,
-         "Persistently reserved NAT identities are not verified")
+    rows = nat.journal_rows(host, Path(journal))
+    need(1 <= len(rows) <= 16, "Expected 1..16 count-driven Windows clones")
+    need(not nat.virsh("list", "--name").strip(),
+         "Require ALL Windows guests SHUT OFF during CAPE KVM registration")
+    # Include collision checks against *all* known libvirt domain NICs,
+    # not only the count-driven clones.
+    domains = [name.strip() for name in
+               nat.virsh("list", "--all", "--name").splitlines()
+               if name.strip()]
+    need(len(domains) == len(set(domains)) and "cuckoo1" not in domains,
+         "Active/legacy cuckoo1 domain or duplicate domain names: "
+         "never remove a real machine registration")
+    nat.occupied_domain_macs()
+    net, views = nat.check_network_references()
+    need(net["nat_network"] == "default" and net["bridge"] == "virbr0",
+         "Expected permanent default-NAT network on virbr0")
+    subnet = ipaddress.IPv4Network(net["ipv4"]["subnet"])
+    gateway = net["ipv4"]["gateway"]
+    need(subnet.prefixlen == 24 and subnet.is_private and
+         gateway == str(ipaddress.IPv4Address(
+             int(subnet.network_address) + 1)),
+         "Unrecognized default NAT /24 gateway/subnet")
+    persistent = nat.profile.ref.nat_details(
+        ET.tostring(views[1], encoding="unicode"))
+    need(persistent["ipv4"] == net["ipv4"] and
+         persistent["dynamic_dhcp_ranges"] ==
+         net["dynamic_dhcp_ranges"],
+         "Live and persistent NAT DHCP/subnet differ")
+    live = set(nat.reservations(views[0]))
+    saved = set(nat.reservations(views[1]))
+    need(live == saved, "Saved and active NAT DHCP reservations differ")
     find_master_snapshot(master_snapshot)
-    hosts = report["dhcp_hosts"]
-    need(len(hosts) == len(rows), "NAT reservation count differs from guest count")
     clients = []
-    for n, (row, item) in enumerate(zip(rows, hosts), 1):
+    ips = set()
+    for n, row in enumerate(rows, 1):
         vm = "win11_" + str(n)
+        address = str(ipaddress.IPv4Address(
+            int(subnet.network_address) + 200 + n))
         need(row["libvirt_name"] == vm and
-             item["name"] == "WIN11-" + str(n) and
-             item["mac"].lower() == row["mac_candidate"].lower(),
-             "NAT DHCP guest identity is inconsistent with private journal")
+             address not in ips and
+             (row["mac_candidate"].lower(), address,
+              "WIN11-" + str(n)) in live,
+             "Unique Windows DHCP reservation absent or journal mismatched")
+        need(nat.virsh("domuuid", vm).lower() ==
+             row["libvirt_uuid_candidate"] and
+             nat.virsh("domstate", vm).strip().lower() == "shut off",
+             "Registered Windows clone UUID/power state differs from journal")
+        guest = ET.fromstring(nat.virsh("dumpxml", "--inactive", vm))
+        nics = guest.findall("./devices/interface")
+        need(guest.tag == "domain" and guest.get("type") == "kvm" and
+             guest.findtext("name") == vm and
+             guest.findtext("uuid") == row["libvirt_uuid_candidate"] and
+             len(nics) == 1 and nics[0].get("type") == "network",
+             "Saved libvirt KVM clone definition differs from journal")
+        nic = nics[0]
+        source = nic.find("source")
+        mac = nic.find("mac")
+        model = nic.find("model")
+        tpm = guest.find("./devices/tpm/backend")
+        need(source is not None and source.get("network") == "default" and
+             mac is not None and
+             mac.get("address", "").lower() == row["mac_candidate"].lower() and
+             model is not None and model.get("type") == "e1000e" and
+             tpm is not None and tpm.get("type") == "emulator" and
+             tpm.get("version") == "2.0",
+             "VM does not have independent expected e1000e NAT MAC and TPM2")
+        # These guards check the real guest's named *running* libvirt RAM +
+        # OS disk and separate QCOW2 UEFI snapshot labels. They still do
+        # NOT establish swtpm2 epoch-consistent restore.
         snapshots.libvirt_snapshot(vm, True)
         snapshots.images(row, True)
-        clients.append({"name": vm, "ip": item["ip"],
+        ips.add(address)
+        clients.append({"name": vm, "ip": address,
                         "snapshot": "cape_one_nat_" + vm})
-    gateway = nat.profile.check_active_nat()["ipv4"]["gateway"]
-    need(report["network"] == "default" and report["bridge"] == "virbr0",
-         "CAPE guest NICs must use the verified default / virbr0 NAT")
-    need(isinstance(gateway, str) and bool(gateway),
-         "Unable to identify verified libvirt NAT gateway")
     return clients, gateway
 
 def plan(conf, host, journal, master_ip, master_snapshot, tag):
