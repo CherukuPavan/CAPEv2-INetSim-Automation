@@ -21,6 +21,7 @@ import subprocess
 import sys
 
 import command3_cape_routing as routing
+import command3_cape_tmpfs as tmpfs
 
 OPERATOR_ORDER = (
     "cape.service",
@@ -118,11 +119,22 @@ def systemd_status(unit):
         "installed_fragment": bool(selected["FragmentPath"]),
     }
 
-def report(conf_path, mode="plan"):
+def report(conf_path, mode="plan", cuckoo_conf=tmpfs.CONF):
     need(mode in ("plan", "verify"), "Read-only inspection modes only")
     original, st = routing.read_conf(conf_path)
     current = routing_status(original)
     units = [systemd_status(name) for name in OPERATOR_ORDER]
+    # CAPE can report systemd 'activating' for hundreds of restart attempts
+    # when enabled tmpfs is mounted as root:root or underprovisioned.
+    # Inspect this prerequisite before any later restart orchestration.
+    try:
+        tmpfs_state = tmpfs.assess(cuckoo_conf)
+    except (tmpfs.TmpfsBlocked, OSError, ValueError) as exc:
+        tmpfs_state = {
+            "result": "CAPE_TMPFS_PREFLIGHT_UNAVAILABLE",
+            "cape_tmpfs_prerequisite_ready": False,
+            "reason": type(exc).__name__ + ": " + str(exc),
+        }
     need(len(units) == 5 and
          [row["unit"] for row in units] == list(OPERATOR_ORDER),
          "Missing/misordered operator service definitions")
@@ -139,6 +151,9 @@ def report(conf_path, mode="plan"):
         "VM swtpm-consistent snapshot restore and benign CAPE cycles not attested",
         "Firewall restrictions around wildcard resultserver/API not attested",
     ])
+    if not tmpfs_state.get("cape_tmpfs_prerequisite_ready", False):
+        blockers.append("CAPE enabled-tmpfs mount/ownership/free-space "
+                        "startup preflight failed or unavailable")
     if not all(x["loaded"] for x in units):
         blockers.append("One or more named services not installed/loaded")
     if mode == "verify" and not all(x["active"] for x in units):
@@ -150,6 +165,9 @@ def report(conf_path, mode="plan"):
         "upstream_documented_cape_start_order": list(UPSTREAM_START_ORDER),
         "suricata_handled_separately": True,
         "service_checks": units,
+        "cape_tmpfs_startup_preflight": tmpfs_state,
+        "cape_tmpfs_prerequisite_ready":
+            tmpfs_state.get("cape_tmpfs_prerequisite_ready", False),
         "routing_file": str(conf_path),
         "routing_file_sha256": routing.guard.sha(original),
         "routing_file_bytes": st.st_size,
@@ -171,9 +189,10 @@ def main():
     parser.add_argument("--mode", choices=("plan", "verify"), default="plan")
     parser.add_argument("--routing-conf", type=Path,
                         default=Path("/opt/CAPEv2/conf/routing.conf"))
+    parser.add_argument("--cuckoo-conf", type=Path, default=tmpfs.CONF)
     a = parser.parse_args()
     try:
-        print(json.dumps(report(a.routing_conf, a.mode),
+        print(json.dumps(report(a.routing_conf, a.mode, a.cuckoo_conf),
                          sort_keys=True, indent=2), flush=True)
         return 0
     except (ServicesBlocked, routing.RoutingBlocked,
