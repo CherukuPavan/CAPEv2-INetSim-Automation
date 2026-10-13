@@ -58,11 +58,13 @@ class JoinedCommand3Tests(unittest.TestCase):
             patch.object(m.route, "plan", return_value=deepcopy(ROUTE)),
         ]
 
-    def test_stable_stage_order_and_config_paths(self):
+    def test_config_path_layout_and_step_order(self):
         with tempfile.TemporaryDirectory() as tmp:
             args = self.context(tmp)
-            with unittest.mock.ExitStack() as _:
-                pass
+            resolved = m.named_configs(args.conf_dir)
+            self.assertEqual(list(resolved), [
+                "api", "auxiliary", "cuckoo", "kvm", "mitmdump", "routing"])
+            self.assertEqual(resolved["kvm"].name, "kvm.conf")
 
     def test_plan_readonly_and_routing_not_claimed_applied(self):
         from contextlib import ExitStack
