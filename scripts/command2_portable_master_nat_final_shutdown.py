@@ -69,8 +69,9 @@ def preflight(host,journal,evidence_dir):
         report=shutdown.inspect(host,"portable-master-nat",vm,journal)
         need(report["state"]=="running" and
              report["uuid"]==row["libvirt_uuid_candidate"] and
-             report["capabilities"]["acpi"] or False,
-             "NAT Windows guest not running with supported ACPI shutdown")
+             (report["capabilities"]["acpi"] or
+              report["capabilities"]["qga_channel"]),
+             "NAT Windows guest not running with supported ACPI/QGA shutdown")
         ordered.append({"vm":vm,"uuid":row["libvirt_uuid_candidate"],
             "running_snapshot":guest["expected_name"],
             "shutdown_mode":"graceful_ACPI_or_QGA_only"})
