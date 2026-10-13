@@ -19,9 +19,21 @@ files through a crypt remote that encrypts **individual file contents
 and filenames ON THE FLY** when uploading to personal Google Drive.
 
 A separate 64+ GiB encrypted tar/zip copy on SSL-55 is unnecessary.
-However the initial verified cold QCOW2 **export itself** still requires
-working storage and sufficient free space; Google Drive does not fix the
-exporter's existing local flattening/free-space requirement.
+The verified cold QCOW2 **export** still requires an output filesystem
+with at least the virtual Windows size plus 30 GiB free. The user's
+SSL-55 has 48.41 GiB free versus 94 GiB required, so do NOT attempt
+the large export there. New [SSL46 remote SSHFS staging](
+COMMAND1_SSL46_TEMPORARY_LAN_STAGING.md) sends the flattened output
+DIRECTLY onto the user's SSL46 host with approximately 340 GiB free
+over encrypted SSH/SFTP. The original three-layer Windows QCOW2 source,
+CAPE, snapshots and TPM stay unchanged on SSL-55.
+
+Google Drive is then uploaded FROM SSL-55 through the existing
+SSHFS-mounted SSL46 bundle via local root-owned `cape_crypt` remote;
+the second machine need not store Drive OAuth secrets. Deleting the
+temporary SSL46 plaintext-at-rest bundle is a future separately approved
+step ONLY after complete remote byte comparison and independent
+download/reverification.
 
 On target hosts, rclone downloads/decrypts into a NEW root-private
 directory, then runs the canonical
