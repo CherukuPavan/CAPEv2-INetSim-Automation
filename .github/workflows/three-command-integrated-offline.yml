@@ -56,11 +56,13 @@ jobs:
         run: |
           python -B - <<'PY'
           from pathlib import Path
-          forbidden_extensions={".qcow2",".vhd",".vmdk",".iso",".p12",".key"}
+          forbidden_extensions={".qcow2",".vhd",".vmdk",".iso",".p12",".key",".pem",".pfx",".fd",".nvram",".tpm",".swtpm"}
           files=list(Path(".").rglob("*"))
           forbidden=[str(f) for f in files if f.is_file()
                      and (f.suffix.lower() in forbidden_extensions
-                          or f.name=="rclone.conf")]
+                          or f.name in ("rclone.conf","cape_world_readonly.conf")
+                          or ("service-account" in f.name.lower() and f.suffix == ".json")
+                          or ("service_account" in f.name.lower() and f.suffix == ".json"))]
           assert not forbidden, forbidden
           print("NO_GOLDEN_DISKS_ISOS_OR_CREDENTIAL_FILES_COMMITTED")
           PY
