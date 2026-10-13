@@ -469,18 +469,29 @@ rooter on a new host simply because config files changed.
   cape-processor, cape-rooter, cape-web and suricata each reported active.
   CAPE main process repeatedly exited with:
       CuckooStartupError: Fix permission on tmpfs path: chown cape:cape /mnt/tmpfs/
-  Journal displayed restart counters above 400. **Do not call all five
-  services healthy; cape.service is NOT ACTIVE.**
-- The immediate SSL-55 guarded mount check and non-recursive owner repair,
-  followed by single-service restart and consolidated TXT report, were
-  supplied in chat. Await operator's CAPE_Tmpfs_Repair_*.txt output.
+  Journal displayed restart counters above 400. **This was the prior
+  failure; subsequent operator-uploaded mount evidence NOW confirms
+  all five systemd services active on the current boot.**
+- First operator report confirmed **/mnt/tmpfs did not exist**,
+  so ownership-only repair was rightly blocked. The second operator report
+  CAPE_Tmpfs_Mount_20261013_071501.txt confirms a new 15995 MiB tmpfs
+  mount (cape:cape, mode 0750), fstab backup and persistence entry.
+  **cape.service now active/running with Result=success,
+  ExecMainStatus=0, NRestarts=0**, after three checks; all other four
+  services also active. CAPE connected to MongoDB, loaded one KVM VM,
+  and reached Waiting for analysis tasks. Optional httpreplay plugin was
+  not installed; startup proceeded despite that message.
+  Real reboot-persistence and multi-VM acceptance are not yet tested.
 - New prestart helper scripts/command3_cape_tmpfs.py guards enabled
   tmpfs mount, cape UID/GID, owner write/traverse and available MiB.
   It is incorporated into read-only command3_cape_services.py checks.
   A separate explicitly approved other-host-only repair changes only
-  mounted tmpfs root ownership. For boot persistence, future host install
-  still needs a correctly sized, cape-owned boot-time mount; it is not
-  yet implemented end-to-end. See
+  mounted tmpfs root ownership. New
+  scripts/command1_cape_tmpfs_mount.py provisions a persistent,
+  host-sized systemd tmpfs mount with the host's actual CAPE UID/GID
+  and a CAPE service mount dependency, on approved OTHER hosts only.
+  Offline tests are separate from a real reboot. One-command Command 1
+  integration remains to be finished. See
   [tmpfs startup repair and reboot-persistence note](COMMAND3_TMPFS_STARTUP_FAILURE_AND_REPAIR.md).
 - Only user commands changed SSL-55; the assistant has no remote terminal
   access and did not execute any host-side commands.
