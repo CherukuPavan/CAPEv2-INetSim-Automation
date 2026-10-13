@@ -92,6 +92,18 @@ class Import(unittest.TestCase):
                     return m.prepare_xml(bundle,disk,vars)[0]
                 raise AssertionError(args)
             uid=pwd.getpwuid(os.getuid()).pw_name
+            real_fstat=os.fstat
+            def fake_root_lock_fstat(fd):
+                st=real_fstat(fd)
+                try:
+                    name=os.readlink("/proc/self/fd/"+str(fd))
+                except OSError:
+                    return st
+                if name==str(root/"lock"):
+                    parts=list(st)
+                    parts[4]=0  # Simulate root owner on lock ONLY.
+                    return os.stat_result(parts)
+                return st  # Preserve real inode/device for temp cleanup.
             # Production import creates a root-private transient libvirt
             # XML folder under /run. Redirect ONLY the synthetic test's
             # temp directory to its private CI fixture; do not relax
@@ -116,8 +128,8 @@ class Import(unittest.TestCase):
                  patch("builtins.input",return_value=(
                      "IMPORT-EXACT-COLD-WIN11-MASTER-ON-NEW-HOST-ONLY")),\
                  patch.object(m.os,"chown",return_value=None),\
-                 patch.object(m.os,"fstat",return_value=SimpleNamespace(
-                     st_mode=stat.S_IFREG|0o600,st_uid=0,st_nlink=1)),\
+                 patch.object(m.os,"fstat",
+                              side_effect=fake_root_lock_fstat),\
                  patch.object(m.golden,"run",return_value=""):
                 before=m.check("lab02",bundle,disk,vars,uid)
                 self.assertEqual(before["result"],
