@@ -154,10 +154,23 @@ def source():
     need(state.is_dir() and not state.is_symlink() and
          not (state.stat().st_mode&0o002),
          "Original swtpm private state dir missing/untrusted")
-    entries=sorted(state.iterdir())
+    # swtpm may leave a ZERO-BYTE .lock beside actual permanent state.
+    # This is a runtime coordination sentinel, NOT TPM data and must not
+    # be copied into the portable backup. Refuse unusual lock contents,
+    # symlinks, hardlinks, sockets, or any additional unexpected member.
+    all_members=sorted(state.iterdir())
+    need(1<=len(all_members)<=MAX_TPM_FILES+1,
+         "Unexpected number of swtpm state directory members")
+    lock=state/".lock"
+    if lock in all_members:
+        st=os.lstat(lock)
+        need(stat.S_ISREG(st.st_mode) and st.st_size==0 and
+             st.st_nlink==1,
+             "Unexpected swtpm .lock type/contents: refuse to exclude")
+    entries=[p for p in all_members if p.name!=".lock"]
     need(1<=len(entries)<=MAX_TPM_FILES and
          "tpm2-00.permall" in {p.name for p in entries},
-         "Expected bounded TPM state members and permanent blob")
+         "Expected bounded TPM data and permanent blob")
     for e in entries:
         need(re.fullmatch(r"[a-zA-Z0-9_.-]{1,100}",e.name) is not None,
              "Unexpected TPM state file name")
