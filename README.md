@@ -10,14 +10,17 @@
 > Windows execution evidence or snapshot completion.
 > [Details](docs/COMMAND2_UNIFIED_OPERATOR_WORKFLOW.md).
 >
-> **Current Command 2 snapshot status (2026-10-12): NOT PHYSICALLY COMPLETE.**
-> SSL-55 `win11_1` is running with **one isolated NIC** and a verified CAPE Agent,
-> but has **NO running snapshot**. Its RAW OVMF pflash and swtpm2 state
-> require real tested recovery/revert on an approved disposable second host.
-> Latest count-journal bound snapshot inventory checks independent disk,
-> UEFI and MAC paths and live/saved XML drift; the [offline CI run](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38251784009)
-> passed. CI is not a real TPM/UEFI rollback or malware-containment test.
-> [Current handoff](docs/COMMAND2_CURRENT_HANDOFF.md). Never run Command 3 yet.
+> **Current Command 2 snapshot status (2026-10-13): NOT TPM-RESTORATION VERIFIED.**
+> SSL-55's actual `win11_1` has a permanent default-NAT Windows NIC,
+> unique IPv4 `192.168.122.131`, verified CAPE Agent, and THREE recorded
+> running RAM/Windows/OVMF internal snapshots (latest:
+> `cape_one_nat_win11_1`). These are **not** evidence of atomically restored
+> swtpm state. **Do not revert them, execute malware or change the protected
+> master/guest on SSL-55.** Disposable OTHER-host full-state recovery and two
+> benign revert cycles remain mandatory. The guarded all-N experimental
+> snapshot + final graceful shutdown stages are development-only and do not
+> authorize CAPE registration. [Exact master status](docs/COMMAND12_EXACT_GOLDEN_MASTER_MODEL.md)
+> and [latest handoff](docs/COMMAND2_CURRENT_HANDOFF.md). Command 3 stays locked.
 
 > **Command 2 development milestone (2026-10-11): 262 aggregate offline tests PASS.**
 > [GitHub Actions evidence](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38146877542).
