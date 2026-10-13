@@ -21,6 +21,17 @@
 > GitHub CI passing does NOT establish portable production readiness.
 > Earlier dated historical notes below, including claims that Command 3
 > is locked/not started, are superseded by this updated status.
+>
+> **NEW Command 1 encrypted golden-master transfer component:**
+> [private personal Google Drive rclone crypt transport](
+> scripts/command1_private_drive_bundle.py) supports review/approval
+> for copying exact SHA-verified COLD Windows/UEFI/TPM bundle files over
+> client-side encrypted Drive storage, avoiding a second huge encrypted
+> local archive. [Design/credentials/gates](
+> docs/COMMAND1_PRIVATE_DRIVE_TRANSFER.md). No Drive credentials or
+> Windows/TPM data are committed or uploaded by this repository.
+> Source export/storage and new-host transfer/VM import are not yet
+> end-to-end tested.
 
 > **2026-10-13 Commands 1–2 source audit (development only):**
 > The exact-master Windows bundle and guarded N-clone stages exist.
