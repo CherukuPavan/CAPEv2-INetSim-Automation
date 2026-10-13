@@ -1,5 +1,18 @@
 # CAPEv2 + INetSim Automation
 
+> **Operator clarification: ROLLBACK means UNDO THIS DEPLOYMENT ONLY.**
+> Do not reimage Ubuntu, delete unrelated VM disks, or reset the OS as a
+> substitute. The intended `repair` checks and fixes resources *created or
+> changed by Commands 1/2/3*; `rollback` reverses precisely those changes,
+> restoring their pre-deployment settings and leaving pre-existing apps,
+> packages, VMs, networks and data intact. See the
+> [deployment-only repair/rollback contract](
+> docs/DEPLOYMENT_SCOPED_REPAIR_ROLLBACK_CONTRACT.md). Today the guarded
+> recovery code covers SIX tracked CAPE configuration files only;
+> complete per-step ownership receipts and reverse-order package/VM/
+> service/network undo are still UNIMPLEMENTED. A full-host image is
+> optional test insurance, **not** the required rollback interface.
+
 > **New-host audit / recovery utilities (2026-10-13):** The
 > [repository-wide checker](scripts/repository_static_preflight.py) scans
 > every tracked Python/Bash/PowerShell/YAML file, checked local imports and
