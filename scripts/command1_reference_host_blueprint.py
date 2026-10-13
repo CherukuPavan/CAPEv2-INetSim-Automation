@@ -38,7 +38,7 @@ def query(*args):
             ("systemctl","show","--no-pager") and
             args[3] == "--property=LoadState,ActiveState,UnitFileState"
             and args[4] in SERVICES,
-        len(args) == 5 and args[:3] ==
+        len(args) == 6 and args[:3] ==
             ("git","-C",str(CAPE)) and
             args[3:] == ("rev-parse","--verify","HEAD"),
         len(args) == 6 and args[:3] ==
