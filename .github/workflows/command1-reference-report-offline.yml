@@ -1,0 +1,42 @@
+name: SSL55 exact installer reference evidence gate offline
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command1_reference_report_gate.py"
+      - "scripts/test_command1_reference_report_gate.py"
+      - "docs/SSL55_REFERENCE_EVIDENCE_20261013.md"
+      - ".github/workflows/command1-reference-report-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-mutation-evidence-gate:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10","3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Verify evidence parser compiles
+        run: |
+          python -B - <<'PY'
+          from pathlib import Path
+          import ast
+          for leaf in ("command1_reference_report_gate.py",
+                       "test_command1_reference_report_gate.py"):
+              path=Path("scripts")/leaf
+              ast.parse(path.read_text(encoding="utf-8"),
+                        filename=str(path))
+              print("SYNTAX_OK",path)
+          PY
+      - name: Run synthetic evidence regressions
+        run: |
+          python -B -m unittest discover -s scripts -p 'test_command1_reference_report_gate.py' -v
