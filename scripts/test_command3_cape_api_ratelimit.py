@@ -107,6 +107,14 @@ class TestApiRatelimit(unittest.TestCase):
             self.assertEqual(target.read_bytes(), before)
             self.assertFalse(backup.exists())
 
+    @staticmethod
+    def synthetic_backup_dir(path):
+        # GitHub Actions is unprivileged. Keep the real production helper's
+        # root-owned 0700 check intact and mock only its ownership admission.
+        folder = Path(path)
+        folder.mkdir(mode=0o700)
+        return folder
+
     def test_approved_atomic_edit_has_private_backup_and_no_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = self.prepare(tmp)
@@ -115,6 +123,8 @@ class TestApiRatelimit(unittest.TestCase):
             original_mode = stat.S_IMODE(target.stat().st_mode)
             with patch.object(c.os, "geteuid", return_value=0), \
                  patch.object(c.sys.stdin, "isatty", return_value=True), \
+                 patch.object(c, "safe_backup_dir",
+                              side_effect=self.synthetic_backup_dir), \
                  patch("builtins.input", return_value=c.APPROVAL):
                 result = c.apply(target, backup_dir)
             self.assertEqual(result["result"],
@@ -134,6 +144,15 @@ class TestApiRatelimit(unittest.TestCase):
             self.assertFalse(again["applied"])
             self.assertFalse(again["backup_created"])
             self.assertEqual(len(list(backup_dir.iterdir())), 1)
+
+    def test_real_backup_dir_enforces_root_ownership(self):
+        if os.getuid() == 0:
+            self.skipTest("Test requires an unprivileged runner")
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "root-only"
+            folder.mkdir(mode=0o700)
+            with self.assertRaisesRegex(c.Command3Blocked, "root-owned"):
+                c.safe_backup_dir(folder)
 
     def test_configuration_changed_after_approval_does_not_apply(self):
         with tempfile.TemporaryDirectory() as tmp:
