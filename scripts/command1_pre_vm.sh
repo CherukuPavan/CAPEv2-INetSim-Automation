@@ -28,6 +28,7 @@ Modes:
   host-acceptance         Consolidated read-only host + finished-master dependency report.
   reference-evidence      Review a supplied SSL-55 JSON reference (read-only).
   source-export-capacity  Read-only actual master disk + TPM metadata, export disk-space check (requires root).
+  source-deep-fingerprint One consolidated root-only SSL55 CAPE revision/QEMU/INetSim/master-space report.
   coverage                Show human-reviewed automation coverage/status documentation.
 
 Examples:
@@ -125,6 +126,9 @@ case "$MODE" in
     ;;
   source-export-capacity)
     exec python3 -B "$HERE/command1_actual_master_export_capacity.py" "$@"
+    ;;
+  source-deep-fingerprint)
+    exec python3 -B "$HERE/command1_ssl55_deep_fingerprint.py" "$@"
     ;;
   master-export)
     exec python3 -B "$HERE/command1_export_existing_master.py" "$@"
