@@ -68,8 +68,14 @@ def guard_file_path(path):
             "Only six exact CAPE configuration paths are authorized")
     require(not any(part.is_symlink() for part in (path, *path.parents)),
             "Symlinked path or parent blocked")
+    # Fresh Ubuntu targets have no /opt/CAPEv2/conf yet. Baseline must
+    # be possible BEFORE Command 1; this records all six as absent.
+    if not CONF.exists():
+        require(not path.exists() and not CONF.is_symlink(),
+                "CAPE conf parent missing but file exists; deny")
+        return path
     require(CONF.is_dir() and not CONF.is_symlink(),
-            "Expected existing CAPE conf directory")
+            "Unexpected CAPE conf path type")
     st = CONF.stat()
     require(stat.S_ISDIR(st.st_mode) and not st.st_mode & 0o022,
             "CAPE conf parent is group/world writable")
@@ -216,7 +222,7 @@ def approve(mode):
 
 def baseline(approved):
     current_host(approved)
-    require(CONF.is_dir(), "Create CAPE conf folder through approved installer first")
+    # Snapshot pre-install on a blank host; missing CAPE configs are valid.
     ensure_root()
     print(json.dumps({"mode": "baseline",
                       "captures_root_private_config_copies": list(NAMES),
@@ -245,6 +251,8 @@ def seal(receipt, approved):
     doc = read_manifest(receipt, approved)
     require(doc["phase"] == "baseline",
             "Sealing requires exact, previously unsealed baseline")
+    require(CONF.is_dir() and not CONF.is_symlink(),
+            "Cannot seal a deployment without its CAPE config directory")
     approve("seal")
     after = phase_snapshot(receipt.parent, "after")
     for name in NAMES:
