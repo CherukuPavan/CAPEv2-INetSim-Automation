@@ -227,12 +227,20 @@ def find_master_snapshot(master_snapshot):
              .splitlines() if x.strip()]
     need(master_snapshot in snaps, "Master snapshot is NOT present in libvirt")
     xml = ET.fromstring(nat.virsh("snapshot-dumpxml", "win11", master_snapshot))
+    snap_disks = xml.findall("./disks/disk")
+    embedded_domain = xml.find("domain")
     need(xml.tag == "domainsnapshot" and
          xml.findtext("name") == master_snapshot and
          xml.findtext("state") == "running" and
          xml.find("memory") is not None and
-         xml.find("memory").get("snapshot") in ("internal", "external"),
-         "Requested golden-master snapshot is not a recorded RUNNING RAM snapshot")
+         xml.find("memory").get("snapshot") in ("internal", "external") and
+         embedded_domain is not None and
+         embedded_domain.findtext("name") == "win11" and
+         any(d.get("snapshot") in ("internal", "external")
+             for d in snap_disks),
+         "Golden-master snapshot must contain named win11 RUNNING RAM "
+         "and at least one snapshotted Windows disk; STOP otherwise")
+    # Metadata only: cannot prove corresponding swtpm state or restore.
     return True
 
 def discover(host, journal, master_snapshot):
@@ -294,6 +302,7 @@ def plan(conf, host, journal, master_ip, master_snapshot, tag):
                                    b"[cuckoo1]" not in proposed,
         "existing_sections_other_than_managed_preserved": True,
         "actual_libvirt_running_snapshot_metadata_checked": True,
+        "master_guest_ipv4_reverified_inside_windows": False,
         "snapshot_revert_with_swtpm_proven": False,
         "safe_malware_isolation_proven": False,
         "cape_service_restarted": False,
