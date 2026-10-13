@@ -29,6 +29,7 @@ Modes:
   reference-evidence      Review a supplied SSL-55 JSON reference (read-only).
   source-export-capacity  Read-only actual master disk + TPM metadata, export disk-space check (requires root).
   source-deep-fingerprint One consolidated root-only SSL55 CAPE revision/QEMU/INetSim/master-space report.
+  safe-space-audit        READ-ONLY filesystem and candidate cache sizes, NEVER delete Win11/TPM/CAPE assets.
   coverage                Show human-reviewed automation coverage/status documentation.
 
 Examples:
@@ -129,6 +130,9 @@ case "$MODE" in
     ;;
   source-deep-fingerprint)
     exec python3 -B "$HERE/command1_ssl55_deep_fingerprint.py" "$@"
+    ;;
+  safe-space-audit)
+    exec python3 -B "$HERE/command1_ssl55_safe_space_audit.py" "$@"
     ;;
   master-export)
     exec python3 -B "$HERE/command1_export_existing_master.py" "$@"
