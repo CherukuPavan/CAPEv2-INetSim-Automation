@@ -204,6 +204,37 @@ def copy_exclusive(source_path,target):
         out.flush()
         os.fsync(out.fileno())
 
+def capture_intent_check(root, manifest):
+    """Validate even the root-private transfer-intent metadata as a member.
+
+    Older v1 exports lack the optional SHA binding. They remain readable
+    but do NOT qualify for the new all-member-bytes-verified claim.
+    """
+    f = root / "capture-intent.json"
+    regular(f, owner_root=True)
+    need(f.stat().st_size <= 65536, "Oversized private capture intent")
+    try:
+        obj = json.loads(f.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise MasterExportBlocked("Invalid cold-master capture intent") from exc
+    need(type(obj) is dict and
+         obj.get("schema") == "cape-command1-intent-v1" and
+         obj.get("master_uuid") == manifest.get("master_uuid") and
+         obj.get("state") == "COPY_IN_PROGRESS" and
+         obj.get("never_auto_retry") is True and
+         set(obj) == {"schema", "master_uuid", "state",
+                      "never_auto_retry"},
+         "Cold-master capture intent differs from exact source identity")
+    expected = manifest.get("capture_intent_sha256")
+    if expected is None:
+        return False  # historic v1: structurally checked, not SHA bound
+    need(type(expected) is str and
+         re.fullmatch(r"[a-f0-9]{64}", expected) is not None and
+         sha(f) == expected,
+         "Master capture-intent metadata is not SHA256 verified")
+    return True
+
+
 def manifest_check(folder):
     root=Path(folder)
     need(root.is_dir() and not root.is_symlink(),
@@ -246,8 +277,11 @@ def manifest_check(folder):
     expected=set(x[0] for x in members.values())|{MANIFEST,"capture-intent.json"}
     need({p.name for p in root.iterdir()}==expected,
          "Unexpected payload in master export folder")
+    intent_sha_bound = capture_intent_check(root, obj)
     # Bundle verification is structural; guest contents are opaque bytes.
     return {"result":"COMMAND1_COLD_MASTER_BUNDLE_BYTE_VERIFIED",
+            "capture_intent_sha256_verified": intent_sha_bound,
+            "all_member_files_sha256_verified": intent_sha_bound,
             "manifest_sha256":sha(mf),
             "master_uuid":obj["master_uuid"],
             "windows_volume_bytes":table["disk"]["bytes"],
@@ -338,6 +372,7 @@ def capture(dest):
                 "master_tpm_state_must_not_be_reused_across_clones":True,
                 "source_master_boot_or_snapshot_revert_attempted":False,
                 "guest_apps_registry_and_original_windows_files_preserved":True,
+                "capture_intent_sha256":sha(dest/"capture-intent.json"),
                 "artifacts":table}
         write_exclusive(dest/MANIFEST,
                  (json.dumps(content,sort_keys=True,indent=2)+"\n").encode())
