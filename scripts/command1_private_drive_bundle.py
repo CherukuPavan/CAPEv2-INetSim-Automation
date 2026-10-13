@@ -279,6 +279,7 @@ def apply_download(host,dest,remote,bundle_id,config):
         "result":"COMMAND1_PRIVATE_MASTER_DOWNLOADED_SHA256_VERIFIED",
         "private_bundle_path":str(folder),
         "bundle_manifest_sha256":proof["manifest_sha256"],
+        "all_member_files_sha256_verified":True,
         "master_windows_disk_and_tpm_verified":True,
         "master_VM_imported":False,"master_running_snapshot_created":False,
         "Drive_remote_encrypted":True,
