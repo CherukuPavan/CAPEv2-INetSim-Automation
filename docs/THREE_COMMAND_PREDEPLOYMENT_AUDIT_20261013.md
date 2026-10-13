@@ -1,5 +1,38 @@
 # Three-command integration audit — October 13, 2026 (development)
 
+## 2026-10-13 later physical evidence and revised operator scope
+
+This is a **newer checkpoint** than the original predeployment audit text
+below. The actual original cold Windows master was SHA-256 verified on SSL46,
+and the private `cape_crypt` upload completed with independent cloud byte
+comparison, no source changes/deletion, and script exit 0
+(`CAPE_GoogleDriveUpload_20261013_124755.txt`). The old cloud/upload blocker
+listed later in this document is now CLOSED **for source cloud transfer**.
+Target-host retrieval and SHA verification remain UNTESTED.
+
+The operator now requires **worldwide independent-network deployment**:
+a village machine must not log into the owner's personal Google account and
+must not depend on SSL55/SSL46 being online. A new reviewed component
+`scripts/command1_worldwide_drive_reader.py` provisions a private
+`drive.readonly` service-account crypt remote on an approved other host
+without overwriting existing credentials. It still requires individually
+authorized service-account Viewer folder sharing, a securely delivered key,
+and matching original crypt password/salt. See
+`docs/COMMAND1_WORLDWIDE_PRIVATE_DRIVE_READER.md`. NEVER make the Drive
+folder public; no actual independent target download has yet passed.
+
+**INetSim automation is deferred at the operator's request**. This is a
+scope change, not evidence INetSim exists, is installed or works.
+
+**Full new-host CAPE + database/service bootstrap, Windows golden master
+first boot, final verified and TPM-consistent running snapshot, truly complete
+all-N clone sequence, snapshot restoration, non-exposing routing and complete
+three-command execution remain engineering and physical acceptance gaps.**
+The availability of gated phase helpers and green synthetic CI does not
+close these. No helper may claim rollback safety without real, independent
+two-cycle guest/TPM evidence from a disposable other host.
+
+
 ## 2026-10-13 SSL55 reference JSON received
 
 The operator uploaded a redacted package/service reference report and
