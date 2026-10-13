@@ -31,7 +31,15 @@
 > docs/COMMAND1_PRIVATE_DRIVE_TRANSFER.md). No Drive credentials or
 > Windows/TPM data are committed or uploaded by this repository.
 > Source export/storage and new-host transfer/VM import are not yet
-> end-to-end tested.
+> end-to-end tested. The new guarded
+> [private download -> exact master import entrypoint](
+> scripts/command1_private_master_stage.py) now combines those stages
+> with independent approvals, SHA256 verification and a root-private
+> partial-state witness, without guest boot or snapshot operations.
+> [Command1 staged import handoff](
+> docs/COMMAND1_PRIVATE_MASTER_STAGE_HANDOFF.md).
+> Neither joined component is a replacement for the unfinished
+> fresh-host CAPEv2/INetSim installer or TPM-safe snapshot acceptance.
 
 > **2026-10-13 Commands 1–2 source audit (development only):**
 > The exact-master Windows bundle and guarded N-clone stages exist.
