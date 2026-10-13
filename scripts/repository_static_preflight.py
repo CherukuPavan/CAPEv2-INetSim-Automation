@@ -35,6 +35,15 @@ def tracked():
 
 def main():
     files = tracked()
+    local_modules = {
+        path.stem for path in files
+        if path.parent == Path("scripts") and path.suffix == ".py"
+    }
+    local_prefixes = ("command1_", "command2_", "command3_",
+                      "command123_", "guard_", "audit_", "bootstrap_",
+                      "private_repo_", "repository_static_",
+                      "test_command1_", "test_command2_",
+                      "test_command3_", "test_command123_")
     errors = []
     warnings = []
     counted = Counter()
@@ -56,8 +65,24 @@ def main():
                 errors.append(str(relative) + ": source exceeds safe parse cap")
                 continue
             if path.suffix == ".py":
-                ast.parse(contents, filename=str(relative))
+                tree = ast.parse(contents, filename=str(relative))
                 counted["python_parsed"] += 1
+                if relative.parent == Path("scripts"):
+                    for node in ast.walk(tree):
+                        modules = []
+                        if isinstance(node, ast.Import):
+                            modules.extend(alias.name.split(".", 1)[0]
+                                           for alias in node.names)
+                        elif (isinstance(node, ast.ImportFrom) and
+                              node.module and node.level == 0):
+                            modules.append(node.module.split(".", 1)[0])
+                        for module in modules:
+                            if (module.startswith(local_prefixes) and
+                                    module not in local_modules):
+                                errors.append(str(relative) +
+                                              ": missing local Python module " +
+                                              module)
+                    counted["python_import_graph_checked"] += 1
             elif path.suffix == ".sh":
                 p = subprocess.run(["bash", "-n", str(path)],
                                    capture_output=True, timeout=30)
