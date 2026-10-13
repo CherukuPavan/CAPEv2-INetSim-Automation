@@ -17,9 +17,9 @@ class BlueprintTests(unittest.TestCase):
         with patch.object(m.subprocess,"run",
                   return_value=SimpleNamespace(
                       stdout="LoadState=loaded\n",returncode=0)) as call:
-            self.assertEqual(m.query("systemctl","show",
-                                    "--property=LoadState","cape.service"),
-                             "LoadState=loaded")
+            self.assertEqual(m.query("systemctl","show","--no-pager",
+                           "--property=LoadState,ActiveState,UnitFileState",
+                           "cape.service"), "LoadState=loaded")
             call.assert_called_once()
             self.assertFalse(call.call_args.kwargs["check"])
 
