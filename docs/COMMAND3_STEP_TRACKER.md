@@ -463,9 +463,27 @@ rooter on a new host simply because config files changed.
 - \`scripts/test_command3_cape_services.py\` exercises safe exact systemd
   arguments, order, blocked Internet routing, absent/failed units, missing
   settings, read-only behavior, no secrets and lack of an apply path.
-- User has **requested** restarts but has not yet supplied proof that all
-  five were executed successfully on SSL-55. No assistant-run host
-  operations, systemd restart or routing/firewall changes occurred.
+- **2026-10-13 operator runtime update:** All five restart commands
+  WERE executed on SSL-55. systemctl is-active showed **cape.service =
+  activating** (repeated automatic restart, ExecStart status 1);
+  cape-processor, cape-rooter, cape-web and suricata each reported active.
+  CAPE main process repeatedly exited with:
+      CuckooStartupError: Fix permission on tmpfs path: chown cape:cape /mnt/tmpfs/
+  Journal displayed restart counters above 400. **Do not call all five
+  services healthy; cape.service is NOT ACTIVE.**
+- The immediate SSL-55 guarded mount check and non-recursive owner repair,
+  followed by single-service restart and consolidated TXT report, were
+  supplied in chat. Await operator's CAPE_Tmpfs_Repair_*.txt output.
+- New prestart helper scripts/command3_cape_tmpfs.py guards enabled
+  tmpfs mount, cape UID/GID, owner write/traverse and available MiB.
+  It is incorporated into read-only command3_cape_services.py checks.
+  A separate explicitly approved other-host-only repair changes only
+  mounted tmpfs root ownership. For boot persistence, future host install
+  still needs a correctly sized, cape-owned boot-time mount; it is not
+  yet implemented end-to-end. See
+  [tmpfs startup repair and reboot-persistence note](COMMAND3_TMPFS_STARTUP_FAILURE_AND_REPAIR.md).
+- Only user commands changed SSL-55; the assistant has no remote terminal
+  access and did not execute any host-side commands.
 
 ### Integration requirements before restart automation can be released
 
