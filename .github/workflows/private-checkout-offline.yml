@@ -1,0 +1,36 @@
+name: Private development checkout admission offline
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/private_repo_checkout_preflight.py"
+      - "scripts/test_private_repo_checkout_preflight.py"
+      - ".github/workflows/private-checkout-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-dev-checkout:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.10","3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile and synthetic authenticated private GitHub checkout tests
+        run: |
+          python -B - <<'PY'
+          import ast
+          from pathlib import Path
+          for path in [Path("scripts/private_repo_checkout_preflight.py"),
+                       Path("scripts/test_private_repo_checkout_preflight.py")]:
+              ast.parse(path.read_text(),filename=str(path))
+              print("SYNTAX_OK",path)
+          PY
+          python -B -m unittest discover -s scripts -p 'test_private_repo_checkout_preflight.py' -v
