@@ -6,10 +6,14 @@ five-service startup proof are the canonical source. No host commands,
 snapshot restoration or Windows/TPM transfer were executed by the
 GitHub development activity below. `main` unchanged.
 
-**All-code offline CI:** 1,478 Python tests successful on each of
-Python 3.10 and 3.12, in
-[GitHub Actions #38372435151](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38372435151).
-That is *synthetic verification only*, not fresh-host qualification.
+**All-code offline CI:** Previously 1,493 Python tests passed on each
+of Python 3.10 and 3.12
+([Actions #38373563965](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38373563965)).
+A new private-repository checkout guard has since been added and its
+separate CI passed. The current all-repository rerun is at
+[Actions #38374387418](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38374387418);
+check its result rather than assuming success while it is still running.
+This is *synthetic verification only*, not fresh-host qualification.
 
 ## Newly integrated code
 
@@ -23,7 +27,7 @@ That is *synthetic verification only*, not fresh-host qualification.
 | Persistent per-host CAPE tmpfs | `scripts/command1_cape_tmpfs_mount.py` | Guarded other-host systemd mount + preflight; physical reboot test not done |
 | Count-driven Command2 all-N cloning | `scripts/command2_exact_master_full_sequence.py` | ONE guarded interactive N-VM sequence using exact-master helpers; TPM restore unproven |
 | Command3 exact config / KVM registration | `scripts/command3_from_operator_reference.py` | ONE config-only entrypoint, conditional on all-N snapshot records and tmpfs |
-| Command3 routing/service acceptance | `scripts/command3_cape_routing.py`, `scripts/command3_cape_services.py` | READ ONLY by design, not active routing/service deployer |
+| Command3 routing/service acceptance | `scripts/command3_cape_routing.py`, `scripts/command3_cape_restart_verified.py` | Routing still READ ONLY; separate approved exact five-unit restart/verify implemented and tested |
 
 IMPORTANT: Count 3 means additional `win11_1`, `win11_2`, `win11_3`,
 not replacing `win11`. Clone Windows configuration uses verified
@@ -62,11 +66,16 @@ running snapshot is not carried over intact by QCOW2 flattening.
    are not proven safe CAPE rollback sources. Implement/test a
    TPM-state-aware recovery model on disposable new-host guests,
    with at least two successful benign restoration cycles.
-5. **Command3 full execution:** The five configuration edits and
-   count-bound KVM planning are joined; the reference routing profile
-   and service restart are not yet automatic. Must be integrated
-   with verified target network/service settings and benign real-host
-   validation, rather than blindly asserting that a unit is active.
+5. **Command3 full execution:** The five configuration edits,
+   count-bound KVM planning and separately approved five-service
+   restart/verify are available through one Command3 entrypoint,
+   with distinct modes and root-private stage receipts. The reference
+   routing profile is still NOT automatically written; the screenshot
+   connects CAPE internet mode to a libvirt VM-side NAT bridge rather
+   than a verified external dirty-line NIC. Host network/service
+   integration and benign real-host acceptance remain necessary.
+   An active systemd unit does NOT prove successful Windows snapshot
+   restoration.
 6. **Cloud and capacity:** No private personal Google Drive credentials
    have been configured or source golden-master bundle uploaded.
    Root-owned rclone config is required, with separate personal Drive
@@ -94,3 +103,12 @@ Before a second machine's installer is run, the seven real blockers
 above must either be coded and verified or explicitly remain a test
 objective on a disposable approved host. A claim that "everything is
 done except testing" would currently be FALSE.
+
+## Private source distribution note
+
+This GitHub repo is PRIVATE, not publicly readable by `curl` to raw
+GitHub without authentication. New hosts must use a separately
+AUTHENTICATED `development` checkout, full pinned commit SHA, clean
+tree and the read-only `private_repo_checkout_preflight.py` before
+planning any mutable installation. See
+`docs/PRIVATE_DEPLOYMENT_SOURCE_AND_GDRIVE_HANDOFF.md`.
