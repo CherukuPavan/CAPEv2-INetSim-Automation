@@ -1,0 +1,40 @@
+name: CAPE source host private provenance offline
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command1_reference_host_blueprint.py"
+      - "scripts/test_command1_reference_host_blueprint.py"
+      - "scripts/command123_readonly_machine_report.py"
+      - ".github/workflows/command1-reference-blueprint-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-provenance:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.10","3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Syntax check
+        run: |
+          python -B - <<'PY'
+          from pathlib import Path
+          import ast
+          for name in ("command1_reference_host_blueprint.py",
+                       "test_command1_reference_host_blueprint.py"):
+              f=Path("scripts")/name
+              ast.parse(f.read_text(),filename=str(f))
+              print("SYNTAX_OK",f)
+          PY
+      - name: Run no-mutation / secret-redacted reference tests
+        run: |
+          python -B -m unittest discover -s scripts -p 'test_command1_reference_host_blueprint.py' -v
