@@ -53,7 +53,20 @@ class GoldenMaster(unittest.TestCase):
     def test_capture_golden_master_contains_apps_uefi_tpm_xml_and_shas(self):
         with tempfile.TemporaryDirectory() as td:
             disk,nv,tpm,xml,dest,virsh,run=self.fixtures(td)
-            with patch.object(m.os,"geteuid",return_value=0),\
+            # The real exporter REQUIRES root-owned 0700/0600 files.
+            # In an unprivileged CI fixture, simulate only the UID of
+            # files inside the synthetic bundle; leave production guard
+            # code unchanged and preserve actual sizes/modes/checksums.
+            real_stat=Path.stat
+            def owned_stat(path,*args,**kwargs):
+                st=real_stat(path,*args,**kwargs)
+                if path==dest or dest in path.parents:
+                    values=list(st)
+                    values[4]=0  # UID field in os.stat_result
+                    return os.stat_result(values)
+                return st
+            with patch.object(Path,"stat",owned_stat),\
+                 patch.object(m.os,"geteuid",return_value=0),\
                  patch.object(m.socket,"gethostname",return_value="CSE-SSL-55"),\
                  patch.object(m,"virsh",side_effect=virsh),\
                  patch.object(m,"run",side_effect=run),\
@@ -86,7 +99,8 @@ class GoldenMaster(unittest.TestCase):
             self.assertTrue(result["master_swtpm_secrets_in_private_bundle"])
             self.assertEqual(stat.S_IMODE(dest.stat().st_mode),0o700)
             (dest/m.FILES["disk"]).write_bytes(b"CORRUPT")
-            with self.assertRaisesRegex(m.MasterExportBlocked,"CORRUPTION"):
+            with patch.object(Path,"stat",owned_stat), \
+                 self.assertRaisesRegex(m.MasterExportBlocked,"CORRUPTION"):
                 m.manifest_check(dest)
 
     def test_master_flatten_reads_exact_checked_backing_chain(self):
