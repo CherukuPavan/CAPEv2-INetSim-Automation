@@ -1,5 +1,20 @@
 # CAPEv2 + INetSim Automation
 
+> **October 13 developer-stage integrated audit:** [READ BEFORE
+> DEPLOYING](docs/THREE_COMMAND_PREDEPLOYMENT_AUDIT_20261013.md).
+> The full offline CI suite passed **1,478 tests on each Python 3.10
+> and Python 3.12** ([Actions](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38372435151)).
+> New integrated components: [Command2 one-invocation count-driven
+> VM sequencer](scripts/command2_exact_master_full_sequence.py),
+> [private Drive golden-master transfer](scripts/command1_private_drive_bundle.py),
+> [new-host exact master staging](scripts/command1_private_master_stage.py),
+> [Command3 joined config workflow](scripts/command3_from_operator_reference.py),
+> and [SSL55 read-only host provenance collector](scripts/command1_reference_host_blueprint.py).
+> **NOT a tested unattended 3-command release:** complete fresh-host
+> CAPEv2/INetSim installer, imported-master running snapshot and
+> TPM-consistent rollback, per-VM actual Windows firstboot, and safe
+> routing/service execution are still open. Protect SSL-55 and `main`.
+
 > **2026-10-13 updated operator handoff — Command 3 MANUAL REFERENCE FINISHED.**
 > SSL-55 now has all seven operator-requested CAPE configuration/restart
 > steps completed. The uploaded post-fix systemd report verified **all
