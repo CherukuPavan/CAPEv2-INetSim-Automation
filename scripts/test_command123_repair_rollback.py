@@ -1,5 +1,6 @@
 """Offline tests: no host service restart, VM action or real CAPE changes."""
 import hashlib
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -43,6 +44,33 @@ class RecoveryTests(unittest.TestCase):
         path.write_bytes(data)
         path.chmod(0o600)
         return path
+
+    def test_fresh_host_baseline_before_cape_exists(self):
+        recovery = self.root / "recovery"
+        recovery.mkdir(mode=0o700)
+        with mock.patch.object(m, "ROOT", recovery), \
+             mock.patch.object(m, "CONF", self.root / "not-installed"), \
+             mock.patch.object(m, "ensure_root"), \
+             mock.patch.object(m, "private_folder"), \
+             mock.patch.object(m, "approve"), \
+             mock.patch.object(m, "current_host", return_value="newhost"):
+            result = m.baseline("newhost")
+        stored = json.loads(Path(result["receipt"]).read_text())
+        self.assertEqual(stored["phase"], "baseline")
+        self.assertTrue(all(row["before"] is None for row in
+                            stored["files"].values()))
+
+    def test_repair_missing_file_recreates_exact_sealed_content(self):
+        self.doc["files"]["api.conf"]["after"] = state(b"good-sealed")
+        with mock.patch.object(m, "no_live_workloads"), \
+             mock.patch.object(m, "approve"), \
+             mock.patch.object(m, "checked_blob",
+                               return_value=b"good-sealed"), \
+             mock.patch.object(m, "replace_manifest"), \
+             mock.patch.object(m.os, "fchown"):
+            result = m.apply(self.receipt, "newhost", "repair")
+        self.assertEqual(result["result"], "CAPE_REPAIR_TRACKED_CONFIGS_DONE")
+        self.assertEqual((self.conf / "api.conf").read_bytes(), b"good-sealed")
 
     def test_repair_only_missing_sealed_configuration(self):
         self.doc["files"]["api.conf"]["after"] = state(b"expected-api")
