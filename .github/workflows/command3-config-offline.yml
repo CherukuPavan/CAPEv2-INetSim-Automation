@@ -45,18 +45,39 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           python -B -m unittest discover -s scripts -p 'test_command3_*.py' -v
-      - name: Assert no automatic CAPE service restart and no generic commands
+      - name: Verify config editors cannot restart and standalone restarter has fixed units
         run: |
           python -B - <<'PY'
+          import ast
           from pathlib import Path
+          special = Path("scripts/command3_cape_restart_verified.py")
+          assert special.is_file()
           reviewed = sorted(Path("scripts").glob("command3_cape_*.py"))
+          reviewed = [file for file in reviewed if file != special]
           reviewed.append(Path("scripts/command3_from_operator_reference.py"))
-          assert all(p.is_file() for p in reviewed), "Missing reviewed Command3 scripts"
+          assert all(p.is_file() for p in reviewed)
           for file in reviewed:
               script = file.read_text(encoding="utf-8")
               for dangerous in ("shell=True", "systemctl restart",
                                 "sudo service", "subprocess.run(",
                                 '"virsh"', "'virsh'"):
                   assert dangerous not in script, (str(file), dangerous)
-          print("NO_SERVICE_RESTART_AND_NO_VM_MUTATION_PASS", len(reviewed))
+          tree = ast.parse(special.read_text(encoding="utf-8"))
+          funcs = {node.name:node for node in tree.body
+                   if isinstance(node, (ast.FunctionDef,ast.AsyncFunctionDef))}
+          assert "restart_exact" in funcs and "apply" in funcs
+          run_calls=[]
+          for node in ast.walk(tree):
+              if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute):
+                  if (isinstance(node.func.value,ast.Name) and
+                      node.func.value.id=="subprocess" and node.func.attr=="run"):
+                      run_calls.append(node)
+          assert len(run_calls)==1
+          assert any(call in ast.walk(funcs["restart_exact"]) for call in run_calls)
+          assert '"systemctl","restart",unit' in special.read_text()
+          assert "need(unit in UNITS" in special.read_text()
+          for banned in ("shell=True","os.system(","subprocess.Popen(",
+                         '"virsh"','"apt-get"'):
+              assert banned not in special.read_text(), banned
+          print("CONFIG_NO_RESTART_AND_EXACT_STANDALONE_SERVICE_RESTART_PASS")
           PY
