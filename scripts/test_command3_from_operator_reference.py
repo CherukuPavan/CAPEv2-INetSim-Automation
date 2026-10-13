@@ -303,6 +303,61 @@ class JoinedCommand3Tests(unittest.TestCase):
             w.assert_not_called()
             self.assertEqual(pre.call_count,2)
 
+    def test_joined_restart_rejects_pending_config_before_service_call(self):
+        with tempfile.TemporaryDirectory() as td:
+            args=self.context(td)
+            args.restart_witness_dir=Path(td)/"restart"
+            with patch.object(m.os,"geteuid",return_value=0), \
+                 patch.object(m.sys.stdin,"isatty",return_value=True), \
+                 patch.object(m,"approved_host",return_value="other-host"), \
+                 patch.object(m,"review",return_value={
+                     "five_config_files_match_target":False,
+                     "verified_target_tmpfs_mounted":True}), \
+                 patch.object(m.restarting,"apply",
+                   side_effect=AssertionError("No premature restart")), \
+                 self.assertRaisesRegex(m.Command3PipelineBlocked,
+                                        "Not all five"):
+                m.restart_existing_config(args)
+
+    def test_joined_restart_requires_mounted_tmpfs_even_if_configs_match(self):
+        with tempfile.TemporaryDirectory() as td:
+            args=self.context(td)
+            args.restart_witness_dir=Path(td)/"restart"
+            with patch.object(m.os,"geteuid",return_value=0), \
+                 patch.object(m.sys.stdin,"isatty",return_value=True), \
+                 patch.object(m,"approved_host",return_value="other-host"), \
+                 patch.object(m,"review",return_value={
+                     "five_config_files_match_target":True,
+                     "verified_target_tmpfs_mounted":False}), \
+                 patch.object(m.restarting,"apply",
+                     side_effect=AssertionError("No restart when tmpfs unmounted")), \
+                 self.assertRaisesRegex(m.Command3PipelineBlocked,"tmpfs"):
+                m.restart_existing_config(args)
+
+    def test_joined_restart_delegates_only_after_configs_and_tmpfs_verified(self):
+        with tempfile.TemporaryDirectory() as td:
+            args=self.context(td)
+            args.restart_witness_dir=Path(td)/"restart"
+            with patch.object(m.os,"geteuid",return_value=0), \
+                 patch.object(m.sys.stdin,"isatty",return_value=True), \
+                 patch.object(m,"approved_host",return_value="other-host"), \
+                 patch.object(m,"review",return_value={
+                     "five_config_files_match_target":True,
+                     "verified_target_tmpfs_mounted":True}), \
+                 patch.object(m.restarting,"apply",return_value={
+                     "result":"COMMAND3_FIVE_SERVICE_RESTARTS_ACTIVE_VERIFIED",
+                     "witness":"/var/lib/cape-command3-restart-receipts/receipt",
+                     "systemd_units_active_at_check":True}) as executor:
+                value=m.restart_existing_config(args)
+            self.assertEqual(value["result"],
+                  "COMMAND3_EXISTING_CONFIG_FIVE_SERVICE_RESTART_COMPLETE")
+            self.assertTrue(value["operator_configs_match_target"])
+            self.assertFalse(value["routing_auto_write_performed"])
+            self.assertFalse(value["CAPE_SAMPLE_ANALYSIS_READY"])
+            executor.assert_called_once_with(
+                "other-host",args.conf_dir/"routing.conf",
+                args.conf_dir/"cuckoo.conf",args.restart_witness_dir)
+
     def test_real_witness_created_private_and_second_write_rejects_untrusted(self):
         with tempfile.TemporaryDirectory() as td:
             record = Path(td)/"receipt.json"
