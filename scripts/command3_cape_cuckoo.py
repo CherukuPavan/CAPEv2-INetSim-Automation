@@ -17,6 +17,7 @@ CAPE semantics or any service readiness.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -152,6 +153,28 @@ def private_dsn_file(path):
     finally:
         os.close(fd)
 
+def valid_existing_value(section, key, actual):
+    """Reject unexpected old types before replacing operator-reviewed keys.
+
+    This is an admission rule only, not evidence of CAPE runtime validity.
+    """
+    if section == "database" and key == "connection":
+        return True  # independently validated below, including placeholders
+    if (section, key) == ("resultserver", "ip"):
+        try:
+            return type(ipaddress.ip_address(actual)) is ipaddress.IPv4Address
+        except ValueError:
+            return False
+    target = TARGET[section][key]
+    if target in ("on", "off"):
+        return actual.lower() in ("on", "off")
+    if target in ("yes", "no"):
+        return actual.lower() in ("yes", "no")
+    if section == "database" and key == "timeout" and actual == "":
+        return True  # operator's BEFORE config has an empty timeout
+    return actual.isascii() and actual.isdecimal() and len(actual) <= 15
+
+
 def transform(data, dsn=None):
     """Conservatively edit only 22 operator-reviewed existing keys."""
     try:
@@ -187,7 +210,11 @@ def transform(data, dsn=None):
         need(pair not in found, "Duplicate configured key: [" + section + "] " + key)
         parsed = OPTION_RE.fullmatch(line)
         need(parsed is not None, "Malformed configured option: [" + section + "] " + key)
-        found[pair] = (index, parsed, parsed.group(2).strip())
+        old = parsed.group(2).strip()
+        need(valid_existing_value(section, key, old),
+             "Unrecognized existing value for [" + section + "] " + key +
+             "; manual review rather than overwrite")
+        found[pair] = (index, parsed, old)
     need(all(x == 1 for x in occurrences.values()),
          "Every target CAPE section must appear exactly once")
     expected = {(section, key) for section, fields in TARGET.items()
