@@ -300,6 +300,53 @@ As an additional consequence, the script does **not** declare CAPE_READY
 and must not be mistaken for the full single-command Command 3
 orchestrator/service restart.
 
+## Step 5 — `mitmdump.conf` host for approved libvirt NAT
+
+**Operator-specified next edit (2026-10-13):** In
+`/opt/CAPEv2/conf/mitmdump.conf`, change exactly the existing active:
+
+```ini
+host = 192.168.122.1
+```
+
+The `192.168.122.1` address is SSL-55's known **host-side
+`virbr0`/default libvirt NAT gateway**. This is NOT the wildcard
+`0.0.0.0` value specified in Step 3 for
+`cuckoo.conf [resultserver] ip`. Do **not** use `0.0.0.0` for
+this `mitmdump.conf host` option.
+
+User specified the edit but has **not explicitly confirmed** in this
+turn whether it is already saved on SSL-55; do not mark the manual
+reference as independently verified. No assistant operation on SSL-55.
+
+### Portable guarded development automation
+
+- `scripts/command3_cape_mitmdump.py` checks exactly one active
+  `host =` key in `mitmdump.conf`, keeps original comments and every
+  other setting intact, and refuses duplicate, absent, malformed or
+  symlinked config entries.
+- Default target IP is **discovered from the actual active AND saved**
+  libvirt `default` NAT gateway/bridge/subnet on the new machine. Thus
+  the established SSL-55 setting resolves to `192.168.122.1`,
+  but a supported target with an approved DIFFERENT verified
+  private NAT /24 uses its own actual gateway. An explicit `--gateway`
+  is an additional ASSERTION that must match what is discovered, never
+  an override for an arbitrary/public IP.
+- Read-only `--mode plan`; typed-approved root-only
+  `--mode apply` on **approved other hosts, never reference SSL-55**.
+  Idempotent already-correct settings require no write.
+  Change includes a private root-owned 0600 original backup, ownership
+  and mode preservation, same-directory atomic replace and SHA256
+  revalidation. Never restart CAPE, start/revert a VM, change libvirt
+  NAT, or run samples.
+- `scripts/test_command3_cape_mitmdump.py` runs synthetic-only tests
+  for exact one-key preservation, CRLF/comments, different new-host NAT,
+  mismatch/duplicate/invalid/unsafe IP, no-write plan, host rejection,
+  private backup, and idempotent re-apply.
+- Network access to MITM/INetSim and firewall isolation remain
+  separate future acceptance gates. A successful config edit alone
+  does not prove traffic routing or public egress containment.
+
 ## Pending operator steps
 
 Await the next supplied configuration-file edit. For each step, document
