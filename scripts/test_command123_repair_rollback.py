@@ -1,5 +1,6 @@
 """Offline tests: no host service restart, VM action or real CAPE changes."""
 import hashlib
+import os
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
