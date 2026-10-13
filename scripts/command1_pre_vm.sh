@@ -31,6 +31,7 @@ Modes:
   source-deep-fingerprint One consolidated root-only SSL55 CAPE revision/QEMU/INetSim/master-space report.
   safe-space-audit        READ-ONLY filesystem and candidate cache sizes, NEVER delete Win11/TPM/CAPE assets.
   ssl46-lan-stage         Plan/export/verify/upload exact cold master THROUGH approved SSHFS on SSL46.
+  worldwide-drive-reader  Set up private, read-only service-account crypt access on ANY approved other host.
   coverage                Show human-reviewed automation coverage/status documentation.
 
 Examples:
@@ -137,6 +138,9 @@ case "$MODE" in
     ;;
   ssl46-lan-stage)
     exec python3 -B "$HERE/command1_ssl46_sshfs_master_stage.py" "$@"
+    ;;
+  worldwide-drive-reader)
+    exec python3 -B "$HERE/command1_worldwide_drive_reader.py" "$@"
     ;;
   master-export)
     exec python3 -B "$HERE/command1_export_existing_master.py" "$@"
