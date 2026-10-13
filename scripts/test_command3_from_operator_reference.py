@@ -262,7 +262,7 @@ class JoinedCommand3Tests(unittest.TestCase):
             # that isn't genuinely root owned.
             if record.stat().st_uid != 0:
                 with self.assertRaisesRegex(m.Command3PipelineBlocked,
-                                            "root owned"):
+                                            "Untrusted existing witness"):
                     m.write_witness(record, {"step":2})
             else:
                 m.write_witness(record, {"step":2})
