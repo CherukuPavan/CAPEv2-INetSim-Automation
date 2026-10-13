@@ -39,7 +39,7 @@ import command3_cape_tmpfs as tmpfs
 import command3_cape_services as services
 
 DEFAULT_CONF_DIR = Path("/opt/CAPEv2/conf")
-DEFAULT_WITNESSES = Path("/var/lib/cape-command3/configuration-receipts")
+DEFAULT_WITNESSES = Path("/var/lib/cape-command3-receipts")
 APPROVAL = "CONFIGURE-CAPE-STEP1-THROUGH-STEP5-NO-RESTART"
 
 class Command3PipelineBlocked(RuntimeError):
