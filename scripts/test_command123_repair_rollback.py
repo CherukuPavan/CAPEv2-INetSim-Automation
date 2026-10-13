@@ -13,7 +13,7 @@ def state(blob):
     if blob is None:
         return None
     return {"sha256": hashlib.sha256(blob).hexdigest(), "size": len(blob),
-            "uid": 0, "gid": 0, "mode": 0o600}
+            "uid": os.getuid(), "gid": os.getgid(), "mode": 0o600}
 
 
 class RecoveryTests(unittest.TestCase):
@@ -65,9 +65,9 @@ class RecoveryTests(unittest.TestCase):
         plan = m.state_plan(self.receipt, "newhost", "rollback")
         d = {item["config"]: item["action"] for item in plan["actions"]}
         self.assertEqual(d["kvm.conf"], "quarantine_new_config")
-        with mock.patch.object(m, "no_live_workloads"), \\
-             mock.patch.object(m, "approve"), \\
-             mock.patch.object(m, "private_folder"), \\
+        with mock.patch.object(m, "no_live_workloads"), \
+             mock.patch.object(m, "approve"), \
+             mock.patch.object(m, "private_folder"), \
              mock.patch.object(m, "replace_manifest"):
             result = m.apply(self.receipt, "newhost", "rollback")
         self.assertEqual(result["result"], "CAPE_ROLLBACK_TRACKED_CONFIGS_DONE")
@@ -82,9 +82,9 @@ class RecoveryTests(unittest.TestCase):
         self.doc["files"]["api.conf"]["before"] = state(before)
         self.doc["files"]["api.conf"]["after"] = state(after)
         target = self.put("api.conf", after)
-        with mock.patch.object(m, "no_live_workloads"), \\
-             mock.patch.object(m, "approve"), \\
-             mock.patch.object(m, "checked_blob", return_value=before), \\
+        with mock.patch.object(m, "no_live_workloads"), \
+             mock.patch.object(m, "approve"), \
+             mock.patch.object(m, "checked_blob", return_value=before), \
              mock.patch.object(m, "replace_manifest"):
             m.apply(self.receipt, "newhost", "rollback")
         self.assertEqual(target.read_bytes(), before)
@@ -95,7 +95,7 @@ class RecoveryTests(unittest.TestCase):
         target = self.put("api.conf", b"edited by operator")
         result = m.state_plan(self.receipt, "newhost", "rollback")
         self.assertFalse(result["can_apply"])
-        with mock.patch.object(m, "no_live_workloads"), \\
+        with mock.patch.object(m, "no_live_workloads"), \
              mock.patch.object(m, "approve"):
             with self.assertRaises(m.RecoveryBlocked):
                 m.apply(self.receipt, "newhost", "rollback")
@@ -103,7 +103,7 @@ class RecoveryTests(unittest.TestCase):
 
     def test_partial_receipt_cannot_mutate(self):
         self.doc["phase"] = "partial"
-        with mock.patch.object(m, "no_live_workloads"), \\
+        with mock.patch.object(m, "no_live_workloads"), \
              mock.patch.object(m, "approve"):
             with self.assertRaises(m.RecoveryBlocked):
                 m.apply(self.receipt, "newhost", "repair")
