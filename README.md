@@ -1,5 +1,19 @@
 # CAPEv2 + INetSim Automation
 
+> **2026-10-13 Commands 1–2 source audit (development only):**
+> The exact-master Windows bundle and guarded N-clone stages exist.
+> New fail-closed admission verifies plaintext/standalone cloned Windows
+> source *before* identity journal mutation, and exact N stage receipts,
+> NAT reservations and Windows provisioning media are now cross-checked.
+> Offline CI is not physical host acceptance. Complete fresh-host CAPEv2/
+> INetSim installation, full one-prompt end-to-end guest provisioning,
+> safe swtpm recovery/revert and malware containment remain **unfinished**.
+> The NAT profile uses stable DHCP-reserved IPv4, not a Windows
+> DHCP-disabled static IP. [Read the reviewed release gates](
+> docs/COMMAND12_PRE_COMMAND3_ENGINEERING_AUDIT_20261013.md).
+> Command 3 can be developed next, but neither Command 1 nor Command 2 is
+> production-ready. Preserve protected SSL-55 and `main`.
+
 > **2026-10-12 development integration:** Windows startup now supports
 > approved first boot with ONE pre-attached isolated NIC after exact trusted
 > source-master bootstrap + independent host isolation receipt. The clone
