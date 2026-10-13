@@ -1,5 +1,50 @@
 # Command 2 — current handoff after first independent clone boot (2026-10-10)
 
+## 2026-10-13 — new all-N golden-NAT final SHUT OFF stage (development only)
+
+Source head before today's work: `afc55a0211d23509acb36416d15799b3302e4c96`.
+**NO SSL-55 commands, VM edits, snapshot revert, main-branch changes or Command 3 execution occurred.**
+Live GitHub source was reviewed; actual operator's `win11` disk/UEFI/swtpm golden
+master remains the **authoritative input** (never reconstruct their Windows
+applications, registry or software manually). The SSL-55 `win11_1` record has
+**three running internal snapshots** including `cape_one_nat_win11_1`;
+they are **not** demonstrated safe for swtpm2 full-state revert.
+
+Discovered a genuine missing end-stage: the existing guarded graceful shutdown
+helper accepted ONLY the old `cape-analysis-isolated` NIC. The newer
+permanent `default` NAT / `virbr0` master-equivalent clones could not use
+it for standard CAPE's required **VM SHUT OFF, snapshot captured RUNNING**
+handoff. Added fail-closed `portable-master-nat` shutdown scope requiring
+exact journal UUID/MAC, persistent DHCP reservation, correct single `e1000e`
+NIC and original master/trial stopped, existing named RUNNING libvirt memory
+snapshot **plus** independently matching Windows and OVMF QCOW2 image
+snapshot inventories. It does not change guest network or capture/revert
+snapshots. Enhanced synthetic guard tests, preserving older scope behavior.
+
+New `scripts/command2_portable_master_nat_final_shutdown.py` and offline
+test module provide all-N plan/approved guarded shutdown: BEFORE any guest
+state mutation verify N count-journal guests are presently RUNNING, their
+own independently accepted Windows hostname/NAT DHCP/DNS/real HTTPS/Agent,
+native stack and RAM+Windows disk+UEFI snapshot, strict master-shutoff;
+on operator-approved apply, recheck, gracefully shut off one VM at a time,
+verify actual SHUT OFF and unchanged snapshot inventory. On partial/unknown
+failure STOP with no forced power-off, auto retry, reboot, revert or snapshot
+deletion. New unified `command2_portable_workflow.py` phase
+`master-nat-final-shutdown` accepts plan/apply and the canonical journal
+and witness directory. See `docs/COMMAND12_EXACT_GOLDEN_MASTER_MODEL.md`.
+
+**Release HOLD:** This is development-stage orchestration, NOT a completed
+one-shot Command 2 and definitely not a validated safe swtpm rollback.
+A real disposable-VM whole-state (disk+OVMF+swtpm+RAM) revert and at least
+two benign reset cycles, second-host guest/containment validation and CAPE
+parallel analysis are STILL required. Permanent default NAT gives guest
+Internet and by itself is NOT malware containment. Command 1 complete
+fresh-host CAPE/INetSim install and actual imported golden-master boot/snapshot
+remain unfinished. Keep `main` and SSL-55 untouched. Do not run Command 3
+yet. Latest offline CI status must be read from GitHub Actions, never inferred
+from a local patch.
+
+
 ## 2026-10-12 ~21:50 UTC — integration recovery after ChatGPT input-stream errors: exact master/Command2 second-clone runtime barrier fixed
 
 User screenshots showed earlier ChatGPT `Error in input stream` while prior model worked on exact-golden-master Command1/Command2 and phases `master-nat-execute`, `master-nat-verify-windows`, `master-nat-running-snapshots`. Verified live GitHub `development` HEAD before this work `44b5d267f3adf8b62ef13bfa0c1ee2fbd09e89c1`; CI [38312277634](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38312277634) offline & PowerShell syntax both PASSED. Windows identity is still copied from byte-exact user-configured source image, not guessed app/reg edit list. `scripts/command1_export_existing_master.py`, `command1_import_existing_master.py`, and `command2_from_exact_master_bundle.py` already committed; do not accidentally reinvent Windows manually, and never upload actual Windows disk/TPM bundle to GitHub or chat. SSL55 remains untouched; original physical `win11_1` with three running internal RAM/OS/OVMF snapshots unchanged; no TPM-safe rollback proof.
