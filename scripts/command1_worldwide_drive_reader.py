@@ -87,6 +87,17 @@ def verify_inputs(args):
             "Expected Google Drive encrypted PARENT folder ID, not a URL")
     require(args.crypt_subfolder == "master-backups",
             "Only approved master-backups encrypted child folder allowed")
+    # INI values must not be able to inject a new line/remote or escape the
+    # protected root-only credential directory. Check BEFORE opening keys.
+    for value in (str(args.service_account_file), str(args.config)):
+        require(len(value) <= 256 and
+                re.fullmatch(r"[A-Za-z0-9_./-]+", value) is not None and
+                ".." not in Path(value).parts,
+                "Unsafe credential/config path for rclone INI")
+    key_parent = args.service_account_file.parent
+    require(key_parent.is_dir() and key_parent.stat().st_uid == 0 and
+            stat.S_IMODE(key_parent.stat().st_mode) == 0o700,
+            "Service-account JSON parent must be root-owned 0700")
     email = service_account_identity(args.service_account_file)
     config = args.config
     require(config.is_absolute() and not any(
