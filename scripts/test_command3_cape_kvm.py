@@ -159,6 +159,71 @@ class KvmMachineTests(unittest.TestCase):
             with self.subTest(ip=bad),self.assertRaises(m.KvmBlocked):
                 m.render(LIVE,bad,"Afterfull",[],"192.168.122.1")
 
+    def test_post_snapshot_discovery_uses_actual_dhcp_and_snapshot_gates(self):
+        # Regression: nat.build(...,True) is a PRE-snapshot NIC helper.
+        # It rejects clones after any snapshot, so Command3 MUST NOT
+        # reuse it to discover already checkpointed analysis guests.
+        from unittest.mock import Mock
+        import command2_portable_master_nat_attach as nat
+        import command2_portable_master_nat_running_snapshots as snapshots
+        saved = ET.fromstring(
+            '<network><name>default</name><forward mode="nat"/>'
+            '<bridge name="virbr0"/></network>')
+        guest = (
+            '<domain type="kvm"><name>win11_1</name>'
+            '<uuid>11111111-1111-4111-8111-111111111111</uuid>'
+            '<devices><interface type="network"><source network="default"/>'
+            '<mac address="02:aa:bb:cc:dd:ee"/><model type="e1000e"/>'
+            '</interface><tpm><backend type="emulator" version="2.0"/>'
+            '</tpm></devices></domain>')
+        row = {"libvirt_name":"win11_1",
+               "libvirt_uuid_candidate":"11111111-1111-4111-8111-111111111111",
+               "mac_candidate":"02:aa:bb:cc:dd:ee"}
+        report = {"nat_network":"default","bridge":"virbr0",
+                  "ipv4":{"subnet":"192.168.122.0/24",
+                          "gateway":"192.168.122.1"},
+                  "dynamic_dhcp_ranges":[]}
+        dns = {("02:aa:bb:cc:dd:ee","192.168.122.201","WIN11-1")}
+        def fake_virsh(*args):
+            values={
+                ("list","--name"):"",
+                ("list","--all","--name"):"win11\\nwin11_1\\n",
+                ("domuuid","win11_1"):row["libvirt_uuid_candidate"],
+                ("domstate","win11_1"):"shut off",
+                ("dumpxml","--inactive","win11_1"):guest}
+            if args not in values: raise AssertionError(args)
+            return values[args].replace("\\\\n","\\n")
+        with patch.object(nat.workflow,"canonical_host"), \
+             patch.object(m.os,"geteuid",return_value=0), \
+             patch.object(nat,"journal_rows",return_value=[row]), \
+             patch.object(nat,"virsh",side_effect=fake_virsh), \
+             patch.object(nat,"occupied_domain_macs",
+                          return_value={"02:aa:bb:cc:dd:ee"}), \
+             patch.object(nat,"check_network_references",
+                          return_value=(report,[saved,saved])), \
+             patch.object(nat.profile.ref,"nat_details",
+                          return_value={"ipv4":report["ipv4"],
+                                        "dynamic_dhcp_ranges":[]}), \
+             patch.object(nat,"reservations",return_value=list(dns)), \
+             patch.object(nat,"build",
+                          side_effect=AssertionError(
+                              "PRE-SNAPSHOT HELPER MUST NOT RUN")), \
+             patch.object(m,"find_master_snapshot",return_value=True), \
+             patch.object(snapshots,"libvirt_snapshot",
+                          return_value={"snapshot_already_exists":True}) as ram, \
+             patch.object(snapshots,"images",
+                          return_value={"Windows_OS":{},"QCOW2_UEFI":{}}) as disk:
+            found,gateway=m.discover(
+                "other-host",
+                Path("/root/approved/command2-identity-reservation.json"),
+                "Afterfull")
+            self.assertEqual(found,[{
+                "name":"win11_1","ip":"192.168.122.201",
+                "snapshot":"cape_one_nat_win11_1"}])
+            self.assertEqual(gateway,"192.168.122.1")
+            ram.assert_called_once_with("win11_1",True)
+            disk.assert_called_once_with(row,True)
+
     def test_read_only_plan_no_mutation_and_no_cape_claim(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)/"conf"
