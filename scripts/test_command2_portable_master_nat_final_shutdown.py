@@ -87,16 +87,16 @@ class ExactFinalNat(unittest.TestCase):
                 called.append(vm)
                 return {"result":"COMMAND2_GRACEFUL_SHUTDOWN_SHUT_OFF_CONFIRMED"}
             a,b,c=self.read_only_context(rows,accepted,states)
-            with a,b,c,patch.object(m.os,"geteuid",return_value=0),\\
-                 patch.object(m.sys.stdin,"isatty",return_value=True),\\
+            with a,b,c,patch.object(m.os,"geteuid",return_value=0),\
+                 patch.object(m.sys.stdin,"isatty",return_value=True),\
                  patch("builtins.input",return_value=
-                       "FINAL-SHUTDOWN-3-NAT-TPM-UNVERIFIED"),\\
-                 patch.object(m,"LOCK",Path(td)/"unique.lock"),\\
+                       "FINAL-SHUTDOWN-3-NAT-TPM-UNVERIFIED"),\
+                 patch.object(m,"LOCK",Path(td)/"unique.lock"),\
                  patch.object(m.os,"fstat",return_value=SimpleNamespace(
-                     st_uid=0,st_nlink=1,st_mode=stat.S_IFREG|0o600)),\\
+                     st_uid=0,st_nlink=1,st_mode=stat.S_IFREG|0o600)),\
                  patch.object(m.shutdown,"request_shutdown",
-                              side_effect=run_shutdown),\\
-                 patch.object(m.snapshots,"libvirt_snapshot") as metadata,\\
+                              side_effect=run_shutdown),\
+                 patch.object(m.snapshots,"libvirt_snapshot") as metadata,\
                  patch.object(m.snapshots,"images") as qcow:
                 out=m.execute(HOST,j,Path(td),420)
             self.assertEqual(called,["win11_1","win11_2","win11_3"])
@@ -123,17 +123,17 @@ class ExactFinalNat(unittest.TestCase):
                 states[vm]="shut off"
                 return {"result":"COMMAND2_GRACEFUL_SHUTDOWN_SHUT_OFF_CONFIRMED"}
             a,b,c=self.read_only_context(rows,accepted,states)
-            with a,b,c,patch.object(m.os,"geteuid",return_value=0),\\
-                 patch.object(m.sys.stdin,"isatty",return_value=True),\\
+            with a,b,c,patch.object(m.os,"geteuid",return_value=0),\
+                 patch.object(m.sys.stdin,"isatty",return_value=True),\
                  patch("builtins.input",return_value=
-                       "FINAL-SHUTDOWN-3-NAT-TPM-UNVERIFIED"),\\
-                 patch.object(m,"LOCK",Path(td)/"unique.lock"),\\
+                       "FINAL-SHUTDOWN-3-NAT-TPM-UNVERIFIED"),\
+                 patch.object(m,"LOCK",Path(td)/"unique.lock"),\
                  patch.object(m.os,"fstat",return_value=SimpleNamespace(
-                     st_uid=0,st_nlink=1,st_mode=stat.S_IFREG|0o600)),\\
+                     st_uid=0,st_nlink=1,st_mode=stat.S_IFREG|0o600)),\
                  patch.object(m.shutdown,"request_shutdown",
-                              side_effect=fail_second),\\
-                 patch.object(m.snapshots,"libvirt_snapshot"),\\
-                 patch.object(m.snapshots,"images"),\\
+                              side_effect=fail_second),\
+                 patch.object(m.snapshots,"libvirt_snapshot"),\
+                 patch.object(m.snapshots,"images"),\
                  self.assertRaisesRegex(m.FinalShutdownBlocked,
                                         "PARTIAL_OR_UNKNOWN"):
                 m.execute(HOST,j,Path(td))
