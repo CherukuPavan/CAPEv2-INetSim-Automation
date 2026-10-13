@@ -137,6 +137,34 @@ class FreshHostTmpfsTests(unittest.TestCase):
             self.assertFalse(result["cape_service_restarted"])
             self.assertFalse(result["reboot_persistence_verified"])
 
+    def test_existing_empty_mount_directory_does_not_break_approved_install(self):
+        with tempfile.TemporaryDirectory() as td:
+            unitdir = Path(td) / "units"
+            unitdir.mkdir()
+            mountdir = Path(td) / "mnt"
+            mountdir.mkdir()
+            mountpoint = mountdir / "tmpfs"
+            mountpoint.mkdir(mode=0o750)
+            report = {"approved_host": "newhost", "cape_uid": 1234,
+                      "cape_gid": 1234, "chosen_mount_size_mib": 6144}
+            with patch.object(m, "MOUNT_UNIT", unitdir / "mnt-tmpfs.mount"), \
+                 patch.object(m, "SERVICE_DROPIN",
+                              unitdir / "cape.service.d" / "require.conf"), \
+                 patch.object(m, "MOUNT_POINT", mountpoint), \
+                 patch.object(m.os, "geteuid", return_value=0), \
+                 patch.object(m.sys.stdin, "isatty", return_value=True), \
+                 patch.object(m, "plan", return_value=report), \
+                 patch("builtins.input", return_value=m.APPROVAL), \
+                 patch.object(m.subprocess, "run",
+                              return_value=SimpleNamespace(stdout="inactive")), \
+                 patch.object(m, "systemctl"), \
+                 patch.object(m.tmpfs, "assess", return_value={
+                     "cape_tmpfs_prerequisite_ready": True,
+                     "filesystem": "tmpfs", "free_mib": 6100}):
+                result = m.apply(Path("/fake/conf/cuckoo.conf"), "newhost")
+            self.assertTrue(result["mounted"])
+            self.assertTrue(mountpoint.is_dir())
+
     def test_failed_mount_leaves_explicit_partial_or_unknown_for_review(self):
         with tempfile.TemporaryDirectory() as td:
             units = Path(td) / "units"
