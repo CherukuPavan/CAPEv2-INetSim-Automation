@@ -83,7 +83,7 @@ def cape_revision():
             "source_uncommitted_tracked_changes":None}
     if not result["root_present"]:return result
     # Git rev-parse has no index refresh or working-tree file writes.
-    # Avoid git status: even a read-oriented status may refresh metadata.
+    # Avoid inspecting working-tree status: it can refresh Git metadata.
     standard=["git","--no-optional-locks",
               "-c","safe.directory=/opt/CAPEv2","-C",str(CAPE)]
     sha=safe_readonly(standard+["rev-parse","--verify","HEAD"])
