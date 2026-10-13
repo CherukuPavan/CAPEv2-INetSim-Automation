@@ -9,7 +9,8 @@
 > below have been applied to the original reference VMs.
 >
 > [Full integration regression](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38373563965):
-> **1,493 synthetic tests passed in each Python 3.10 and 3.12.**
+> **1,500 synthetic tests passed in each Python 3.10 and 3.12.**
+> [Latest full regression](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38374387418).
 > [Command3 service restart](scripts/command3_cape_restart_verified.py)
 > is now a guarded, operator-approved action reachable from the joined
 > [Command3 entrypoint](scripts/command3_from_operator_reference.py)
