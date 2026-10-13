@@ -181,8 +181,25 @@ def render(existing, master_ip, master_snapshot, guests, gateway, tag="win11"):
         old = sections["cuckoo1"]
         # Only remove the exact inactive legacy sample: the user explicitly
         # requested replacing [cuckoo1] with their actual [win11] master.
-        need(any("label = cuckoo1" in x for x in old["body"]),
-             "Unrecognized active cuckoo1 definition, manual review")
+        # Only a recognisable *template* may be replaced, never a
+        # possibly active or customized cuckoo1 stanza with credentials
+        # or unreviewed per-machine settings. Live libvirt discovery also
+        # rejects a real domain named cuckoo1.
+        allowed = {"label", "platform", "ip", "tags", "snapshot",
+                   "interface", "resultserver_ip", "arch", "reserved"}
+        seen = {}
+        for line in old["body"]:
+            if not line.strip() or line.lstrip().startswith(("#", ";")):
+                continue
+            match = OPTION.fullmatch(line)
+            need(match is not None and match.group(2).lower() in allowed,
+                 "Legacy cuckoo1 has custom/unsafe options; manual review")
+            key = match.group(2).lower()
+            need(key not in seen, "Duplicate legacy cuckoo1 option")
+            seen[key] = match.group(4).strip()
+        need(seen.get("label") == "cuckoo1" and
+             seen.get("platform") in ("windows", None),
+             "Legacy cuckoo1 does not match disposable example")
         pieces.remove(old)
         del sections["cuckoo1"]
     # Pre-existing matching named sections may contain custom attributes;
