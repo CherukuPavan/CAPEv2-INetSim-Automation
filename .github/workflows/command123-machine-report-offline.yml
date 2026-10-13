@@ -1,0 +1,41 @@
+name: Same-day CAPE source target preflight offline
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command123_readonly_machine_report.py"
+      - "scripts/test_command123_readonly_machine_report.py"
+      - ".github/workflows/command123-machine-report-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-target-report:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.10","3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile only
+        run: |
+          python -B - <<'PY'
+          import ast
+          from pathlib import Path
+          for filename in (
+              "command123_readonly_machine_report.py",
+              "test_command123_readonly_machine_report.py",
+          ):
+              target = Path("scripts") / filename
+              ast.parse(target.read_text(), filename=str(target))
+              print("SYNTAX_OK", target)
+          PY
+      - name: Synthetic source and target inventory tests
+        run: |
+          python -B -m unittest discover -s scripts -p 'test_command123_readonly_machine_report.py' -v
