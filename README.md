@@ -5,12 +5,19 @@
 > will not fetch the scripts. Authenticate and pin the exact `development`
 > SHA using the [private code and encrypted master deployment handoff](
 > docs/PRIVATE_DEPLOYMENT_SOURCE_AND_GDRIVE_HANDOFF.md).
+> [SSL55 report review](docs/SSL55_REFERENCE_EVIDENCE_20261013.md) documents
+> the now-confirmed 48.41 GiB free space, active CAPE services,
+> unknown custom QEMU/libvirt package provenance, no proven INetSim
+> service and unavailable CAPE Git SHA. The new guarded source
+> [reference evidence gate](scripts/command1_reference_report_gate.py)
+> and [read-only deep host fingerprint](scripts/command1_ssl55_deep_fingerprint.py)
+> are designed to resolve these before export or portable installation.
 > Your manually configured SSL-55 master is preserved. No code changes
 > below have been applied to the original reference VMs.
 >
 > [Full integration regression](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38373563965):
-> **1,500 synthetic tests passed in each Python 3.10 and 3.12.**
-> [Latest full regression](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38374387418).
+> **1,524 synthetic tests passed in each Python 3.10 and 3.12.**
+> [Latest full regression](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38385255330).
 > [Command3 service restart](scripts/command3_cape_restart_verified.py)
 > is now a guarded, operator-approved action reachable from the joined
 > [Command3 entrypoint](scripts/command3_from_operator_reference.py)
