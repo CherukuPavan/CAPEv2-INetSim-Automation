@@ -84,14 +84,15 @@ def path_and_mount(path,expected_source):
         row=mounts[0]
         need(type(row) is dict and row.get("target")==str(path) and
              row.get("source")==expected_source and
-             row.get("fstype") in ("fuse.sshfs","sshfs") and
-             "idmap=user" in (row.get("options") or "").split(","),
-             "Mounted FUSE peer/path/idmap differs from approved SSL46 share")
+             row.get("fstype") in ("fuse.sshfs","sshfs"),
+             "Mounted FUSE peer/path differs from approved SSL46 share")
     except (ValueError,TypeError,KeyError,IndexError) as exc:
         raise LanStageBlocked("Unrecognized mounted SSHFS identity") from exc
+    # sshfs userspace idmap=user is not always listed in kernel mount
+    # options. Enforce the EFFECTIVE local owner/permission outcome.
     st=path.stat()
     need(st.st_uid==0 and stat.S_IMODE(st.st_mode)==0o700,
-         "Mounted remote storage must appear root-owned mode 0700 locally")
+         "SSHFS must expose the private SSL46 directory as root 0700")
     available=os.statvfs(path)
     free=available.f_bavail*available.f_frsize
     need(free>0,"Cannot confirm remote free space")
