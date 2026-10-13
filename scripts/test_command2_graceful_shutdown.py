@@ -143,6 +143,7 @@ class Shutdown(unittest.TestCase):
     def test_master_nat_scope_requires_snapshot_identity_and_reserved_dhcp(self):
         # All local mocks: real host, Windows and libvirt remain untouched.
         import command2_portable_master_nat_attach as nat
+        import command2_portable_master_nat_running_snapshots as verified
         import command2_portable_workflow as workflow
         from xml.etree import ElementTree as ET
         row={"libvirt_name":VM,"libvirt_uuid_candidate":UUID,
@@ -164,6 +165,11 @@ class Shutdown(unittest.TestCase):
              patch.object(nat,"check_network_references",
                           return_value=(net,[view,view])),\
              patch.object(s,"state",return_value="shut off"),\
+             patch.object(nat,"virsh",return_value="win11\\nwin11_1"),\
+             patch.object(verified,"libvirt_snapshot",return_value={
+                 "captured_running_ram":True}) as complete_snapshot,\
+             patch.object(verified,"images",return_value={
+                 "Windows_OS":True,"QCOW2_UEFI":True}) as complete_images,\
              patch.object(s,"virsh",side_effect=lambda *a:
                  "cape_one_nat_win11_1" if a[0]=="snapshot-list"
                  else snapshot if a[0]=="snapshot-dumpxml"
@@ -171,6 +177,8 @@ class Shutdown(unittest.TestCase):
             got=s.guard("lab02","portable-master-nat",VM,
                         Path("/root/private/command2-identity-reservation.json"))
             self.assertEqual(got["network"],"default")
+            complete_snapshot.assert_called_once_with(VM,True)
+            complete_images.assert_called_once_with(row,True)
             self.assertEqual(got["reserved_nat_ipv4"],"192.168.122.201")
             self.assertEqual(got["nic_model"],"e1000e")
             self.assertEqual(nat.reservations(view),[reservation])
