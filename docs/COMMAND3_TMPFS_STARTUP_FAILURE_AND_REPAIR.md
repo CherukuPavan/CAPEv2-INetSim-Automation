@@ -11,7 +11,41 @@ repeatedly showed activating/auto-restart, exit status 1. Journal:
 The operator previously enabled CAPE [tmpfs] and configured
 freespace = 4096. A correct mounted tmpfs path must be writable/owned
 by the cape service account. No remote host operation was executed by
-the assistant, and the operator has not yet uploaded the repair report.
+the assistant, and the earlier repair report initially showed a missing directory.
+
+## Verified SUCCESS on SSL-55 (operator report, 2026-10-13 07:15 UTC)
+
+Two operator-uploaded reports are now available:
+
+- Initial CAPE_Tmpfs_Repair report reached
+  **BLOCKED: /mnt/tmpfs does not exist**, confirming the startup issue
+  was a MISSING filesystem/mount, not just incorrect mounted ownership.
+- CAPE_Tmpfs_Mount_20261013_071501.txt then confirmed:
+  - Actual CAPE identity: UID 995, GID 1009 (on **SSL-55 only**).
+  - Installed physical RAM 63981 MiB, available 53114 MiB at preflight.
+  - Fresh /mnt/tmpfs mounted as filesystem **tmpfs** with logical
+    capacity 15995 MiB, uid=995, gid=1009, mode=0750 and noexec,nodev,nosuid.
+  - Existing /etc/fstab was privately backed up before one persistent
+    mount entry was added; backup timestamp 20261013T071501Z.
+  - Three successive cape.service checks returned **active**.
+  - All FIVE systemd units showed **active**.
+  - cape.service: ActiveState=active, SubState=running,
+    ExecMainStatus=0, Result=success, NRestarts=0.
+  - New CAPE startup loaded one KVM machine and reached
+    **Waiting for analysis tasks**. MongoDB localhost connected.
+  - Log mentioned an OPTIONAL network processor dependency:
+    CAPESandbox/httpreplay. It did **not block this startup**;
+    no claim that optional traffic-replay functionality works.
+
+**CAPE service startup failure is RESOLVED on the current SSL-55 boot.**
+This is direct evidence from the operator's uploaded TXT report and not
+an assertion that all Command 1/2/3 integration or reboot testing passed.
+A persistent fstab entry was written, but CAPE service state
+**AFTER A REAL REBOOT** has NOT YET been tested.
+
+Do not rerun the initial mount command on SSL-55: it refuses already
+mounted filesystems, as intended. Do not re-run Command3 automatic
+configuration on reference SSL-55.
 
 ## Guarded immediate recovery (reference SSL-55, operator-only)
 
@@ -29,7 +63,7 @@ CAPE_Tmpfs_Repair_YYYYMMDD_HHMMSS.txt report to the user's home and:
 
 Never chown an unmounted /mnt/tmpfs directory to paper over an
 absent tmpfs: memory dumps may then land on the root filesystem.
-Do not claim repair successful until the report proves it.
+The later mount report DOES prove current-boot service success; see the Verified SUCCESS section above.
 
 CAPE upstream discusses the expected CAPE tmpfs mount and ownership:
 - https://github.com/kevoreilly/CAPEv2/issues/2077
@@ -51,10 +85,22 @@ scripts/command3_cape_tmpfs.py:
 - Repair refuses unmounted/missing tmpfs, insufficient free memory,
   disallowed mount mode, and protected reference SSL-55.
 
-scripts/command3_cape_services.py now includes the read-only
-tmpfs gate. Regardless of systemd statuses, mount/owner/capacity
-problems remain an explicit startup blocker. All untrusted analysis
-and network-containment release gates remain in place.
+scripts/command3_cape_services.py includes the read-only
+tmpfs gate. Regardless of systemd states, it reports mount/owner/capacity
+startup blockers separately.
+
+NEW: scripts/command1_cape_tmpfs_mount.py now provides a development
+fresh-host systemd mount provisioner. Read-only plan checks the actual
+host CAPE account, cuckoo.conf [tmpfs], existing mount/fstab/unit
+conflicts, physical RAM and free-space threshold; interactive APPLY
+is restricted to explicitly approved non-SSL-55 hosts with CAPE stopped.
+It creates an idempotence-protected mnt-tmpfs.mount unit with the
+actual per-host UID/GID and RAM-derived size, a cape.service mount
+dependency, runs systemd daemon-reload and enables/starts the mount.
+It does NOT restart cape.service. An interrupted installation reports
+PARTIAL_OR_UNKNOWN and refuses blind retry. Physical install/reboot
+acceptance and wiring into Command 1's eventual one-command entrypoint
+are still pending.
 
 ## REQUIRED persistent boot behavior (not yet implemented end-to-end)
 
