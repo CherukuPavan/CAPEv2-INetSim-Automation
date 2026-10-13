@@ -416,6 +416,71 @@ References:
   destination routing. Never relabel this `route=internet` reference
   as safe because the screenshot matches.
 
+## Step 7 — Restart five services after the reviewed configuration set
+
+**Operator instruction (2026-10-13):** After saving the CAPE configuration
+changes, the following five service units need to be restarted:
+
+1. \`cape.service\`
+2. \`cape-processor.service\`
+3. \`cape-rooter.service\`
+4. \`cape-web.service\`
+5. \`suricata.service\`
+
+The order above preserves the user's exact requested sequence. The official
+upstream CAPEv2 systemd README shows an initial startup sequence with the
+**rooter first**, then processor, CAPE core, and web. Suricata is a separate
+service and its installation/unit must be verified rather than presumed.
+Actual systemd \`After=/Requires=\` relationships should be inspected on
+the installed host before adopting a dependency-correct restart sequence.
+Sources:
+- <https://github.com/kevoreilly/CAPEv2/blob/master/systemd/README.md>
+- <https://github.com/kevoreilly/CAPEv2/blob/master/systemd/suricata.service>
+
+**STOP: NOT YET AUTHORIZED TO AUTOMATICALLY RESTART.** Earlier Step 6's
+\`route = internet\` combined with \`internet = virbr0\` is a mismatch
+between CAPE's external dirty-line routing and the internal libvirt default
+NAT. It may permit real-world egress and invalidate required INetSim/host
+containment. Step 3 also uses result-server \`0.0.0.0\`, requiring
+verified firewall binding/exposure restrictions. In addition, remaining
+unverified TPM-safe VM snapshot restore and full benign CAPE task cycling
+must not be conflated with service unit health.
+
+A successful \`systemctl\` unit state is **not** proof of successful CAPE
+analysis or network isolation. Never automatically start/restart CAPE
+rooter on a new host simply because config files changed.
+
+### Development-only implementation
+
+- \`scripts/command3_cape_services.py\` supports read-only \`--mode plan\`
+  and \`--mode verify\`. It reads the saved \`routing.conf\` and five exact
+  units using only \`systemctl show\`; returns service loaded/active states,
+  the operator's requested sequence, upstream rooter-first startup hint,
+  and blockers. It does **not** execute service actions, load firewall
+  rules, boot/revert VMs, or perform malware analysis.
+- Deliberately **NO --mode apply** at this stage; no unsafe auto-restart
+  even if the currently listed systemd units are \`active\`.
+- \`scripts/test_command3_cape_services.py\` exercises safe exact systemd
+  arguments, order, blocked Internet routing, absent/failed units, missing
+  settings, read-only behavior, no secrets and lack of an apply path.
+- User has **requested** restarts but has not yet supplied proof that all
+  five were executed successfully on SSL-55. No assistant-run host
+  operations, systemd restart or routing/firewall changes occurred.
+
+### Integration requirements before restart automation can be released
+
+1. All Command 3 configuration files saved and validated.
+2. Safe isolated/INetSim routing design with positive benign test and
+   negative host/Internet egress tests; evaluate actual
+   \`default\`/virbr0 NAT separately from CAPE's route field.
+3. Restrict CAPE web/API and wildcard resultserver exposure.
+4. Verify each systemd unit exists and the host's service dependency
+   order; restart one component at a time, inspect unit health and logs,
+   stop on failures with a durable redacted report.
+5. Snapshot-revert/TPM and benign multi-VM CAPE acceptance gates before
+   allowing untrusted analysis tasks.
+
+
 ## Pending operator steps
 
 Await the next supplied configuration-file edit. For each step, document
