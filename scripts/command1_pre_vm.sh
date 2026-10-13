@@ -30,6 +30,7 @@ Modes:
   source-export-capacity  Read-only actual master disk + TPM metadata, export disk-space check (requires root).
   source-deep-fingerprint One consolidated root-only SSL55 CAPE revision/QEMU/INetSim/master-space report.
   safe-space-audit        READ-ONLY filesystem and candidate cache sizes, NEVER delete Win11/TPM/CAPE assets.
+  ssl46-lan-stage         Plan/export/verify/upload exact cold master THROUGH approved SSHFS on SSL46.
   coverage                Show human-reviewed automation coverage/status documentation.
 
 Examples:
@@ -133,6 +134,9 @@ case "$MODE" in
     ;;
   safe-space-audit)
     exec python3 -B "$HERE/command1_ssl55_safe_space_audit.py" "$@"
+    ;;
+  ssl46-lan-stage)
+    exec python3 -B "$HERE/command1_ssl46_sshfs_master_stage.py" "$@"
     ;;
   master-export)
     exec python3 -B "$HERE/command1_export_existing_master.py" "$@"
