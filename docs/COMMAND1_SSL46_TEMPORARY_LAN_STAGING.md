@@ -1,7 +1,7 @@
 # SSL-55 → SSL46 → private encrypted Google Drive: exact golden-master storage
 
 **Operator change:** Do NOT clean or delete anything on SSL-55 or
-`/home/ssladmin`. Use existing **SSL46** host with reported **340 GiB
+`/home/ssladmin`. Use **CSE-SSL-46** at **10.23.105.46** with **347 GB
 available**, on the same trusted LAN, as TEMPORARY STAGING storage
 for original `win11`'s 64-GiB virtual / 3-layer backing-chain Windows
 disk plus domain XML, OVMF VARS and ORIGINAL MASTER swtpm private blobs.
@@ -19,8 +19,9 @@ required on SSL-55.
 
 The export needs **94 GiB free** on the **mount's backing storage**,
 not on SSL-55, since the current exporter requires virtual-size+30GiB.
-SSL46's claimed 340 GiB must be CONFIRMED from actual
-`df -h`/SSHFS `statvfs` on the final dedicated remote folder. Space
+SSL46's actual operator report identifies **347G available** on
+`/dev/nvme0n1p2` (ext4 `/`). Still verify remote `statvfs`
+after mounting the exact private staging folder. Space
 from a different partition is irrelevant. Future new-host import still
 needs disk+40GiB reserve independently.
 
@@ -40,14 +41,19 @@ that remote private path using a root-owned OpenSSH identity file and
 a manually checked, PINNED server host key. Password authentication
 or root SSH login is not necessary after authorized key setup.
 
-## One-time operator setup (templates; NEED actual SSL46 address/username)
+## One-time operator setup (actual SSL46 address and username now known)
 
-On SSL46, establish the real account and source capacity with
-`hostname -s; id -un; df -hT ~`. Create a NEW dedicated empty directory
-under that account (not in any other user's folder):
-`mkdir -m 700 -p "$HOME/cape-ssl46-private"`, only AFTER confirming
-`$HOME` is on the filesystem reporting ≥94GiB available. No VM,
-network or CAPE source files are changed by mkdir.
+The operator has verified **hostname CSE-SSL-46**, SSH user **charan**,
+Ethernet IP **10.23.105.46/22**, SSH service **active**, and created the
+NEW dedicated empty private folder
+`/home/charan/cape-ssl46-private` with owner UID 1005, mode 0700.
+No more staging folder creation is required; do NOT overwrite it.
+As a first connection safety step, on SSL46 record its SSH server's
+ED25519 host-key fingerprint via
+`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256`.
+Compare this out-of-band fingerprint to the **SSL55** observed SSH key
+before permitting root-owned SSHFS connection. The IP, username and
+private path are verified in the operator's 2026-10-13 report.
 
 On SSL-55, install `sshfs` if missing, after package manager review:
 `sudo apt-get install sshfs` (can require an operator approval).
@@ -124,8 +130,10 @@ returned an HTTP 200.
 
 ## What is NOT established yet
 
-The actual SSL46 IP/account, SSH host fingerprint, permissions and
-mounted free space are not yet observed; no new remote mount,
+The SSL46 IP/account/folder permissions and destination disk capacity
+have been reported, but its SSH host-key fingerprint, the actual
+FUSE mount identity and mounted free-space view are not yet observed.
+No new remote mount,
 cold export, cloud upload or cleanup has been performed by ChatGPT.
 SSHFS write/fsync/qemu-img compatibility must be verified with
 a **small disposable test file** before the 64-GiB export.
