@@ -50,7 +50,8 @@ jobs:
           python -B - <<'PY'
           from pathlib import Path
           reviewed = sorted(Path("scripts").glob("command3_cape_*.py"))
-          assert reviewed, "Missing reviewed Command3 configuration scripts"
+          reviewed.append(Path("scripts/command3_from_operator_reference.py"))
+          assert all(p.is_file() for p in reviewed), "Missing reviewed Command3 scripts"
           for file in reviewed:
               script = file.read_text(encoding="utf-8")
               for dangerous in ("shell=True", "systemctl restart",
