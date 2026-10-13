@@ -13,11 +13,17 @@ personal Google Drive. INetSim is expressly **deferred** for this test.
 
 ## Before FIRST deployment attempt
 
-1. On the new machine, record an **offline bootable whole-system image**
-   of the operating system drive if *true original-system restoration* is
-   required. That is the dependable universal rollback; CAPE installers
-   can change packages, users, services, firmware, networking and files.
-   Capturing six configuration files alone does **not** undo these effects.
+**Operator's rollback requirement is deployment-scoped**, NOT a complete
+Ubuntu reset: undo ONLY changes caused by the three deployment commands and
+preserve the initial packages, files, VMs, network and services. The
+[deployment-only rollback contract](DEPLOYMENT_SCOPED_REPAIR_ROLLBACK_CONTRACT.md)
+documents required per-resource receipts and reverse-order undo. This is
+NOT completely implemented: the current command only restores the six CAPE
+config files. An optional offline full-host image is a secondary safety
+precaution for a disposable test machine, not the intended rollback mechanism.
+
+1. Capture a *before* read-only inventory and baseline on the NEW host before
+   any mutable deployment command. Keep this private for troubleshooting.
 2. Use a private, authenticated, **pinned `development` checkout** of
    `CherukuPavan/CAPEv2-INetSim-Automation`; don't download moving
    scripts with uncredentialed curl or sign into a personal Google account.
@@ -111,12 +117,16 @@ recovery folder, never unlinked. Unknown changes force a STOP. A partial
 step failure leaves a durable `partial` receipt and blocks blind
 automatic re-execution. The operator must inspect private state.
 
-**Full machine rollback is NOT provided by this subcommand.**
-For exact restoration of all system packages, users, network, services,
-VM definitions/disks, OVMF, swtpm, LVM/filesystem configuration and
-firmware, restore the verified **offline full-system image** created
-before deployment, or rebuild/reimage the dedicated fresh target.
-Running-snapshot restore alone cannot roll back separately stored TPM.
+**Deployment-wide rollback is NOT YET provided by this subcommand.**
+The intended feature is to undo just this deployment's changes across
+packages, CAPE files/services, new VM disks/UEFI/TPM, and dedicated network
+resources, restoring the affected *pre-deployment* values while preserving
+all unrelated original state. That functionality requires an exact
+transaction journal that all three deployment commands must populate.
+Until it is implemented and tested, do not remove VMs, packages or network
+objects from before/after inventory differences alone. A full-system image
+is optional insurance for tomorrow's controlled test, not the rollback goal.
+See [contract](DEPLOYMENT_SCOPED_REPAIR_ROLLBACK_CONTRACT.md).
 
 ## One consolidated non-mutating post-test report
 
@@ -145,10 +155,11 @@ crypt passwords, rooter/firewall or Windows state.
 * If an existing Windows VM or TPM state differs from expectation, stop.
   The recovery tool does not change VM state and does not invent evidence
   that a running RAM snapshot safely restores swtpm persistent state.
-* If rollback is required for packages, services, network or VMs, use
-  the recorded whole-machine restore point or explicit, item-by-item
-  reviewed uninstall. NEVER issue `apt autoremove`, `virsh undefine`,
-  disk removal or TPM resets as a guessed universal cleanup procedure.
+* Until the deployment-specific resource-ownership journal and
+  guarded undo are implemented, STOP at an explicit review for packages,
+  services, network and VM removal. Do not guess ownership from names.
+  An optional existing test-host image can be used for emergency recovery,
+  but no universal wipe or OS reinstall is the user's desired rollback.
 
 ## Validation evidence
 
