@@ -94,12 +94,47 @@ def five_plans(args):
          "Unexpected CAPE configuration stage order")
     return paths, results
 
+def target_tmpfs_ready():
+    """Pre-admit the ON-state tmpfs required by Step3, even if now OFF.
+
+    Reading cuckoo.conf [tmpfs] when currently OFF would incorrectly
+    skip mount checks. The proposed Step3 target explicitly turns it ON.
+    This must be checked before any combined config changes.
+    """
+    mount = tmpfs.EXPECTED
+    need(not mount.is_symlink() and
+         not any(p.is_symlink() for p in mount.parents),
+         "Target CAPE tmpfs path contains a symlink")
+    need(tmpfs.mount_fstype(mount) == "tmpfs",
+         "Step3 would enable tmpfs, but /mnt/tmpfs is not actually mounted")
+    st = os.stat(mount, follow_symlinks=False)
+    uid, gid = tmpfs.cape_ids()
+    need(stat.S_ISDIR(st.st_mode) and st.st_uid == uid and st.st_gid == gid
+         and stat.S_IMODE(st.st_mode) & 0o300 == 0o300,
+         "Step3 requires cape-owned writable/traversable tmpfs mount root")
+    vfs = os.statvfs(mount)
+    free = (vfs.f_bavail * vfs.f_frsize) // (1024 * 1024)
+    limit = int(cuckoo.TARGET["tmpfs"]["freespace"])
+    need(free >= limit,
+         "Step3 requires enough available tmpfs free MiB before file edits")
+    return {"status":"TARGET_ON_MOUNT_READY", "mounted_tmpfs":True,
+            "cape_ownership":True, "owner_writable":True,
+            "free_mib":free,"required_free_mib":limit,
+            "host_modified":False}
+
+
 def review(args, verify=False):
     paths, stages = five_plans(args)
     # Retain the complete user-provided routing target as a traceable
     # PLAN-only report. It is not an authorization to create network egress.
     routing = route.plan(paths["routing"])
     mount = tmpfs.assess(paths["cuckoo"])
+    try:
+        target_mount = target_tmpfs_ready()
+    except (Command3PipelineBlocked, OSError, tmpfs.TmpfsBlocked) as exc:
+        target_mount = {
+            "status":"TARGET_ON_MOUNT_NOT_READY",
+            "error_type":type(exc).__name__, "host_modified":False}
     service = (services.report(paths["routing"], "verify", paths["cuckoo"])
                if verify else None)
     return {
@@ -115,6 +150,7 @@ def review(args, verify=False):
              data.get("source_sha256") != data.get("target_sha256"))],
         "routing_review": routing,
         "tmpfs_preflight": mount,
+        "target_enabled_tmpfs_preflight": target_mount,
         "service_readiness": service,
         "configuration_only_apply_supported": True,
         "routing_auto_apply_supported": False,
@@ -180,6 +216,10 @@ def configure(args):
     approved_host(args.approved_host)
     paths, staged = five_plans(args)
     initial = [(name, dict(plan)) for name, plan in staged]
+    # Crucial ordering: Step3 sets [tmpfs] enabled=on. Even if its prior
+    # value is OFF, the target mount MUST exist and meet access/capacity
+    # requirements before writing any configuration file.
+    initial_mount = target_tmpfs_ready()
     # Confirm that we never silently add a routing apply: this script calls
     # only five reviewed config helpers. It can leave routing unchanged.
     other = route.plan(paths["routing"])
@@ -207,8 +247,9 @@ def configure(args):
     # Existing independently revalidated plan APIs detect journal/snapshot,
     # guest identity, IP and secret drift before any mutation.
     paths_again, staged_again = five_plans(args)
-    need(paths_again == paths and staged_again == initial,
-         "CAPE plans/VM snapshot identities changed before batch approval")
+    need(paths_again == paths and staged_again == initial and
+         target_tmpfs_ready() == initial_mount,
+         "CAPE plans, VM identities or tmpfs changed before batch approval")
     directory = private_witness_dir(args.witness_dir)
     target = directory / ("command3-config." + uuid.uuid4().hex + ".json")
     witness = {
