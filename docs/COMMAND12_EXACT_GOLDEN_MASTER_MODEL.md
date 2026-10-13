@@ -66,6 +66,41 @@ The new-host flow requires TWO physically distinct kinds of input:
   is genuinely proven; libvirt internal checkpoints do not imply
   atomic TPM state rollback.
 
+### 2026-10-13: guarded FINAL SHUT OFF handoff for N permanent-NAT clones
+
+Development-only on the **approved OTHER host**, never SSL-55:
+
+```bash
+# Requires previously captured and independently checked N running
+# RAM/Windows QCOW2/QCOW2-UEFI checkpoints; PLAN is read-only.
+sudo python3 scripts/command2_portable_workflow.py \\
+  --phase master-nat-final-shutdown --mode plan \\
+  --approved-host "$(hostname -s | tr '[:upper:]' '[:lower:]')" \\
+  --journal /root/approved-private/command2-identity-reservation.json \\
+  --witness-dir /root/approved-private/windows-witness
+
+# ONLY after reviewing the exact plan and separate-host evidence, change
+# --mode plan to --mode apply, with direct per-VM operator approval.
+```
+
+This wraps `command2_portable_master_nat_final_shutdown.py`.
+The plan requires every cloned guest (1–16) to be RUNNING, with
+the exact host-journal UUID/MAC/DHCP reservation, positive NAT Agent and
+Windows acceptance evidence, and existing named *running* QCOW2 OS +
+UEFI + RAM internal snapshots; it reads only. The apply mode rechecks
+all N, then uses the guarded `portable-master-nat` graceful Windows
+shutdown path, confirming SHUT OFF per VM and preserving every saved
+snapshot. It stops after any uncertain/failed shutdown, never destroys,
+reverts, starts or auto-retries. It is **not safe to rerun automatically
+after a partial batch**. The final state expected by standard CAPE is
+SHUT OFF, with a checkpoint originally captured RUNNING.
+
+**Important limits:** this adds the missing NAT/SHUT OFF sequencing but
+does NOT restore, synchronize or test swtpm persistent/volatile TPM state.
+These checkpoints remain **CAPE_UNVERIFIED** until separate disposable-host
+full restore/revert tests, malware egress containment, CAPE configuration,
+and concurrent benign analyses pass. All current tests are synthetic.
+
 ### Blocking work BEFORE full Commands 1 & 2 can be certified
 
 - Command1 safe noninteractive install of **complete** Ubuntu host
