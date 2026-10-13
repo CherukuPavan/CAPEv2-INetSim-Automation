@@ -27,8 +27,27 @@ CONF=("api.conf","auxiliary.conf","cuckoo.conf","kvm.conf",
       "mitmdump.conf","routing.conf")
 
 def query(*args):
-    if not args or args[0] not in (
-         "dpkg-query","systemctl","git","findmnt","qemu-img"):
+    # Whitelist FULL read-only argument patterns, not just program names.
+    # Otherwise a caller could accidentally execute systemctl restart,
+    # git checkout or a mutable mount operation under this blueprint.
+    approved = (
+        len(args) == 4 and args[:3] ==
+            ("dpkg-query","-W","-f=$"+"{Status}|$"+"{Version}")
+            and args[3] in PACKAGES,
+        len(args) == 5 and args[:3] ==
+            ("systemctl","show","--no-pager") and
+            args[3] == "--property=LoadState,ActiveState,UnitFileState"
+            and args[4] in SERVICES,
+        len(args) == 5 and args[:3] ==
+            ("git","-C",str(CAPE)) and
+            args[3:] == ("rev-parse","--verify","HEAD"),
+        len(args) == 6 and args[:3] ==
+            ("git","-C",str(CAPE)) and
+            args[3:] == ("status","--porcelain","--untracked-files=no"),
+        args == ("findmnt","--mountpoint","/mnt/tmpfs","-n","-o",
+                 "FSTYPE"),
+    )
+    if not any(approved):
         return None
     try:
         p=subprocess.run(args,capture_output=True,text=True,check=False,
