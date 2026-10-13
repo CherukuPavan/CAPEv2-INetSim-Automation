@@ -165,7 +165,9 @@ class KvmMachineTests(unittest.TestCase):
             root.mkdir()
             src=root/"kvm.conf"
             src.write_bytes(LIVE)
-            with patch.object(m, "discover",return_value=(
+            import command2_portable_master_nat_attach as nat
+            with patch.object(nat.workflow, "canonical_host"), \
+                 patch.object(m, "discover",return_value=(
                         guests(2),"192.168.122.1")), \
                  patch.object(m, "safe_conf",wraps=m.safe_conf), \
                  patch.object(m, "ipaddr",wraps=m.ipaddr), \
