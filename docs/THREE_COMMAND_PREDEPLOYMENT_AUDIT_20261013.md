@@ -1,5 +1,21 @@
 # Three-command integration audit — October 13, 2026 (development)
 
+## 2026-10-13 SSL55 reference JSON received
+
+The operator uploaded a redacted package/service reference report and
+our audit is committed as
+[`docs/SSL55_REFERENCE_EVIDENCE_20261013.md`](SSL55_REFERENCE_EVIDENCE_20261013.md).
+It proves Ubuntu 24.04.3 LTS, CAPE/processor/rooter/web/Suricata
+loaded+active, MongoDB active under `mongodb.service`, PostgreSQL
+active, a mounted `/mnt/tmpfs`, master `win11` shut off with a named
+`Afterfull` snapshot, and `rclone` installed. It does NOT attest
+INetSim installation, working QEMU/libvirt via selected dpkg package
+names, actual CAPE checkout SHA or Windows virtual image size.
+VM/home storage free: 48.41 GiB on the reported host; conservative
+golden source export needs Windows virtual disk size PLUS 30 GiB.
+A root-only READ-ONLY deep host fingerprint is implemented to
+resolve these unanswered requirements without touching SSL-55.
+
 **Reference host:** CSE-SSL-55; Windows golden master `win11` remains
 protected. The operator's manually completed CAPE configuration and
 five-service startup proof are the canonical source. No host commands,
