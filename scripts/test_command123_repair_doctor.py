@@ -49,11 +49,11 @@ class DoctorTests(TestCase):
     def test_incomplete_host_is_not_claimed_ready(self, _):
         with mock.patch.object(m, "os_status",
                                return_value={"ID": "ubuntu",
-                                             "VERSION_ID": "24.04"}), \\
-             mock.patch.object(m, "package_status", return_value={}), \\
-             mock.patch.object(m, "service_status", return_value={}), \\
+                                             "VERSION_ID": "24.04"}), \
+             mock.patch.object(m, "package_status", return_value={}), \
+             mock.patch.object(m, "service_status", return_value={}), \
              mock.patch.object(m, "vm_status",
-                               return_value={"all_expected_vms_present": False}), \\
+                               return_value={"all_expected_vms_present": False}), \
              mock.patch.object(m, "read_command", return_value=None):
             report = m.inventory("village-host", 1, Path("/not-present"))
         self.assertFalse(report["release_cleared_for_live_malware"])
