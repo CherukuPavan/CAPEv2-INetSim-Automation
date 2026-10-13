@@ -1,5 +1,31 @@
 # CAPEv2 + INetSim Automation
 
+> **2026-10-13 VERIFIED GOLDEN BACKUP / WORLDWIDE DEPLOYMENT UPDATE**
+> The operator physically exported the original customized SSL55 cold
+> Windows master to private SSL46 SSHFS storage and then completed encrypted
+> private Google Drive upload. `CAPE_GoogleDriveUpload_20261013_124755.txt`
+> ended **exit 0**, result
+> `SSL46_STAGED_MASTER_PRIVATE_DRIVE_VERIFIED`, with
+> `remote_bytes_compared=true`, `local_bundle_hash_unchanged=true`,
+> source Windows/snapshots untouched and **no SSL46 deletion**. This supersedes
+> older below-the-fold statements that the export/upload had not occurred.
+> The operator requires **worldwide, different-LAN deployment** without a
+> personal Google login on target. The new
+> [root-private service-account Drive reader](scripts/command1_worldwide_drive_reader.py)
+> and [deployment runbook](docs/COMMAND1_WORLDWIDE_PRIVATE_DRIVE_READER.md)
+> support separately authorized **Viewer** access to only an encrypted
+> Drive parent, plus identical crypt password/salt. Never make the Drive
+> folder public or commit service-account keys/OAuth/crypt credentials.
+> The new reader's actual other-host download is not yet tested.
+> **INetSim is expressly deferred by the operator** (not implemented or
+> implied functional). Fresh-host CAPE installation, personalized master
+> Windows boot/running checkpoint, all-N clone firstboot, swtpm-coherent
+> snapshot restoration, safe routing and three-command physical acceptance
+> remain RELEASE BLOCKERS. Do not run malware on default NAT or claim all
+> three commands completed merely because cold backup upload succeeded.
+> Do not modify source SSL55 Windows, source snapshots or GitHub `main`.
+
+
 > **2026-10-13 current development status — READ BEFORE NEW-HOST TEST**
 > This repository is **PRIVATE**; unauthenticated raw GitHub `curl`
 > will not fetch the scripts. Authenticate and pin the exact `development`
