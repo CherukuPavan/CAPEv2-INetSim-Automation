@@ -1,7 +1,8 @@
 # Command 3 — Joined, exact-operator workflow handoff (development)
 
-**Status:** Config-only joined automation coded and offline-tested, not a full
-release. **Master/reference:** SSL-55 operator manually completed all seven
+**Status:** Joined five-config editor PLUS separately approved five-service
+restart mode coded and offline-tested, not a full release.
+**Master/reference:** SSL-55 operator manually completed all seven
 configuration/restart steps. On 2026-10-13 the user supplied actual runtime
 proof that `cape.service` and the other four services were **active** after
 mounting `/mnt/tmpfs` as a cape-owned 15,995 MiB tmpfs. No assistant-side
@@ -43,6 +44,20 @@ write a private per-batch witness; sequentially call the original helpers
 with EACH helper's own approval, protected original backup, SHA recheck,
 atomic edit and readback. On failure, persist a PARTIAL_OR_UNKNOWN witness
 and STOP, with no automatic retry or destructive rollback.
+
+`--mode restart` uses the SAME joined Command3 entrypoint, but only
+AFTER all five configuration files exactly match the planned targets
+and the target `/mnt/tmpfs` passes admission. It additionally checks the
+existing `routing.conf` against the operator's six settings (the tool
+DOES NOT automatically write that disputed route). With root, a direct
+terminal and separately typed consent, it invokes only the approved
+`cape.service`, `cape-processor.service`, `cape-rooter.service`,
+`cape-web.service`, `suricata.service` in the supplied operator order.
+Each completed stage is persisted in a root-private progress witness;
+a failure or unexpected state halts without automatic retry. Verification
+requires all five loaded units active in consecutive status samples.
+This proves service status only, NOT guest boot, actual snapshot restore
+or any malware-analysis acceptance.
 
 `--mode verify` re-runs read-only checks, including systemd unit health,
 and reports outstanding independent acceptance blockers. It does not
@@ -95,9 +110,14 @@ After every plan/gate passes and approved changes are required, change
 Then run the same command using `--mode verify` to read service states.
 
 **Command 3 is NOT yet a fully unattended one-command installation:**
+The plan, configure, restart and verify *modes* are separate invocations
+of the same entrypoint with bounded per-stage approvals.
 - `routing.conf` in the operator's guide set `route = internet` and
   `internet = virbr0`; this is still review-only, NOT applied by batch.
-- The five-service restart stage is read-only verification, not apply.
+- The approved five-service restart stage now has a guarded
+  `--mode restart` executor; it will not run until routing.conf has
+  been separately and explicitly set to a reviewed target profile.
+  It does not declare samples/VM snapshots ready.
 - A full fresh-host CAPE installation, complete unattended firstboot of
   N clone guests, TPM-consistent running-snapshot restoration and
   target-host integration checks remain separate blockers.
