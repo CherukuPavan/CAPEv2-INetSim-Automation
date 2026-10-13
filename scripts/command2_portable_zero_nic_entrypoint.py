@@ -231,6 +231,21 @@ def execute(*, count,approved_host,disk_dir,nvram_dir,template,
         count=count,approved_host=approved_host,disk_dir=disk_dir,
         nvram_dir=nvram_dir,template=template,effective_subnet=effective_subnet,
         resources=resources,candidates=candidates)
+    # CRITICAL: all expensive/source-dependent read-only checks MUST pass
+    # before writing the exclusive identity journal. Previously a BitLocker-
+    # encrypted or invalid master export was discovered only inside the
+    # stager AFTER the reservation was permanently written, leaving an
+    # unusable half-started command even though no VM had been created.
+    # This checks true QCOW2 format/virtual size/backing, full SHA256,
+    # cloned Windows GPT plaintext signature, independent NVRAM, source
+    # VM shutdown/identity, each target definition and destination modes.
+    master_uuid,master_nvram=source_profile()
+    master_xml=stager.virsh("dumpxml","--inactive","win11")
+    stager.validate_inputs(
+        candidates["candidates"],master_uuid,Path(template),
+        master_nvram,master_xml,template_sha256,audit_source=True)
+    # Revalidate all candidate names/path collisions before first mutation.
+    stager.assert_no_collision(candidates["candidates"])
     folder=staging_dir(folder)
     recorded=reserve.reserve(candidates,folder,expected_host=approved_host)
     require(recorded["guest_count"]==count and not recorded["guest_vm_created"],
@@ -248,7 +263,6 @@ def execute(*, count,approved_host,disk_dir,nvram_dir,template,
         configs.append({"name":row["libvirt_name"],
                         "configuration_sha256":checksum,
                         "configuration_created_but_not_delivered":True})
-    master_uuid,master_nvram=source_profile()
     stage_report=stager.execute(
         mode="stage",approved_host=approved_host,journal_dir=folder,
         template=Path(template),template_sha256=template_sha256,
