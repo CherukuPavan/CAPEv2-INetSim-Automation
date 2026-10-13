@@ -83,6 +83,40 @@ class Workflow(unittest.TestCase):
             self.assertEqual(argv[argv.index("--journal")+1],str(j))
             self.assertFalse(result["master_vm_mutations_authorized"])
 
+    def test_master_nat_final_shutdown_routes_exact_batch_and_never_autoreverts(self):
+        argv=["script.py","--phase","master-nat-final-shutdown",
+              "--mode","plan","--approved-host",HOST,
+              "--journal","/root/guarded/command2-identity-reservation.json",
+              "--witness-dir","/root/guarded/accepted-windows",
+              "--shutdown-timeout","420"]
+        captured=[]
+        def sub(args,check=False):
+            captured.append(args)
+            return type("Process",(),{"returncode":0})()
+        with patch.object(w.sys,"argv",argv),\
+             patch.object(w,"canonical_host",return_value=HOST),\
+             patch.object(w.os,"geteuid",return_value=0),\
+             patch.object(w,"absolute",return_value=None),\
+             patch.object(w.subprocess,"run",side_effect=sub):
+            self.assertEqual(w.main(),0)
+        self.assertEqual(len(captured),1)
+        self.assertIn("command2_portable_master_nat_final_shutdown.py",
+                      captured[0][2])
+        self.assertEqual(captured[0][captured[0].index("--mode")+1],"plan")
+        self.assertEqual(captured[0][captured[0].index("--timeout-seconds")+1],
+                         "420")
+        self.assertNotIn("snapshot-revert",str(captured[0]))
+        captured.clear()
+        with patch.object(w.sys,"argv",argv[:]),\
+             patch.object(w,"canonical_host",return_value=HOST),\
+             patch.object(w.os,"geteuid",return_value=0),\
+             patch.object(w,"absolute",return_value=None),\
+             patch.object(w.subprocess,"run",side_effect=sub),\
+             patch.object(w.sys.stdin,"isatty",return_value=False):
+            argv[argv.index("plan")]="apply"
+            self.assertEqual(w.main(),2)
+        self.assertEqual(captured,[])
+
     def test_graceful_shutdown_routes_exact_journal_vm_and_timeout(self):
         with TemporaryDirectory() as td:
             journal,rows=self.makefixture(td)
