@@ -231,7 +231,7 @@ def find_master_snapshot(master_snapshot):
          xml.findtext("name") == master_snapshot and
          xml.findtext("state") == "running" and
          xml.find("memory") is not None and
-         xml.find("memory").get("snapshot") not in ("no", "none"),
+         xml.find("memory").get("snapshot") in ("internal", "external"),
          "Requested golden-master snapshot is not a recorded RUNNING RAM snapshot")
     return True
 
@@ -263,7 +263,9 @@ def discover(host, journal, master_snapshot):
         clients.append({"name": vm, "ip": item["ip"],
                         "snapshot": "cape_one_nat_" + vm})
     gateway = nat.profile.check_active_nat()["ipv4"]["gateway"]
-    need(gateway == report["network"] or isinstance(gateway, str),
+    need(report["network"] == "default" and report["bridge"] == "virbr0",
+         "CAPE guest NICs must use the verified default / virbr0 NAT")
+    need(isinstance(gateway, str) and bool(gateway),
          "Unable to identify verified libvirt NAT gateway")
     return clients, gateway
 
