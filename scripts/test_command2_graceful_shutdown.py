@@ -157,13 +157,13 @@ class Shutdown(unittest.TestCase):
         snapshot=("<domainsnapshot><name>cape_one_nat_win11_1</name>"
                   "<state>running</state><memory snapshot='internal'/>"
                   "</domainsnapshot>")
-        with patch.object(s.os,"geteuid",return_value=0),\\
-             patch.object(s.socket,"gethostname",return_value="lab02"),\\
-             patch.object(workflow,"canonical_host",return_value="lab02"),\\
-             patch.object(nat,"journal_rows",return_value=[row]),\\
+        with patch.object(s.os,"geteuid",return_value=0),\
+             patch.object(s.socket,"gethostname",return_value="lab02"),\
+             patch.object(workflow,"canonical_host",return_value="lab02"),\
+             patch.object(nat,"journal_rows",return_value=[row]),\
              patch.object(nat,"check_network_references",
-                          return_value=(net,[view,view])),\\
-             patch.object(s,"state",return_value="shut off"),\\
+                          return_value=(net,[view,view])),\
+             patch.object(s,"state",return_value="shut off"),\
              patch.object(s,"virsh",side_effect=lambda *a:
                  "cape_one_nat_win11_1" if a[0]=="snapshot-list"
                  else snapshot if a[0]=="snapshot-dumpxml"
