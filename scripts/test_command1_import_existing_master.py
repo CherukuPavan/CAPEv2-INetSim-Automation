@@ -92,7 +92,17 @@ class Import(unittest.TestCase):
                     return m.prepare_xml(bundle,disk,vars)[0]
                 raise AssertionError(args)
             uid=pwd.getpwuid(os.getuid()).pw_name
-            with patch.object(m,"TPM_ROOT",tpmroot),\
+            # Production import creates a root-private transient libvirt
+            # XML folder under /run. Redirect ONLY the synthetic test's
+            # temp directory to its private CI fixture; do not relax
+            # the production root-only /run behavior.
+            original_tempdir=tempfile.TemporaryDirectory
+            def local_tempdir(*args,**kwargs):
+                kwargs["dir"]=str(root)
+                return original_tempdir(*args,**kwargs)
+            with patch.object(m.tempfile,"TemporaryDirectory",
+                              side_effect=local_tempdir),\
+                 patch.object(m,"TPM_ROOT",tpmroot),\
                  patch.object(m,"LOCK",root/"lock"),\
                  patch.object(m.os,"geteuid",return_value=0),\
                  patch.object(m.socket,"gethostname",return_value="lab02"),\
