@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -121,6 +122,10 @@ def read_crypt_settings(config_file, remote):
          "Crypt must wrap a personal Google Drive remote (not team drive)")
     # This is a structural check, not a claim about Drive folder ACLs.
     return {
+        # Bind operator approval to the exact OAuth+crypt config bytes
+        # WITHOUT disclosing the token or obscured crypt passphrase.
+        "rclone_config_sha256": hashlib.sha256(
+            data.encode("utf-8")).hexdigest(),
         "crypt_remote": remote,
         "underlying_provider": "personal_google_drive",
         "crypt_content_and_names_enabled": True,
