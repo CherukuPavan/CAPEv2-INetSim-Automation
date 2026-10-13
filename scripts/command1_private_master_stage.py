@@ -142,8 +142,9 @@ def stage(args):
             args.approved_host,args.bundle_dir,args.crypt_remote,
             args.bundle_id,args.rclone_config)
         need(copied.get("result")==
-             "COMMAND1_PRIVATE_MASTER_DOWNLOADED_SHA256_VERIFIED",
-             "Exact master Drive download not byte verified")
+             "COMMAND1_PRIVATE_MASTER_DOWNLOADED_SHA256_VERIFIED" and
+             copied.get("all_member_files_sha256_verified") is True,
+             "Exact master Drive download is not fully SHA256 verified")
         journal["completed"].append(
             {"step":"private_google_drive_download",
              "manifest_sha256":copied["bundle_manifest_sha256"]})
