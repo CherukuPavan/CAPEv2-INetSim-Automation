@@ -27,3 +27,18 @@ reports/
 artifacts/
 samples/
 secrets/
+
+# Never version deployment authentication/Windows firmware or TPM state.
+# Google service-account JSON is a PRIVATE KEY even if the suffix is .json.
+*service-account*.json
+*service_account*.json
+rclone.conf
+cape_world_readonly.conf
+*.fd
+*.nvram
+*.tpm
+*.swtpm
+*.token
+*.credentials
+CAPE_*Doctor.json
+CAPE_*Provenance.json
