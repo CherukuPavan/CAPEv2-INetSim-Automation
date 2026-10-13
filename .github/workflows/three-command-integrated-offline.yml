@@ -12,6 +12,8 @@ on:
       - "scripts/test_command2_*.py"
       - "scripts/test_command3_*.py"
       - "scripts/test_command123_*.py"
+      - "scripts/private_repo_checkout_preflight.py"
+      - "scripts/test_private_repo_checkout_preflight.py"
       - ".github/workflows/three-command-integrated-offline.yml"
   workflow_dispatch:
 
