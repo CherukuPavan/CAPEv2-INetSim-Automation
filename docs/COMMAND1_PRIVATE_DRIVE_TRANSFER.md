@@ -32,23 +32,41 @@ manual inspection, not automatically cleaned or silently retried.
 
 ### Credential provisioning (operator once, later; NOT needed right now)
 
-Configure `rclone` on your own system when ready:
+**IMPORTANT ROOT CONFIG MATCH:** The uploader/downloader is a
+root-interactive program and by default reads
+`/root/.config/rclone/rclone.conf` (owned UID 0, mode 0600).
+Running only `rclone config` as an ordinary user instead creates
+`$HOME/.config/rclone/rclone.conf`, which the root script does NOT
+read by default. Avoid the mismatch: use `sudo -H rclone config`
+on the source and new host with a secure interactive console.
+Alternately use `--rclone-config /ABSOLUTE/ROOT_OWNED_0600_FILE`
+when prepared through a trusted root-only process. Never copy an
+unverified world-readable Google token file.
 
-1. A personal Google Drive remote (e.g. `mydrive:`) using official
-   Google OAuth. Make a dedicated **private** subdirectory for the
-   encrypted master. Do not set it to "Anyone with the link."
-2. A second rclone remote (e.g. `mycrypt:`) with `type = crypt`
-   pointing to `mydrive:cape-private/master-backups`.
+Configure `rclone` on the operator's system when ready:
+
+1. A personal Google Drive remote named `cape_drive` using official
+   Google OAuth. Create a dedicated **private** Drive subdirectory for
+   the encrypted master. Do NOT set it to "Anyone with the link."
+   An SSH-only terminal may display a URL to approve using a separate
+   logged-in local browser, which is an expected OAuth setup step.
+2. A second rclone remote named `cape_crypt` with `type = crypt`
+   pointing to `cape_drive:cape-private-encrypted/master-backups`.
    Use **standard filename encryption**, encrypted directory names,
-   and regular encrypted file contents. Back up the separate strong
-   crypt passphrase securely.
-3. A root-owned **0600** rclone configuration file, default at
-   `/root/.config/rclone/rclone.conf`. Rclone passwords are lightly
-   *obscured* in config, NOT protected by that obscuration alone.
-   Protect the config via root permissions and separately secure
-   passphrase backup; do not share it in ChatGPT or GitHub. On a
-   different host, authorize Google Drive and configure the SAME crypt
-   passphrase so existing encrypted files can be decrypted.
+   and normal encrypted file contents. Back up the strong crypt password
+   and salt password (if selected) in a password manager.
+3. Confirm `sudo -H rclone listremotes` prints BOTH
+   `cape_drive:` and `cape_crypt:`. Confirm the root config is
+   **0600**; do not print its contents or copy it to ChatGPT/GitHub.
+   Passwords in rclone config are *obscured*, not securely encrypted.
+   On the target machine, separately authorize Google Drive and
+   configure the SAME crypt password(s) to access the existing data.
+4. Ensure **the encrypted Drive directory remains PRIVATE** even
+   though its stored bytes are encrypted. The program cannot prove
+   Google Drive folder ACLs, storage quotas or user account entitlements.
+5. `rclone version` and
+   `sudo -H rclone listremotes` are safe metadata checks; do not share
+   `rclone config show` output since it contains credentials.
 
 The helper INSPECTS the rclone config type without printing tokens or
 passwords and refuses a raw Drive remote, unencrypted crypt modes,
