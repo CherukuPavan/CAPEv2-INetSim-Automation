@@ -6,13 +6,11 @@ five-service startup proof are the canonical source. No host commands,
 snapshot restoration or Windows/TPM transfer were executed by the
 GitHub development activity below. `main` unchanged.
 
-**All-code offline CI:** Previously 1,493 Python tests passed on each
-of Python 3.10 and 3.12
-([Actions #38373563965](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38373563965)).
-A new private-repository checkout guard has since been added and its
-separate CI passed. The current all-repository rerun is at
-[Actions #38374387418](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38374387418);
-check its result rather than assuming success while it is still running.
+**All-code offline CI:** 1,500 Python tests passed on each of
+Python 3.10 and 3.12
+([Actions #38374387418](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38374387418)).
+This includes the exact private GitHub development checkout guard and
+the approved five-service Command3 restart tests.
 This is *synthetic verification only*, not fresh-host qualification.
 
 ## Newly integrated code
