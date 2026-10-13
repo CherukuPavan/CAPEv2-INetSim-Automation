@@ -193,6 +193,9 @@ def plan_upload(host, bundle, remote, config):
          "Only actual cape-master-* export directories allowed")
     secret=read_crypt_settings(config,remote)
     proof=master.manifest_check(directory)
+    need(proof.get("all_member_files_sha256_verified") is True,
+         "Exact master export predates SHA256-bound capture intent; "
+         "do not claim full byte verification")
     return {
         "result":"COMMAND1_PRIVATE_CRYPT_GDRIVE_UPLOAD_PLAN_ONLY",
         "source_bundle":str(directory),
@@ -262,7 +265,9 @@ def apply_download(host,dest,remote,bundle_id,config):
     try:
         execute_rclone(config,"copy","--immutable","--transfers","1",
                        "--checkers","1",first["remote"],str(folder))
-        proof=master.manifest_check(folder)  # checks SHA256 ALL files
+        proof=master.manifest_check(folder)
+        need(proof.get("all_member_files_sha256_verified") is True,
+             "Private golden bundle lacks all-member SHA256 manifest proof")
         need(len(list(folder.iterdir()))==first["expected_file_count"],
              "Downloaded bundle count differs from remote inventory")
     except Exception as exc:
