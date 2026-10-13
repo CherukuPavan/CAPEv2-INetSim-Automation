@@ -39,6 +39,7 @@ jobs:
         run: |
           PYTHONPATH=scripts python -m unittest -v \
             test_command123_repair_rollback \
+            test_command123_repair_doctor \
             test_command1_worldwide_drive_reader
       - name: Full Python syntax tree compilation
         run: |
