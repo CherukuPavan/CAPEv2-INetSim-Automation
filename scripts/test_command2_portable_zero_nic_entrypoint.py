@@ -87,6 +87,9 @@ class ControllerTests(unittest.TestCase):
                  patch.object(c.sys.stdin,"isatty",return_value=True), \
                  patch("builtins.input",return_value="APPROVE_COMMAND2_ZERO_NIC_APPROVED"), \
                  patch.object(c,"revalidate_before_reservation",return_value={"stage_resource_rechecked":True}), \
+                 patch.object(c.stager,"virsh",return_value="<domain/>"), \
+                 patch.object(c.stager,"validate_inputs",return_value=(1,2,"/src")) as master_check, \
+                 patch.object(c.stager,"assert_no_collision"), \
                  patch.object(c,"staging_dir",return_value=state), \
                  patch.object(c.reserve,"reserve",return_value={
                      "guest_count":2,"guest_vm_created":False,
@@ -108,6 +111,44 @@ class ControllerTests(unittest.TestCase):
             self.assertEqual(stage_mock.call_args.kwargs["master_uuid"],
                              "f15ce036-e6e6-4bd4-955a-8b502ecf9581")
             self.assertEqual(reserve_mock.call_args.kwargs["expected_host"],"approved")
+            master_check.assert_called_once()
+            self.assertTrue(master_check.call_args.kwargs["audit_source"])
+
+    def test_invalid_or_encrypted_master_blocked_before_journal_or_disk_write(self):
+        # This failure used to happen only in the later stager, after
+        # recording an exclusive journal that could not safely be retried.
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td)/"journal"
+            checks=[]
+            def impossible(*a,**kw):
+                checks.append("template")
+                raise c.stager.StageBlocked(
+                    "Template plaintext Windows volume not verified")
+            with patch.object(c,"guard_host"), \
+                 patch.object(c,"proposal",return_value=(
+                     sample_blueprint(),{"resource_preflight_pass":True})), \
+                 patch.object(c.os,"geteuid",return_value=0), \
+                 patch.object(c.sys.stdin,"isatty",return_value=True), \
+                 patch("builtins.input",
+                       return_value="APPROVE_COMMAND2_ZERO_NIC_APPROVED"), \
+                 patch.object(c,"revalidate_before_reservation"), \
+                 patch.object(c,"source_profile",return_value=(
+                     "f15ce036-e6e6-4bd4-955a-8b502ecf9581",
+                     Path("/firmware_VARS.fd"))), \
+                 patch.object(c.stager,"virsh",return_value="<domain/>"), \
+                 patch.object(c.stager,"validate_inputs",
+                              side_effect=impossible), \
+                 patch.object(c.reserve,"reserve") as reserve_mock, \
+                 patch.object(c,"staging_dir") as mkdir_mock, \
+                 patch.object(c.stager,"execute") as clone_mock:
+                with self.assertRaisesRegex(c.stager.StageBlocked,
+                                            "plaintext Windows"):
+                    c.execute(**args(mode="stage",journal_dir=folder))
+                reserve_mock.assert_not_called()
+                mkdir_mock.assert_not_called()
+                clone_mock.assert_not_called()
+            self.assertEqual(checks,["template"])
+            self.assertFalse(folder.exists())
 
     def test_master_memory_requirements_cannot_assume_four_gib(self):
         self.assertEqual(c.vm_memory_mib('<domain><memory unit="KiB">8388608</memory></domain>'),8192)
