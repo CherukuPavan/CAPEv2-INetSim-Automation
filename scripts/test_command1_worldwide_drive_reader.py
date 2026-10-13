@@ -82,12 +82,12 @@ class WorldReaderTests(unittest.TestCase):
 
     @mock.patch.object(m.socket, "gethostname", return_value="remote-village")
     def test_create_one_restricted_0600_reader_only(self, _):
-        with mock.patch.object(m.sys, "stdin") as stdin, \\
-             mock.patch.object(m, "input", return_value=m.APPROVAL), \\
+        with mock.patch.object(m.sys, "stdin") as stdin, \
+             mock.patch.object(m, "input", return_value=m.APPROVAL), \
              mock.patch.object(m.getpass, "getpass",
                                side_effect=["existing-crypt-password",
                                             "existing-crypt-password",
-                                            "existing-salt-password"]), \\
+                                            "existing-salt-password"]), \
              mock.patch.object(m, "obscure",
                                side_effect=["obscured_crypt_password",
                                             "obscured_salt_password"]):
@@ -107,8 +107,8 @@ class WorldReaderTests(unittest.TestCase):
 
     @mock.patch.object(m.socket, "gethostname", return_value="remote-village")
     def test_password_mismatch_writes_nothing(self, _):
-        with mock.patch.object(m.sys, "stdin") as stdin, \\
-             mock.patch.object(m, "input", return_value=m.APPROVAL), \\
+        with mock.patch.object(m.sys, "stdin") as stdin, \
+             mock.patch.object(m, "input", return_value=m.APPROVAL), \
              mock.patch.object(m.getpass, "getpass",
                                side_effect=["first-password", "wrong-password"]):
             stdin.isatty.return_value = True
