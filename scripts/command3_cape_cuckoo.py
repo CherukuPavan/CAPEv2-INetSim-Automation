@@ -176,6 +176,11 @@ def transform(data, dsn=None):
         if not possible:
             continue
         key = possible.group(1).lower()
+        if section == "cleaner" and key in (
+                "binaries_days", "tmp_days", "analysis_days"):
+            raise CuckooBlocked(
+                "Found PDF-style cleaner *_days option; expected actual "
+                "SSL-55 keys binaries, tmp and analysis; STOP for review")
         if key not in TARGET[section] and (section, key) != ("database", "connection"):
             continue
         pair = (section, key)
@@ -190,10 +195,6 @@ def transform(data, dsn=None):
     absent = expected - found.keys()
     need(not absent, "Missing reviewed CAPE option(s): " +
          ", ".join("[" + s + "] " + k for s, k in sorted(absent)))
-    # These three were explicitly corrected by the OPERATOR, not the PDF.
-    for key in ("binaries", "tmp", "analysis"):
-        need(("cleaner", key + "_days") not in found,
-             "Ambiguous legacy cleaner setting")  # alias is never written
     current_database = found[("database", "connection")][2]
     selected = safe_dsn(dsn) if dsn is not None else safe_dsn(current_database)
     changes = []
