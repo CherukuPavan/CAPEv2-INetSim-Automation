@@ -347,12 +347,81 @@ reference as independently verified. No assistant operation on SSL-55.
   separate future acceptance gates. A successful config edit alone
   does not prove traffic routing or public egress containment.
 
+## Step 6 — routing.conf, screenshot reference but unsafe to automate
+
+**User-provided screenshot (2026-10-13):**
+`/opt/CAPEv2/conf/routing.conf`, section `[routing]`.
+The two images show the before and an unsaved Nano buffer after.
+
+| Key | Before | Requested AFTER |
+|---|---|---|
+| `enable_pcap` | `no` | `yes` |
+| `route` | `none` | `internet` |
+| `internet` | `none` | `virbr0` |
+| `nat` | `yes` | `yes` (unchanged) |
+| `no_local_routing` | `yes` | `yes` (unchanged) |
+| `rt_table` | `main` | `main` (unchanged) |
+
+The AFTER Nano title contains **`routing.conf *`**, indicating
+unsaved edits at screenshot time. Do not certify a saved physical
+configuration without operator confirmation or a read-only inspection.
+
+### Engineering/security finding — Internet / virbr0 cannot ship
+
+CAPE upstream's **routing.conf.default** says `[routing] internet`
+specifies an external **dirty-line uplink** permitting real Internet
+traffic from possibly malicious analysis VMs. Its documentation explicitly
+warns about this. The CAPEv2 Guest Troubleshooting guide explicitly
+says the dirtyline should be the *host's Internet interface*, not a
+virtual libvirt bridge such as `virbr0`. Thus:
+- `internet = virbr0` conflates libvirt's VM-side NAT bridge with an
+  external uplink: the resulting CAPE rooter network policy may be
+  incorrect and is **not reliably portable**.
+- `route = internet` authorizes a routing *mode* that can send malicious
+  traffic to real networks. The reference default `virbr0` network is
+  already IPv4 NAT with Internet egress, so **even `route = none`
+  alone is NOT a containment guarantee**.
+- Do not blindly replace `internet = virbr0` with the host's
+  normal management uplink (`enp0s31f6` on the historical SSL-55 route)
+  because that risks exposing the campus/management network.
+- The supported release target must be a reviewed, isolated
+  network/INetSim, with explicit firewall/router/IPv6/peer egress
+  negative tests and benign simulation positive tests before
+  any malware execution or automatic CAPE service/rooter activation.
+- `enable_pcap = yes` increases capture workload and disk usage;
+  review analysis count, storage, and retention separately.
+
+References:
+- <https://github.com/kevoreilly/CAPEv2/blob/master/conf/default/routing.conf.default>
+- <https://capev2.readthedocs.io/en/latest/installation/host/routing.html>
+- <https://capev2.readthedocs.io/en/latest/installation/guest/troubleshooting.html>
+
+### Implemented development gate (safe and non-mutating)
+
+- `scripts/command3_cape_routing.py` **only supports `--mode plan`**.
+  It validates exactly the six observed settings in the real existing
+  file, computes the requested three-value diff while preserving
+  all other bytes, comments and sections, and reports an explicit
+  `BLOCKED_DIRTY_LINE_VM_BRIDGE_AND_PUBLIC_EGRESS` status.
+- There is intentionally **NO APPLY path** for this operator example,
+  no service/rooter/iptables changes, no live VM or snapshot actions.
+  The step is **RECORDED but NOT deployed/accepted** as a safe profile.
+  This protects the request's traceability while preserving the
+  broader project requirement of safe sandbox containment.
+- `scripts/test_command3_cape_routing.py` tests exact three-setting
+  edits, unchanged fields, duplicate/malformed rejection, read-only
+  host behavior, no secret leaks and explicit prohibition of apply.
+- To close Step 6 later, implement a distinct isolated/INetSim-backed
+  production profile with evidence-based host preflight and real
+  destination routing. Never relabel this `route=internet` reference
+  as safe because the screenshot matches.
+
 ## Pending operator steps
 
 Await the next supplied configuration-file edit. For each step, document
 exact file/section/key, operator's desired value, project-specific reason,
 the old value if known, dependency/security impact, and idempotent regression.
-Do not invent unspecified `kvm.conf`, `routing.conf` or other future values. The operator-confirmed `cuckoo.conf` fields are recorded above.
+Do not invent unspecified future configuration values. The operator's routing.conf values are recorded as a BLOCKED safety reference above.
 
 Restart CAPE/related services **only after** the complete reviewed change
 set and its service dependency order have been validated. Do not assume a
