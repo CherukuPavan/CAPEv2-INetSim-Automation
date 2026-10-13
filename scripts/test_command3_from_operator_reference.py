@@ -87,6 +87,8 @@ class JoinedCommand3Tests(unittest.TestCase):
                              ["cuckoo", "kvm", "mitmdump"])
             self.assertFalse(result["host_modified"])
             self.assertFalse(result["CAPE_READY"])
+            self.assertFalse(result["five_config_files_match_target"])
+            self.assertTrue(result["verified_target_tmpfs_mounted"])
             self.assertFalse(result["routing_auto_apply_supported"])
             self.assertFalse(result["service_auto_restart_supported"])
             self.assertIsNone(result["service_readiness"])
@@ -106,6 +108,8 @@ class JoinedCommand3Tests(unittest.TestCase):
             self.assertEqual(result["result"],
                              "COMMAND3_JOINED_VERIFY_READ_ONLY")
             self.assertFalse(result["CAPE_READY"])
+            self.assertTrue(result["all_five_service_units_active_readonly"])
+            self.assertFalse(result["five_config_files_match_target"])
             ser.assert_called_once_with(
                 args.conf_dir / "routing.conf", "verify",
                 args.conf_dir / "cuckoo.conf")
