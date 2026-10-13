@@ -1,0 +1,61 @@
+name: Three-command integrated offline regression
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command1_*.py"
+      - "scripts/command2_*.py"
+      - "scripts/command3_*.py"
+      - "scripts/command123_*.py"
+      - "scripts/test_command1_*.py"
+      - "scripts/test_command2_*.py"
+      - "scripts/test_command3_*.py"
+      - "scripts/test_command123_*.py"
+      - ".github/workflows/three-command-integrated-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  all-python-offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile all automation Python modules without bytecode writes
+        run: |
+          python -B - <<'PY'
+          from pathlib import Path
+          import ast
+          count=0
+          for path in sorted(Path("scripts").glob("*.py")):
+              ast.parse(path.read_text(encoding="utf-8"),filename=str(path))
+              count+=1
+          print("PYTHON_SOURCE_SYNTAX_PASS",count)
+          PY
+      - name: Run every synthetic Python regression against joined architecture
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -B -m unittest discover -s scripts -p 'test_*.py' -q
+      - name: Guarantee protected reference and latest master stay out of artifact
+        run: |
+          python -B - <<'PY'
+          from pathlib import Path
+          forbidden_extensions={".qcow2",".vhd",".vmdk",".iso",".p12",".key"}
+          files=list(Path(".").rglob("*"))
+          forbidden=[str(f) for f in files if f.is_file()
+                     and (f.suffix.lower() in forbidden_extensions
+                          or f.name=="rclone.conf")]
+          assert not forbidden, forbidden
+          print("NO_GOLDEN_DISKS_ISOS_OR_CREDENTIAL_FILES_COMMITTED")
+          PY
