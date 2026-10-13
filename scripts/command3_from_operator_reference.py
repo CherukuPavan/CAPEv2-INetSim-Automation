@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Command 3 combined CAPE operator-reference workflow (development).
 
-ONE entrypoint for the five supported config edits + strict read-only checks
-for routing, tmpfs mount and installed services.
+ONE entrypoint for five guarded config edits, standalone APPROVED service
+restart, and read-only checks for routing, tmpfs mount and installed services.
+Restart is allowed ONLY when all five configs match actual checked VM records,
+the operator routing values are ALREADY present, and tmpfs/units admit it.
+It never automatically writes the disputed internet/virbr0 routing profile.
 
 PLAN    : checks all five edit plans, routing review and tmpfs admission
           without modifying any host state (except normal file reads).
@@ -37,6 +40,7 @@ import command3_cape_mitmdump as mitm
 import command3_cape_routing as route
 import command3_cape_tmpfs as tmpfs
 import command3_cape_services as services
+import command3_cape_restart_verified as restarting
 
 DEFAULT_CONF_DIR = Path("/opt/CAPEv2/conf")
 DEFAULT_WITNESSES = Path("/var/lib/cape-command3-receipts")
@@ -330,9 +334,37 @@ def configure(args):
         "Command3_final_release_complete": False,
     }
 
+def restart_existing_config(args):
+    """Same Command3 entrypoint; never start services before all edits match."""
+    need(os.geteuid()==0 and sys.stdin.isatty(),
+         "Restart stage needs direct root operator terminal")
+    approved_host(args.approved_host)
+    validated=review(args)
+    need(validated["five_config_files_match_target"] is True,
+         "Not all five reviewed CAPE config files match target; do not restart")
+    need(validated["verified_target_tmpfs_mounted"] is True,
+         "CAPE enabled-tmpfs mount missing before any restart")
+    paths=named_configs(args.conf_dir)
+    # The standalone restarter performs a second, dedicated route,
+    # systemd and actual mount check before its own typed consent.
+    restarted=restarting.apply(
+        args.approved_host,paths["routing"],paths["cuckoo"],
+        args.restart_witness_dir)
+    need(restarted.get("result")==
+         "COMMAND3_FIVE_SERVICE_RESTARTS_ACTIVE_VERIFIED",
+         "Five-service restart did not pass readback")
+    return {**restarted,
+            "result":"COMMAND3_EXISTING_CONFIG_FIVE_SERVICE_RESTART_COMPLETE",
+            "operator_configs_match_target":True,
+            "routing_auto_write_performed":False,
+            "guest_or_snapshot_modified":False,
+            "CAPE_SAMPLE_ANALYSIS_READY":False}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--mode", choices=("plan", "configure", "verify"),
+    p.add_argument("--mode",
+                   choices=("plan", "configure", "restart", "verify"),
                    default="plan")
     p.add_argument("--approved-host", required=True)
     p.add_argument("--journal", required=True, type=Path)
@@ -343,10 +375,13 @@ def main():
     p.add_argument("--backup-dir", type=Path, default=api.DEFAULT_BACKUPS)
     p.add_argument("--db-dsn-file", type=Path)
     p.add_argument("--witness-dir", type=Path, default=DEFAULT_WITNESSES)
+    p.add_argument("--restart-witness-dir", type=Path,
+                   default=restarting.RECEIPTS)
     args = p.parse_args()
     try:
         result = (review(args) if args.mode == "plan" else
                   review(args, True) if args.mode == "verify" else
+                  restart_existing_config(args) if args.mode == "restart" else
                   configure(args))
         print(json.dumps(result, indent=2, sort_keys=True), flush=True)
         return 0
