@@ -19,6 +19,7 @@ PLANNED={
 DOWNLOADED={
     "result":"COMMAND1_PRIVATE_MASTER_DOWNLOADED_SHA256_VERIFIED",
     "bundle_manifest_sha256":"a"*64,
+    "all_member_files_sha256_verified":True,
 }
 IMPORTED={
     "from_verified_actual_master_bundle":True,
@@ -124,6 +125,31 @@ class PrivateMasterStageTests(unittest.TestCase):
             self.assertFalse(result["fresh_host_CAPE_install_complete"])
             self.assertEqual(milestones[-1]["result"],result["result"])
             self.assertEqual(len(milestones[-1]["completed"]),2)
+
+    def test_refuses_incomplete_master_bundle_proof_before_import(self):
+        with tempfile.TemporaryDirectory() as td:
+            args=self.args(td)
+            records=[]
+            no_intent=dict(DOWNLOADED)
+            no_intent["all_member_files_sha256_verified"]=False
+            with patch.object(m.os,"geteuid",return_value=0), \
+                 patch.object(m.sys.stdin,"isatty",return_value=True), \
+                 patch.object(m,"path_plan",return_value=deepcopy(PLANNED)), \
+                 patch("builtins.input",return_value=m.APPROVAL), \
+                 patch.object(m,"root_host",return_value="other-host"), \
+                 patch.object(m,"secure_witness_folder",
+                              return_value=args.witness_dir), \
+                 patch.object(m,"save_witness",
+                              side_effect=lambda path,record,**kw:
+                                  records.append(deepcopy(record))), \
+                 patch.object(m.drive,"apply_download",return_value=no_intent), \
+                 patch.object(m.imported,"apply",
+                              side_effect=AssertionError("No import")), \
+                 self.assertRaisesRegex(m.ExactMasterBlocked,
+                                        "PARTIAL_OR_UNKNOWN"):
+                m.stage(args)
+            self.assertEqual(records[-1]["result"],
+                    "COMMAND1_PRIVATE_MASTER_STAGE_PARTIAL_OR_UNKNOWN")
 
     def test_failed_import_preserves_partial_verified_download_witness(self):
         with tempfile.TemporaryDirectory() as td:
