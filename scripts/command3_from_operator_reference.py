@@ -152,6 +152,16 @@ def review(args, verify=False):
         "tmpfs_preflight": mount,
         "target_enabled_tmpfs_preflight": target_mount,
         "service_readiness": service,
+        "five_config_files_match_target": not any(
+            name for name, data in stages
+            if (data.get("source_sha256") != data.get("target_sha256")
+                if name == "kvm" else
+                data.get("status") not in
+                ("ALREADY_CONFIGURED", "NO_CHANGE_ALREADY_CONFIGURED"))),
+        "verified_target_tmpfs_mounted": (
+            target_mount.get("status") == "TARGET_ON_MOUNT_READY"),
+        "all_five_service_units_active_readonly": (
+            bool(service and service.get("all_services_active_now"))),
         "configuration_only_apply_supported": True,
         "routing_auto_apply_supported": False,
         "service_auto_restart_supported": False,
@@ -247,8 +257,11 @@ def configure(args):
     # Existing independently revalidated plan APIs detect journal/snapshot,
     # guest identity, IP and secret drift before any mutation.
     paths_again, staged_again = five_plans(args)
+    checked_mount = target_tmpfs_ready()
     need(paths_again == paths and staged_again == initial and
-         target_tmpfs_ready() == initial_mount,
+         checked_mount.get("status") == initial_mount.get("status") and
+         checked_mount.get("required_free_mib") ==
+         initial_mount.get("required_free_mib"),
          "CAPE plans, VM identities or tmpfs changed before batch approval")
     directory = private_witness_dir(args.witness_dir)
     target = directory / ("command3-config." + uuid.uuid4().hex + ".json")
