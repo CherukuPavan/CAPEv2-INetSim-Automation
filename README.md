@@ -1,5 +1,29 @@
 # CAPEv2 + INetSim Automation
 
+> **New-host audit / recovery utilities (2026-10-13):** The
+> [repository-wide checker](scripts/repository_static_preflight.py) scans
+> every tracked Python/Bash/PowerShell/YAML file, checked local imports and
+> Markdown links. Its GitHub Actions job
+> [repository-wide-preflight.yml](.github/workflows/repository-wide-preflight.yml)
+> runs alongside the full existing synthetic test suite.
+> [Read-only new-host doctor](scripts/command123_repair_doctor.py) checks
+> installed packages, CAPE configuration/services, libvirt names and
+> snapshot inventory. [Guarded configuration recovery](
+> scripts/command123_repair_rollback.py) supports pre-deployment baseline,
+> post-deployment seal, plan-repair, approved missing-file repair,
+> plan-rollback and approved reversible rollback for **SIX tracked CAPE
+> config files ONLY**, using root-private SHA256 receipts and quarantine.
+> [Tomorrow's test and limitations](
+> docs/NEW_HOST_REPAIR_ROLLBACK_AND_TOMORROW_TEST.md).
+> **DO NOT call this universal whole-machine recovery**: package installs,
+> systemd changes, VM disks/TPM, network/firewall and real host backups
+> require a genuine OFFLINE full-system image taken before installation.
+> This repo still does NOT contain a production-ready CAPE-only full-host
+> installer, does not demonstrate TPM-coherent running-snapshot revert,
+> and does not automatically create a verified three-command deployment.
+> INetSim is now explicitly deferred by the operator.
+
+
 > **2026-10-13 VERIFIED GOLDEN BACKUP / WORLDWIDE DEPLOYMENT UPDATE**
 > The operator physically exported the original customized SSL55 cold
 > Windows master to private SSL46 SSHFS storage and then completed encrypted
