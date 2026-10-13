@@ -129,6 +129,45 @@ class GoldenMaster(unittest.TestCase):
                  self.assertRaises(m.MasterExportBlocked):
                 m.backing_chain(top)
 
+    def test_swtpm_lock_directory_validation_with_actual_source_function(self):
+        with tempfile.TemporaryDirectory() as td:
+            disk,nv,tpm,xml,dest,virsh,run=self.fixtures(td)
+            lock=tpm/".lock"
+            lock.touch()
+            state_base=Path("/var/lib/libvirt/swtpm")
+            real_path_cls=m.Path
+            # Supply a fake Path factory only for the hardcoded TPM root.
+            def fake_path(x):
+                if str(x)==str(state_base):
+                    return Path(td)/"swtpm"
+                return Path(x)
+            with patch.object(m,"Path",side_effect=fake_path), \
+                 patch.object(m.os,"geteuid",return_value=0), \
+                 patch.object(m.socket,"gethostname",return_value="CSE-SSL-55"), \
+                 patch.object(m,"virsh",side_effect=virsh), \
+                 patch.object(m,"backing_chain",
+                     return_value=([disk],64*1024**3)):
+                source=m.source()
+                self.assertEqual(source["tpm_members"],
+                                 [tpm/"tpm2-00.permall"])
+                self.assertNotIn(lock,source["tpm_members"])
+                for corrupt in (b"tampered",):
+                    lock.write_bytes(corrupt)
+                    with self.assertRaisesRegex(
+                        m.MasterExportBlocked,"Unexpected swtpm .lock"):
+                        m.source()
+                    lock.write_bytes(b"")
+                lock.unlink()
+                lock.symlink_to(tpm/"tpm2-00.permall")
+                with self.assertRaisesRegex(
+                    m.MasterExportBlocked,"Unexpected swtpm .lock"):
+                    m.source()
+                lock.unlink()
+                os.link(tpm/"tpm2-00.permall",lock)
+                with self.assertRaisesRegex(
+                    m.MasterExportBlocked,"Unexpected swtpm .lock"):
+                    m.source()
+
     def test_source_rejects_powered_master_or_forged_id(self):
         with patch.object(m.os,"geteuid",return_value=0),\
              patch.object(m,"virsh",return_value="running"),\
