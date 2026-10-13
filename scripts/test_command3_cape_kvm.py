@@ -184,7 +184,9 @@ class KvmMachineTests(unittest.TestCase):
 
     def test_master_running_snapshot_is_verified_by_name_not_guessed(self):
         live_xml=('<domainsnapshot><name>Afterfull</name><state>running</state>'
-                  '<memory snapshot="internal"/></domainsnapshot>')
+                  '<memory snapshot="internal"/>'
+                  '<disks><disk name="sda" snapshot="internal"/></disks>'
+                  '<domain><name>win11</name></domain></domainsnapshot>')
         def fake_virsh(*args):
             if args==("domstate","win11"):return "shut off"
             if args==("snapshot-list","win11","--name"):return "Afterfull\nAnother"
@@ -195,6 +197,108 @@ class KvmMachineTests(unittest.TestCase):
             self.assertTrue(m.find_master_snapshot("Afterfull"))
             with self.assertRaises(m.KvmBlocked):
                 m.find_master_snapshot("snapshot1")
+
+    def test_snapshot_without_os_disk_or_wrong_domain_rejected(self):
+        import command2_portable_master_nat_attach as nat
+        def query(*args):
+            if args==("domstate","win11"):
+                return "shut off"
+            if args==("snapshot-list","win11","--name"):
+                return "Afterfull"
+            if args==("snapshot-dumpxml","win11","Afterfull"):
+                return snapshot[0]
+            raise AssertionError(args)
+        candidates=(
+            '<domainsnapshot><name>Afterfull</name><state>running</state>'
+            '<memory snapshot="internal"/><domain><name>win11</name></domain>'
+            '</domainsnapshot>',
+            '<domainsnapshot><name>Afterfull</name><state>running</state>'
+            '<memory snapshot="internal"/>'
+            '<disks><disk name="sda" snapshot="no"/></disks>'
+            '<domain><name>win11</name></domain></domainsnapshot>',
+            '<domainsnapshot><name>Afterfull</name><state>running</state>'
+            '<memory snapshot="internal"/>'
+            '<disks><disk name="sda" snapshot="internal"/></disks>'
+            '<domain><name>not-win11</name></domain></domainsnapshot>',
+        )
+        snapshot=[""]
+        with patch.object(nat,"virsh",side_effect=query):
+            for xml in candidates:
+                snapshot[0]=xml
+                with self.subTest(xml=xml), self.assertRaisesRegex(
+                        m.KvmBlocked,"RAM"):
+                    m.find_master_snapshot("Afterfull")
+
+    def test_approved_config_only_apply_backup_and_repeat_noop(self):
+        import command2_portable_master_nat_attach as nat
+        with tempfile.TemporaryDirectory() as td:
+            directory=Path(td)/"CAPE"/"conf"
+            directory.mkdir(parents=True)
+            conf=directory/"kvm.conf"
+            conf.write_bytes(LIVE)
+            conf.chmod(0o640)
+            save=Path(td)/"backups"
+            original=conf.read_bytes()
+            def fake_private_backup_dir(path):
+                folder=Path(path)
+                folder.mkdir(mode=0o700)
+                return folder
+            with patch.object(nat.workflow,"canonical_host"), \
+                 patch.object(m,"discover",return_value=(
+                      guests(3),"192.168.122.1")), \
+                 patch.object(m.os,"geteuid",return_value=0), \
+                 patch.object(m.sys.stdin,"isatty",return_value=True), \
+                 patch.object(m.socket,"gethostname",return_value="other-host"), \
+                 patch.object(m.backup_guard,"safe_backup_dir",
+                              side_effect=fake_private_backup_dir), \
+                 patch("builtins.input",return_value=m.APPROVAL):
+                out=m.apply(conf,"other-host",
+                            Path("/root/cape/command2-identity-reservation.json"),
+                            "192.168.122.125","Afterfull","win11",save)
+            self.assertTrue(out["applied"])
+            self.assertEqual(out["result"],
+                             "COMMAND3_KVM_ALL_N_CONFIG_ONLY_APPLIED_NOT_STARTED")
+            self.assertFalse(out["cape_service_restarted"])
+            self.assertFalse(out["CAPE_READY"])
+            self.assertIn(b"machines = win11,win11_1,win11_2,win11_3",
+                          conf.read_bytes())
+            self.assertEqual(Path(out["backup_path"]).read_bytes(),original)
+            self.assertEqual(Path(out["backup_path"]).stat().st_mode & 0o777,0o600)
+            with patch.object(nat.workflow,"canonical_host"), \
+                 patch.object(m,"discover",return_value=(
+                      guests(3),"192.168.122.1")), \
+                 patch.object(m.os,"geteuid",return_value=0), \
+                 patch.object(m.sys.stdin,"isatty",return_value=True), \
+                 patch.object(m.socket,"gethostname",return_value="other-host"), \
+                 patch("builtins.input",
+                       side_effect=AssertionError("Already configured")):
+                again=m.apply(conf,"other-host",
+                              Path("/root/cape/command2-identity-reservation.json"),
+                              "192.168.122.125","Afterfull","win11",save)
+            self.assertFalse(again["applied"])
+            self.assertEqual(len(list(save.iterdir())),1)
+
+    def test_declined_approval_does_not_touch_kvm_or_create_backup(self):
+        import command2_portable_master_nat_attach as nat
+        with tempfile.TemporaryDirectory() as td:
+            directory=Path(td)/"CAPE"/"conf"
+            directory.mkdir(parents=True)
+            conf=directory/"kvm.conf"
+            conf.write_bytes(LIVE)
+            save=Path(td)/"backups"
+            with patch.object(nat.workflow,"canonical_host"), \
+                 patch.object(m,"discover",return_value=(
+                      guests(2),"192.168.122.1")), \
+                 patch.object(m.os,"geteuid",return_value=0), \
+                 patch.object(m.sys.stdin,"isatty",return_value=True), \
+                 patch.object(m.socket,"gethostname",return_value="other-host"), \
+                 patch("builtins.input",return_value="NO"), \
+                 self.assertRaisesRegex(m.KvmBlocked,"authorize"):
+                m.apply(conf,"other-host",
+                        Path("/root/cape/command2-identity-reservation.json"),
+                        "192.168.122.125","Afterfull","win11",save)
+            self.assertEqual(conf.read_bytes(),LIVE)
+            self.assertFalse(save.exists())
 
     def test_manual_apply_never_touches_ssl55(self):
         with patch.object(m.os,"geteuid",return_value=0), \
