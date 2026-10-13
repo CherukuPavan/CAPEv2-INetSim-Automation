@@ -149,6 +149,51 @@ class RestartStepTests(unittest.TestCase):
                     m.ServicesBlocked):
                 m.routing_status(val)
 
+    def test_tmpfs_owner_failure_is_a_restart_blocker_even_when_all_units_active(self):
+        with tempfile.TemporaryDirectory() as td:
+            f = self.fake_conf(td)
+            broken = {
+                "result": "CAPE_TMPFS_STARTUP_PREFLIGHT_ONLY",
+                "cape_tmpfs_prerequisite_ready": False,
+                "status": "BLOCKED_MOUNT_ACCESS_OR_CAPACITY",
+                "blocking_issues": ["Mounted tmpfs root not owned by cape:cape"],
+            }
+            with patch.object(m, "systemd_status",
+                              side_effect=lambda name: {
+                                  "unit": name, "loaded": True, "active": True,
+                                  "load_state": "loaded",
+                                  "active_state": "active"}), \
+                 patch.object(m.tmpfs, "assess", return_value=broken):
+                report = m.report(f, "plan")
+            self.assertFalse(report["cape_tmpfs_prerequisite_ready"])
+            self.assertFalse(report["restart_apply_authorized"])
+            self.assertTrue(any("tmpfs" in issue
+                                for issue in report["blocking_issues"]))
+            self.assertFalse(report["CAPE_READY"])
+
+    def test_tmpfs_is_checked_but_not_claimed_persistent_after_owner_repair(self):
+        with tempfile.TemporaryDirectory() as td:
+            f = self.fake_conf(td)
+            ready = {
+                "result": "CAPE_TMPFS_STARTUP_PREFLIGHT_ONLY",
+                "cape_tmpfs_prerequisite_ready": True,
+                "status": "READY",
+                "mount_persistence_proved": False,
+                "host_modified": False,
+            }
+            with patch.object(m, "systemd_status",
+                              side_effect=lambda name: {
+                                  "unit": name, "loaded": True, "active": True,
+                                  "load_state": "loaded",
+                                  "active_state": "active"}), \
+                 patch.object(m.tmpfs, "assess", return_value=ready):
+                result = m.report(f, "verify")
+            self.assertTrue(result["cape_tmpfs_prerequisite_ready"])
+            self.assertFalse(result["cape_tmpfs_startup_preflight"]
+                             ["mount_persistence_proved"])
+            self.assertFalse(result["CAPE_READY"])
+            self.assertFalse(result["restart_automated"])
+
     def test_unsupported_apply_mode_and_absence_of_mutating_commands(self):
         with self.assertRaisesRegex(m.ServicesBlocked,
                                     "Read-only"):
