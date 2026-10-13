@@ -9,8 +9,7 @@
 > INetSim installation, full one-prompt end-to-end guest provisioning,
 > safe swtpm recovery/revert and malware containment remain **unfinished**.
 > The NAT profile uses stable DHCP-reserved IPv4, not a Windows
-> DHCP-disabled static IP. [Read the reviewed release gates](
-> docs/COMMAND12_PRE_COMMAND3_ENGINEERING_AUDIT_20261013.md).
+> DHCP-disabled static IP. See the [Commands 1–2 engineering audit](docs/COMMAND12_PRE_COMMAND3_ENGINEERING_AUDIT_20261013.md).
 > Command 3 can be developed next, but neither Command 1 nor Command 2 is
 > production-ready. Preserve protected SSL-55 and `main`.
 
