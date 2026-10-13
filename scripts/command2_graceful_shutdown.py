@@ -7,7 +7,10 @@ then one ACPI power button event if the OS does not stop. Never invoke
 destroy, reset, managedsave, snapshot, force, or alter libvirt XML/firmware.
 
 SSL55 is restricted to win11_1 and protected master/trial. Portable targets
-require a canonical count-driven Command2 private reservation.
+require a canonical count-driven Command2 private reservation. The separate
+portable-master-nat scope accepts only exactly snapshotted golden NAT clones,
+with saved+live one-NIC identity checks before a graceful SHUT OFF handoff.
+This is NOT proof of swtpm-safe snapshot revert or malware containment.
 """
 from __future__ import annotations
 import argparse
@@ -61,7 +64,8 @@ def guard(host,scope,vm,journal):
                 "disk":"/var/lib/libvirt/images/cape-clones-staging/win11_1.command2.qcow2",
                 "nvram":"/var/lib/libvirt/qemu/nvram/win11_1.command2_VARS.fd",
                 "mac":"02:0a:30:6a:3f:50"}
-    need(scope=="portable-other" and current not in ("ssl-55","cse-ssl-55"),
+    need(scope in ("portable-other","portable-master-nat") and
+         current not in ("ssl-55","cse-ssl-55"),
          "Portable workflow forbidden on protected SSL55")
     import command2_portable_workflow as flow
     flow.canonical_host(host)
@@ -69,6 +73,44 @@ def guard(host,scope,vm,journal):
          isinstance(journal,Path) and journal.is_absolute() and
          journal.name=="command2-identity-reservation.json",
          "Exact reserved VM/private journal required")
+    if scope=="portable-master-nat":
+        # The canonical golden-master NAT profile is deliberately NOT the
+        # older isolated network. Require an actual running-state snapshot
+        # already captured before using this final CAPE handoff shutdown.
+        import ipaddress
+        import command2_portable_master_nat_attach as nat
+        rows=nat.journal_rows(host,journal)
+        row=next((r for r in rows if r["libvirt_name"]==vm),None)
+        need(row is not None,"NAT clone absent from canonical count journal")
+        need(state("win11")=="shut off","Original master must remain shut off")
+        net,views=nat.check_network_references()
+        need(net["nat_network"]=="default" and net["bridge"]=="virbr0",
+             "Golden master's persistent NAT bridge changed")
+        network=ipaddress.IPv4Network(net["ipv4"]["subnet"])
+        need(network.prefixlen==24 and network.is_private,
+             "Master NAT subnet no longer the reviewed private /24")
+        index=int(VM_RE.fullmatch(vm).group(1))
+        expected_ip=str(ipaddress.IPv4Address(
+            int(network.network_address)+200+index))
+        entry=(row["mac_candidate"].lower(),expected_ip,"WIN11-"+str(index))
+        need(all(nat.reservations(view).count(entry)==1 for view in views),
+             "Final NAT guest DHCP reservation changed")
+        snap="cape_one_nat_"+vm
+        need(virsh("snapshot-list",vm,"--name").splitlines()==[snap],
+             "NAT handoff shutdown needs exactly one existing running snapshot")
+        saved=ET.fromstring(virsh("snapshot-dumpxml",vm,snap))
+        memory=saved.find("memory")
+        need(saved.tag=="domainsnapshot" and
+             saved.findtext("name")==snap and
+             saved.findtext("state")=="running" and
+             memory is not None and memory.get("snapshot")=="internal",
+             "NAT final snapshot has no proven RUNNING RAM checkpoint")
+        return {"uuid":row["libvirt_uuid_candidate"],
+                "disk":row["disk_target"],
+                "nvram":row["uefi_nvram_target"],
+                "mac":row["mac_candidate"],"network":"default",
+                "nic_model":"e1000e","reserved_nat_ipv4":expected_ip,
+                "running_snapshot":snap}
     row,_,_=flow.load_guest(journal,host,vm)
     need(state("win11")=="shut off","Original master must remain shut off")
     return {"uuid":row["libvirt_uuid_candidate"],"disk":row["disk_target"],
@@ -94,10 +136,14 @@ def capabilities(xml,vm,expected):
     nics=root.findall("./devices/interface")
     need(len(nics)==1 and nics[0].get("type")=="network" and
          nics[0].find("source") is not None and
-         nics[0].find("source").get("network")=="cape-analysis-isolated" and
+         nics[0].find("source").get("network")==
+             expected.get("network","cape-analysis-isolated") and
          nics[0].find("mac") is not None and
-         nics[0].find("mac").get("address","").lower()==expected["mac"],
-         "Guest has an unexpected analysis NIC/MAC")
+         nics[0].find("mac").get("address","").lower()==expected["mac"] and
+         (expected.get("nic_model") is None or (
+             nics[0].find("model") is not None and
+             nics[0].find("model").get("type")==expected["nic_model"])),
+         "Guest has an unexpected analysis NIC/MAC/model")
     tpm=root.find("./devices/tpm/backend")
     need(tpm is not None and tpm.get("type")=="emulator" and
          tpm.get("version")=="2.0","Independent TPM2 missing")
@@ -210,7 +256,7 @@ def finish(host,scope,vm,journal,attempted):
 
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--scope",choices=("ssl55-clone","portable-other"),required=True)
+    p.add_argument("--scope",choices=("ssl55-clone","portable-other","portable-master-nat"),required=True)
     p.add_argument("--approved-host",required=True)
     p.add_argument("--vm",required=True)
     p.add_argument("--journal",type=Path)
