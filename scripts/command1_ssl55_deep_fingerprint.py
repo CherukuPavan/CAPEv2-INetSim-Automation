@@ -82,17 +82,14 @@ def cape_revision():
             "git_commit_sha40":None,
             "source_uncommitted_tracked_changes":None}
     if not result["root_present"]:return result
-    # Git rev-parse and porcelain status only. These cannot start Git
-    # hooks, install packages or mutate the working tree.
-    standard=["git","-c","safe.directory=/opt/CAPEv2",
-              "-C",str(CAPE)]
+    # Git rev-parse has no index refresh or working-tree file writes.
+    # Avoid git status: even a read-oriented status may refresh metadata.
+    standard=["git","--no-optional-locks",
+              "-c","safe.directory=/opt/CAPEv2","-C",str(CAPE)]
     sha=safe_readonly(standard+["rev-parse","--verify","HEAD"])
     if sha and re.fullmatch(r"[a-f0-9]{40}",sha):
         result["git_commit_sha40"]=sha
-    changes=safe_readonly(standard+["status","--porcelain",
-                                      "--untracked-files=no"])
-    if changes is not None:
-        result["source_uncommitted_tracked_changes"]=bool(changes)
+    result["uncommitted_changes_not_assessed"]=True
     return result
 
 def root_crypt_config_status():
