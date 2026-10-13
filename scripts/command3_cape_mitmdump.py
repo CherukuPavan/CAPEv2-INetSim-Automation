@@ -52,9 +52,13 @@ def private_ipv4(value):
         ip = ipaddress.IPv4Address(value)
     except (ValueError, ipaddress.AddressValueError) as exc:
         raise MitmdumpBlocked("Invalid NAT gateway IPv4") from exc
-    need(ip.is_private and not ip.is_link_local and not ip.is_loopback
-         and not ip.is_multicast and str(ip) == value,
-         "NAT gateway must be canonical private unicast IPv4")
+    private_networks = tuple(ipaddress.IPv4Network(r) for r in
+                             ("10.0.0.0/8", "172.16.0.0/12",
+                              "192.168.0.0/16"))
+    need(any(ip in net for net in private_networks) and
+         not ip.is_unspecified and not ip.is_multicast and
+         str(ip) == value,
+         "NAT gateway must be canonical RFC1918 private unicast IPv4")
     return value
 
 
