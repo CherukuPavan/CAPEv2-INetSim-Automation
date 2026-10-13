@@ -29,6 +29,8 @@ no_data_encryption = false
 pass_bad_blocks = false
 """
 PROOF = {"result":"COMMAND1_COLD_MASTER_BUNDLE_BYTE_VERIFIED",
+         "all_member_files_sha256_verified":True,
+         "capture_intent_sha256_verified":True,
          "manifest_sha256":"a"*64,"master_uuid":"some-uuid",
          "windows_volume_bytes":20*1024**3,
          "ready_to_transfer_privately":True}
@@ -164,6 +166,19 @@ class PrivateDriveTests(unittest.TestCase):
             self.assertFalse(report["Drive_uploaded"])
             self.assertEqual(report["bundle_proof"],PROOF)
             verified.assert_called_once_with(src)
+
+    def test_refuse_legacy_unbound_intent_manifest_for_private_transfer(self):
+        with tempfile.TemporaryDirectory() as td:
+            src=Path(td)/"cape-master-20261013_abcdef"
+            src.mkdir()
+            old=dict(PROOF)
+            old["all_member_files_sha256_verified"]=False
+            with patch.object(m,"verify_host",return_value="ref"), \
+                 patch.object(m,"read_crypt_settings",return_value={}), \
+                 patch.object(m.master,"manifest_check",return_value=old), \
+                 self.assertRaisesRegex(m.TransferBlocked,
+                                        "predates SHA256-bound"):
+                m.plan_upload("ref",src,"mycrypt",Path("/root/cfg"))
 
     def test_upload_approval_runs_immutable_crypt_copy_then_full_download_check(self):
         with tempfile.TemporaryDirectory() as td:
