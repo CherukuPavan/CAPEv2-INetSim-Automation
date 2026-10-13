@@ -56,6 +56,8 @@ class JoinedCommand3Tests(unittest.TestCase):
             patch.object(m.mitm, "plan",
                          return_value=deepcopy(INITIAL["mitmdump"])),
             patch.object(m.route, "plan", return_value=deepcopy(ROUTE)),
+            patch.object(m, "target_tmpfs_ready",
+                         return_value={"status":"TARGET_ON_MOUNT_READY"}),
         ]
 
     def test_config_path_layout_and_step_order(self):
@@ -211,6 +213,49 @@ class JoinedCommand3Tests(unittest.TestCase):
             self.assertEqual(milestones[-1]["completed"][0]["name"],"api")
             cuckoo.assert_not_called()
 
+    def test_missing_target_tmpfs_blocks_config_before_any_file_write(self):
+        from contextlib import ExitStack
+        with tempfile.TemporaryDirectory() as td, ExitStack() as stack:
+            args = self.context(td)
+            for p in self.patch_plans(self):
+                stack.enter_context(p)
+            stack.enter_context(patch.object(m.os,"geteuid",return_value=0))
+            stack.enter_context(patch.object(m.sys.stdin,"isatty",
+                                              return_value=True))
+            stack.enter_context(patch.object(m.socket,"gethostname",
+                                              return_value="other-host"))
+            stack.enter_context(patch.object(m,"target_tmpfs_ready",
+                 side_effect=m.Command3PipelineBlocked("missing tmpfs")))
+            a=stack.enter_context(patch.object(m.api,"apply",
+                      side_effect=AssertionError("No partial changes")))
+            with self.assertRaisesRegex(m.Command3PipelineBlocked,
+                                        "missing tmpfs"):
+                m.configure(args)
+            a.assert_not_called()
+            self.assertFalse(args.witness_dir.exists())
+
+    def test_actual_target_mount_checks_require_tmpfs_and_cape_owner(self):
+        import stat
+        fake = SimpleNamespace(st_mode=stat.S_IFDIR|0o750,
+                               st_uid=1500,st_gid=1600)
+        vfs = SimpleNamespace(f_bavail=6000,f_frsize=1024*1024)
+        with patch.object(m.tmpfs,"mount_fstype",return_value="tmpfs"), \
+             patch.object(m.tmpfs,"cape_ids",return_value=(1500,1600)), \
+             patch.object(m.os,"stat",return_value=fake), \
+             patch.object(m.os,"statvfs",return_value=vfs), \
+             patch.object(m.Path, "is_symlink",return_value=False):
+            data=m.target_tmpfs_ready()
+            self.assertEqual(data["status"],"TARGET_ON_MOUNT_READY")
+            self.assertEqual(data["required_free_mib"],4096)
+            with patch.object(m.tmpfs,"mount_fstype",return_value=None), \
+                 self.assertRaisesRegex(m.Command3PipelineBlocked,
+                                         "not actually mounted"):
+                m.target_tmpfs_ready()
+            vfs.f_bavail=3000
+            with self.assertRaisesRegex(m.Command3PipelineBlocked,
+                                        "enough available tmpfs"):
+                m.target_tmpfs_ready()
+
     def test_protected_ssl55_never_applies_even_with_root(self):
         from contextlib import ExitStack
         with tempfile.TemporaryDirectory() as td, ExitStack() as stack:
@@ -244,6 +289,8 @@ class JoinedCommand3Tests(unittest.TestCase):
                                               return_value="other-host"))
             stack.enter_context(patch.object(m.route,"plan",
                                               return_value=deepcopy(ROUTE)))
+            stack.enter_context(patch.object(m,"target_tmpfs_ready",
+                  return_value={"status":"TARGET_ON_MOUNT_READY"}))
             stack.enter_context(patch("builtins.input",return_value=m.APPROVAL))
             w=stack.enter_context(patch.object(m,"write_witness"))
             with self.assertRaisesRegex(m.Command3PipelineBlocked,
