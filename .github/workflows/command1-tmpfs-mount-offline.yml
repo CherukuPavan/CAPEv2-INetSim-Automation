@@ -1,0 +1,63 @@
+name: Command 1 persistent CAPE tmpfs mount offline
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command1_cape_tmpfs_mount.py"
+      - "scripts/test_command1_cape_tmpfs_mount.py"
+      - "scripts/command3_cape_tmpfs.py"
+      - "scripts/command3_cape_api_ratelimit.py"
+      - "docs/COMMAND3_TMPFS_STARTUP_FAILURE_AND_REPAIR.md"
+      - ".github/workflows/command1-tmpfs-mount-offline.yml"
+  pull_request:
+    branches: [development]
+    paths:
+      - "scripts/command1_cape_tmpfs_mount.py"
+      - "scripts/test_command1_cape_tmpfs_mount.py"
+      - "scripts/command3_cape_tmpfs.py"
+      - ".github/workflows/command1-tmpfs-mount-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  persistent-mount-offline:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Syntax check persistent CAPE tmpfs provider
+        run: |
+          python -B - <<'PY'
+          import ast
+          from pathlib import Path
+          for name in ("command1_cape_tmpfs_mount.py",
+                       "test_command1_cape_tmpfs_mount.py",
+                       "command3_cape_tmpfs.py"):
+              path = Path("scripts") / name
+              ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+              print("SYNTAX_OK", path)
+          PY
+      - name: Run synthetic-only mount installer regression
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -B -m unittest discover -s scripts -p 'test_command1_cape_tmpfs_mount.py' -v
+      - name: Guard against CAPE/VM restarts in mounted filesystem installer
+        run: |
+          python -B - <<'PY'
+          from pathlib import Path
+          source = Path("scripts/command1_cape_tmpfs_mount.py").read_text()
+          for denied in ("systemctl restart", "shell=True", "virsh start",
+                         "snapshot-revert", "iptables -", "rm -rf"):
+              assert denied not in source, denied
+          print("NO_CAPE_RESTART_NO_VM_MUTATION_PASS")
+          PY
