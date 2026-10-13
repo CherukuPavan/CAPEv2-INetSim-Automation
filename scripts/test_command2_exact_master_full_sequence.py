@@ -64,7 +64,8 @@ class SequenceTests(unittest.TestCase):
                          "independently_verify_windows"):
                 cmd=s.child_args(a,2,"/PRIVATE/code/"+s.STEPS[kind],kind,vm)
                 self.assertEqual(cmd[cmd.index("--vm")+1],vm)
-                self.assertIn("win11_2.master-nat.iso",cmd)
+                self.assertEqual(Path(cmd[cmd.index("--nat-iso")+1]).name,
+                                 "win11_2.master-nat.iso")
                 self.assertIn(str(a.journal_dir/"command2-identity-reservation.json"),cmd)
             cmd=s.child_args(a,2,"/PRIVATE/code/"+s.STEPS[
                              "all_graceful_shutdown"],"all_graceful_shutdown")
