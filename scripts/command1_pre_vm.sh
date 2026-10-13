@@ -25,7 +25,10 @@ Modes:
   master-checkpoint       Read-only final Windows master/snapshot handoff (after guest setup).
   master-export           Plan/capture/verify exact cold win11 Windows disk + OVMF + TPM golden bundle.
   master-import           Plan/stage/verify a PRIVATE golden bundle on a separate approved host.
-  host-acceptance         Consolidated read-only host + finished-master dependency report.\n  coverage                Show human-reviewed automation coverage/status documentation.
+  host-acceptance         Consolidated read-only host + finished-master dependency report.
+  reference-evidence      Review a supplied SSL-55 JSON reference (read-only).
+  source-export-capacity  Read-only actual master disk + TPM metadata, export disk-space check (requires root).
+  coverage                Show human-reviewed automation coverage/status documentation.
 
 Examples:
   bash scripts/command1_pre_vm.sh audit
@@ -116,6 +119,12 @@ case "$MODE" in
     command -v python3 >/dev/null 2>&1 || { echo 'Python3 missing' >&2; exit 2; }
     REPORT="${HOME:?}/cape_command1_master_checkpoint_$(date +%Y%m%d_%H%M%S)_$.json"
     exec python3 "$HERE/command1_master_checkpoint.py" --report "$REPORT" "$@"
+    ;;
+  reference-evidence)
+    exec python3 -B "$HERE/command1_reference_report_gate.py" "$@"
+    ;;
+  source-export-capacity)
+    exec python3 -B "$HERE/command1_actual_master_export_capacity.py" "$@"
     ;;
   master-export)
     exec python3 -B "$HERE/command1_export_existing_master.py" "$@"
