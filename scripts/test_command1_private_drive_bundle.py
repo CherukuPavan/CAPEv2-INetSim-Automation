@@ -62,6 +62,24 @@ class PrivateDriveTests(unittest.TestCase):
                  self.assertRaisesRegex(m.TransferBlocked,"CRYPT|crypt"):
                 m.read_crypt_settings(config,"mydrive")
 
+    def test_approval_is_bound_to_exact_oauth_and_crypt_configuration_bytes(self):
+        with tempfile.TemporaryDirectory() as td:
+            cfg=self.config(td)
+            with patch.object(m.os,"fstat",
+                              return_value=self.root_owner(cfg.stat())):
+                before=m.read_crypt_settings(cfg,"mycrypt")
+            cfg.write_text(RCLONE.replace(
+                "SENSITIVE_OAUTH_NOT_TO_ECHO",
+                "DIFFERENT_OAUTH_NOT_TO_ECHO"))
+            with patch.object(m.os,"fstat",
+                              return_value=self.root_owner(cfg.stat())):
+                after=m.read_crypt_settings(cfg,"mycrypt")
+            self.assertNotEqual(before["rclone_config_sha256"],
+                                after["rclone_config_sha256"])
+            self.assertEqual(len(after["rclone_config_sha256"]),64)
+            self.assertNotIn("OAUTH",str(before))
+            self.assertNotIn("OAUTH",str(after))
+
     def test_blocks_config_that_disables_encryption_or_uses_team_drive(self):
         for raw in (
             RCLONE.replace("no_data_encryption = false",
