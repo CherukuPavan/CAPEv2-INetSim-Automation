@@ -1,19 +1,32 @@
 # CAPEv2 + INetSim Automation
 
-> **October 13 developer-stage integrated audit:** [READ BEFORE
-> DEPLOYING](docs/THREE_COMMAND_PREDEPLOYMENT_AUDIT_20261013.md).
-> The full offline CI suite passed **1,478 tests on each Python 3.10
-> and Python 3.12** ([Actions](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38372435151)).
-> New integrated components: [Command2 one-invocation count-driven
-> VM sequencer](scripts/command2_exact_master_full_sequence.py),
-> [private Drive golden-master transfer](scripts/command1_private_drive_bundle.py),
-> [new-host exact master staging](scripts/command1_private_master_stage.py),
-> [Command3 joined config workflow](scripts/command3_from_operator_reference.py),
-> and [SSL55 read-only host provenance collector](scripts/command1_reference_host_blueprint.py).
-> **NOT a tested unattended 3-command release:** complete fresh-host
-> CAPEv2/INetSim installer, imported-master running snapshot and
-> TPM-consistent rollback, per-VM actual Windows firstboot, and safe
-> routing/service execution are still open. Protect SSL-55 and `main`.
+> **2026-10-13 current development status — READ BEFORE NEW-HOST TEST**
+> This repository is **PRIVATE**; unauthenticated raw GitHub `curl`
+> will not fetch the scripts. Authenticate and pin the exact `development`
+> SHA using the [private code and encrypted master deployment handoff](
+> docs/PRIVATE_DEPLOYMENT_SOURCE_AND_GDRIVE_HANDOFF.md).
+> Your manually configured SSL-55 master is preserved. No code changes
+> below have been applied to the original reference VMs.
+>
+> [Full integration regression](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38373563965):
+> **1,493 synthetic tests passed in each Python 3.10 and 3.12.**
+> [Command3 service restart](scripts/command3_cape_restart_verified.py)
+> is now a guarded, operator-approved action reachable from the joined
+> [Command3 entrypoint](scripts/command3_from_operator_reference.py)
+> as `--mode restart`, after five-file and mounted-tmpfs gates. Its
+> routing.conf step is still review-only and requires a separate
+> approved routing decision. Never claim service status proves VM readiness.
+>
+> [Count-driven exact-master Command2 sequencer](
+> scripts/command2_exact_master_full_sequence.py) and
+> [private encrypted Drive download + import](
+> scripts/command1_private_master_stage.py) are guarded developer-stage
+> workflows. They have NOT physically booted/verified the new-host
+> Windows master, recreated its running snapshot, or demonstrated
+> swtpm-consistent snapshot reset. Full fresh-host CAPEv2/INetSim
+> installation remains a gap. **This is not yet an accepted unattended
+> three-command release**; see the
+> [predeployment audit](docs/THREE_COMMAND_PREDEPLOYMENT_AUDIT_20261013.md).
 
 > **2026-10-13 updated operator handoff — Command 3 MANUAL REFERENCE FINISHED.**
 > SSL-55 now has all seven operator-requested CAPE configuration/restart
@@ -30,9 +43,10 @@
 > durable partial-step receipts and read-only routing/service checks.
 > [Command 3 joined runbook](docs/COMMAND3_JOINED_AUTOMATION_HANDOFF.md)
 > and [SSL-55 evidence](docs/COMMAND3_TMPFS_STARTUP_FAILURE_AND_REPAIR.md).
-> The routing writer and five-service restart executor are **not**
-> automated yet. Commands 1/2 installation, VM firstboot, TPM-safe
-> snapshot restore and new-host integration remain outstanding. Offline
+> The routing writer is NOT automated; a separately approved
+> five-service restart mode is now available after config and tmpfs checks.
+> Commands 1/2 installation, VM firstboot, TPM-safe snapshot restore
+> and new-host integration remain outstanding. Offline
 > GitHub CI passing does NOT establish portable production readiness.
 > Earlier dated historical notes below, including claims that Command 3
 > is locked/not started, are superseded by this updated status.
