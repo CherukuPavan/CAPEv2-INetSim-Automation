@@ -33,6 +33,30 @@ class WorldReaderTests(unittest.TestCase):
             config=self.root / "readonly.conf",
         )
 
+        # CI runs as an unprivileged user. Mock the metadata owner as UID 0
+        # while preserving *real* file type, permissions, sizes and links.
+        real_fstat = os.fstat
+        real_path_stat = Path.stat
+
+        def root_stat(s):
+            fields = list(s[:10])
+            fields[4] = 0
+            return os.stat_result(fields)
+
+        def fstat(fd):
+            return root_stat(real_fstat(fd))
+
+        def path_stat(path, *args, **kwargs):
+            return root_stat(real_path_stat(path, *args, **kwargs))
+
+        for patcher in (
+            mock.patch.object(m.os, "geteuid", return_value=0),
+            mock.patch.object(m.os, "fstat", side_effect=fstat),
+            mock.patch.object(m.Path, "stat", autospec=True, side_effect=path_stat),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     @mock.patch.object(m.socket, "gethostname", return_value="remote-village")
     def test_plan_never_writes_and_never_needs_personal_login(self, _):
         result = m.plan(self.args)
