@@ -1,5 +1,27 @@
 # CAPEv2 + INetSim Automation
 
+> **2026-10-13 updated operator handoff — Command 3 MANUAL REFERENCE FINISHED.**
+> SSL-55 now has all seven operator-requested CAPE configuration/restart
+> steps completed. The uploaded post-fix systemd report verified **all
+> five services active**, with CAPE waiting for tasks after a correctly
+> mounted and owned `/mnt/tmpfs`. The operator's manual work is
+> **finished**; do not rerun any installers or revert protected Windows
+> snapshots on SSL-55.
+>
+> **NEW developer-stage integration:** [one-entrypoint Command 3
+> plan/configure/verify](scripts/command3_from_operator_reference.py)
+> joins the five supported config editors with count-bound real KVM
+> guests, strict prechecks for enabled tmpfs, root-private backups,
+> durable partial-step receipts and read-only routing/service checks.
+> [Command 3 joined runbook](docs/COMMAND3_JOINED_AUTOMATION_HANDOFF.md)
+> and [SSL-55 evidence](docs/COMMAND3_TMPFS_STARTUP_FAILURE_AND_REPAIR.md).
+> The routing writer and five-service restart executor are **not**
+> automated yet. Commands 1/2 installation, VM firstboot, TPM-safe
+> snapshot restore and new-host integration remain outstanding. Offline
+> GitHub CI passing does NOT establish portable production readiness.
+> Earlier dated historical notes below, including claims that Command 3
+> is locked/not started, are superseded by this updated status.
+
 > **2026-10-13 Commands 1–2 source audit (development only):**
 > The exact-master Windows bundle and guarded N-clone stages exist.
 > New fail-closed admission verifies plaintext/standalone cloned Windows
@@ -10,8 +32,8 @@
 > safe swtpm recovery/revert and malware containment remain **unfinished**.
 > The NAT profile uses stable DHCP-reserved IPv4, not a Windows
 > DHCP-disabled static IP. See the [Commands 1–2 engineering audit](docs/COMMAND12_PRE_COMMAND3_ENGINEERING_AUDIT_20261013.md).
-> Command 3 can be developed next, but neither Command 1 nor Command 2 is
-> production-ready. Preserve protected SSL-55 and `main`.
+> Command 3 is now under active development (see current handoff above).
+> Commands 1 and 2 are not yet production-ready. Protect SSL-55 and `main`.
 
 > **2026-10-12 development integration:** Windows startup now supports
 > approved first boot with ONE pre-attached isolated NIC after exact trusted
