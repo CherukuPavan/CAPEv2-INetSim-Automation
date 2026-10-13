@@ -102,12 +102,86 @@ which would erase the operator's actual settings.
   current reference analysis VM is Windows 11; do not infer a Linux
   analysis VM exists.
 
+## Step 3 — reported completed on SSL-55 (2026-10-13)
+
+- Guide: Section **13.2.3**, CAPE core `cuckoo.conf`.
+- File: `/opt/CAPEv2/conf/cuckoo.conf`.
+- Operator confirms the manual edit was completed. **Their corrections override
+  the AFTER figure**: `[resultserver] ip = 0.0.0.0` (not
+  `192.168.122.1`), and the **existing cleaner keys are exactly**
+  `binaries`, `tmp`, and `analysis` (NOT `binaries_days`,
+  `tmp_days`, `analysis_days`). Keep existing section/key spelling
+  verbatim. An actual terminal screenshot confirms the cleaner spellings.
+
+### Exact operator target
+
+| Section | Existing keys and final values |
+|---|---|
+| `[cuckoo]` | `machinery_screenshots = on`, `memory_dump = on`, `reschedule = on`, `freespace = 0`, `freespace_processing = 0` |
+| `[resultserver]` | **`ip = 0.0.0.0`**, `store_csvs = on`, `upload_max_size = 1000000000` |
+| `[processing]` | `analysis_size_limit = 1000000000` |
+| `[database]` | `connection = postgresql://cape:<PRIVATE_PASSWORD>@localhost:5432/cape`, `timeout = 150` |
+| `[timeouts]` | `default = 300`, `critical = 300`, `vm_state = 150` |
+| `[tmpfs]` | `enabled = on`, `freespace = 4096` |
+| `[cleaner]` | `enabled = yes`, **`binaries = 0`, `tmp = 0`, `analysis = 0`**, `mongo = yes`, `unused_files_in_mongodb = yes` |
+
+**Total: 22 existing options**, including private database connection; the
+script changes only those whose values are different. No invented cleaner
+aliases, unwanted sections, or unrelated settings.
+
+### Development automation
+
+- `scripts/command3_cape_cuckoo.py` offers read-only `--mode plan` and
+  typed-confirmed root `--mode apply`. It uses the existing `cuckoo.conf`,
+  never rewrites the whole file from PDF, and requires all 22 keys exactly
+  once in their correct sections. Invalid booleans/numbers/IPv4 or PDF
+  `*_days` cleaner aliases fail closed, instead of being changed blindly.
+- A valid, existing local PostgreSQL CAPE URL stays unchanged. If the
+  database connection is missing/blank/placeholder on a **new host**,
+  the deployer needs `--db-dsn-file` referring to a **preexisting root
+  owned 0600 file**, containing the locally provisioned
+  `postgresql://cape:<encoded-password>@localhost:5432/cape` URL.
+  No password is hardcoded in source, reports, CI logs, or Git commits.
+  No evidence that the database was actually reachable is claimed.
+- Explicit approval, before/after SHA256, private original-config backup,
+  ownership/mode preservation, atomic replace, readback and no-op repeat.
+  It never restarts CAPE, alters guest VMs, changes services or exposes
+  DB credentials. No need to rerun manually finished steps on SSL-55.
+- Regression tests include the **operator's two corrections**, correct
+  multi-section options, a blank initial DB connection, the root-only
+  private-DSN pathway, secret redaction, backup, malformed values,
+  repeat-run idempotence and non-restart behavior.
+
+### Safety/acceptance gates before ANY CAPE service restart
+
+1. **`0.0.0.0` listens on all IPv4 interfaces**, including potentially
+   campus/public-facing ones. Result-server port exposure, API access,
+   firewall allowlist and host route/isolation must be verified; a
+   wildcard bind is **not** proof of sandbox containment.
+2. `memory_dump = on` creates potentially large files while the two
+   free-space thresholds are **disabled (0)**. Check host capacity and
+   capacity alarm/recovery, rather than accepting zero as "safe".
+3. `[tmpfs] enabled = on` requires an actual configured tmpfs mount and
+   enough reserved RAM/disk for guest analysis on the target host.
+4. The cleaner's zero-valued `binaries/tmp/analysis` settings and
+   `mongo = yes` could trigger aggressive retention/deletion policies.
+   **Protect needed samples and analysis results; review effective CAPE
+   cleaner semantics before enabling the service.**
+5. PostgreSQL role/password/DB must exist, be reachable, and remain
+   private; connection-string syntax alone is insufficient.
+6. `store_csvs`, `upload_max_size`, `analysis_size_limit` change
+   storage and upload limits; verify storage quotas/permissions and
+   CAPE version-specific units on the new machine.
+
+No restarts, samples, tests on reference snapshots, nor network edits
+were performed by this development-only GitHub work.
+
 ## Pending operator steps
 
 Await the next supplied configuration-file edit. For each step, document
 exact file/section/key, operator's desired value, project-specific reason,
 the old value if known, dependency/security impact, and idempotent regression.
-Do not invent unspecified `kvm.conf`, `cuckoo.conf`, `routing.conf` values.
+Do not invent unspecified `kvm.conf`, `routing.conf` or other future values. The operator-confirmed `cuckoo.conf` fields are recorded above.
 
 Restart CAPE/related services **only after** the complete reviewed change
 set and its service dependency order have been validated. Do not assume a
