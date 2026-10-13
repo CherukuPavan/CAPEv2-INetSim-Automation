@@ -15,7 +15,18 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-import tomllib
+
+# tomllib is stdlib from Python 3.11 onward. Supported Python 3.10
+# installs must provide the small tomli backport explicitly.
+try:
+    import tomllib
+except ModuleNotFoundError:
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Python 3.10 requires the tomli package for CAPE poetry.lock "
+            "validation; install it in the selected interpreter") from exc
 
 SAMPLES = ("ImageHash", "deepdiff", "binGraph", "HTTPReplay", "Socks5man", "pyattck")
 SERVICES = ("cape.service", "cape-processor.service", "cape-web.service", "cape-rooter.service")
