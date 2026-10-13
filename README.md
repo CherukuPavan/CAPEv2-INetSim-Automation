@@ -12,12 +12,22 @@
 > [reference evidence gate](scripts/command1_reference_report_gate.py)
 > and [read-only deep host fingerprint](scripts/command1_ssl55_deep_fingerprint.py)
 > are designed to resolve these before export or portable installation.
+> **Source export storage audit:** the actual reference `win11`
+> has a 64-GiB virtual disk and 3-layer QCOW2 chain. The existing
+> 94-GiB-free export rule compared against 48.41 GiB available leaves
+> **45.59 GiB** to reclaim or provide on another mounted disk. Never
+> delete the Windows backing chain or snapshots to meet this goal.
+> [One-command read-only safe-space audit](
+> scripts/command1_ssl55_safe_space_audit.py) and
+> [review-before-cleanup guide](
+> docs/SSL55_SAFE_SPACE_RECLAIM_PLAN_20261013.md) are committed.
+> No user disk files were deleted by this development work.
 > Your manually configured SSL-55 master is preserved. No code changes
 > below have been applied to the original reference VMs.
 >
 > [Full integration regression](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38373563965):
-> **1,524 synthetic tests passed in each Python 3.10 and 3.12.**
-> [Latest full regression](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38385255330).
+> **1,532 synthetic tests passed in each Python 3.10 and 3.12.**
+> [Latest full regression](https://github.com/CherukuPavan/CAPEv2-INetSim-Automation/actions/runs/38387072634).
 > [Command3 service restart](scripts/command3_cape_restart_verified.py)
 > is now a guarded, operator-approved action reachable from the joined
 > [Command3 entrypoint](scripts/command3_from_operator_reference.py)
