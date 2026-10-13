@@ -127,6 +127,21 @@ class KvmMachineTests(unittest.TestCase):
                 m.render(old,"192.168.122.125","Afterfull",guests(2),
                          "192.168.122.1")
 
+    def test_never_delete_real_or_credential_bearing_legacy_registration(self):
+        for invalid in (
+            LEGACY.replace(b"snapshot = snapshot1\\n",
+                           b"snapshot = snapshot1\\npassword = retain-this\\n"),
+            LEGACY.replace(b"label = cuckoo1\\n",
+                           b"label = cuckoo1\\nsecret_token = PRIVATE\\n"),
+            LEGACY.replace(b"label = cuckoo1\\n",
+                           b"label = cuckoo1\\nlabel = cuckoo1\\n"),
+        ):
+            with self.subTest(config=invalid[-80:]), \\
+                 self.assertRaisesRegex(m.KvmBlocked,
+                                        "custom/unsafe|Duplicate"):
+                m.render(invalid, "192.168.122.125", "Afterfull",
+                         guests(1), "192.168.122.1")
+
     def test_duplicate_managed_kvm_options_blocked(self):
         bad=LIVE.replace(b"machines = win11\n",b"machines = win11\nmachines = win11\n")
         with self.assertRaisesRegex(m.KvmBlocked,"Duplicate"):
