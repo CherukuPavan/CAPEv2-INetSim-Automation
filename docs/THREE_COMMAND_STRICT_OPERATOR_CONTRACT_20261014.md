@@ -78,6 +78,33 @@ same persisted deployment transaction and refuse deletion of preexisting or
 unproven resources. Current six-config-only repair and rollback are not
 equivalent to full deployment undo.
 
+## 2026-10-15 newly confirmed release blocker: Ubuntu Noble snapshot stack
+
+The previous plan to silently invoke distro `bootstrap_virtualization_stack.sh
+--apply` cannot satisfy the existing `command2_native_snapshot_stack_guard.py`
+minimums for a real RUNNING pflash/TPM checkpoint. The release guard demands
+**libvirt >=10.10.0 and QEMU >=9.0.0**. Official Ubuntu 24.04 (Noble)
+packages provide **libvirt 10.0.0 and QEMU 8.2.2** (even after normal
+security updates). Installing them can create cold VMs, but does not pass
+the project's running-snapshot version admission.
+
+A new no-write `scripts/command123_hypervisor_release_compat.py` checks
+actual APT candidates and fails before attempting full-snapshot installation.
+A new `--require-snapshot-stack` opt-in on
+`scripts/bootstrap_virtualization_stack.sh` invokes this gate **before**
+any APT changes. Never relax the minimums merely to make a CLI return zero.
+
+Complete Command 1 must choose and implement a pinned, validated compatible
+hypervisor source build OR an independently proven TPM-consistent running
+checkpoint mechanism compatible with Ubuntu packages. The former's upstream
+installer rewrites host packages, services, boot policies and dependencies
+and cannot be invoked blindly without cross-command rollback attribution.
+The latter must demonstrate real benign two-cycle restoration before
+registering the resulting guest with CAPE.
+
+Neither the presence of `/dev/kvm` on `rakshati` nor 1,500+ offline
+regression tests can close that physical and integration gap.
+
 ## Current implementation status (explicit, fail closed)
 
 As of this specification, **THE THREE-COMMAND RELEASE IS NOT BUILT**.
