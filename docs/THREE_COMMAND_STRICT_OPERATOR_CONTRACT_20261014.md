@@ -93,6 +93,11 @@ actual APT candidates and fails before attempting full-snapshot installation.
 A new `--require-snapshot-stack` opt-in on
 `scripts/bootstrap_virtualization_stack.sh` invokes this gate **before**
 any APT changes. Never relax the minimums merely to make a CLI return zero.
+Even future APT candidates meeting the version floor are **not approved**
+for installation on Noble until a compatible, signed/pinned source and
+reversible deployment provenance have been established. Candidate version
+strings alone cannot authorize arbitrary PPA or mixed-Ubuntu-release APT
+packages. The current full-snapshot gate deliberately exits nonzero.
 
 Complete Command 1 must choose and implement a pinned, validated compatible
 hypervisor source build OR an independently proven TPM-consistent running
