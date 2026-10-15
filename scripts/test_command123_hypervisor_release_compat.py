@@ -37,6 +37,18 @@ class ReleaseSnapshotVersionsTests(unittest.TestCase):
         with self.assertRaises(g.ReleaseBlocked):
             g.parse_deb_version("(none)")
 
+    def test_reject_prerelease_and_upstream_downgrade_packages(self):
+        # Debian ~rc is older than GA; +really can denote older upstream.
+        for candidate in ("1:9.0.0~rc1-1",
+                          "9.0.0+really8.2.2-1",
+                          "10.10.0~rc2-1",
+                          "10.10.0+really10.0.0-2"):
+            with self.subTest(candidate=candidate):
+                with self.assertRaises(g.ReleaseBlocked):
+                    g.parse_deb_version(candidate)
+        self.assertEqual(g.parse_deb_version("1:9.1.0+ds-1ubuntu2"),
+                         (9, 1, 0))
+
     def test_no_candidate_is_fail_closed(self):
         with self.assertRaises(g.ReleaseBlocked):
             g.policy_candidate("Installed: (none)\nCandidate: (none)\n")
