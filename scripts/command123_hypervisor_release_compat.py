@@ -100,7 +100,13 @@ def candidate_matrix(candidates):
         "swtpm_restore_consistency_proven": False,
         "CAPE_three_commands_ready": False,
         "apt_modified": False, "VMs_modified": False,
-        "safe_to_autoinstall_for_full_snapshot_contract": not blockers,
+        # Version strings do not prove repository trust, package integrity,
+        # compatibility with Noble, or a reversible APT transaction. A
+        # separately pinned and verified stack source is still required.
+        "snapshot_stack_package_provenance_approved": False,
+        "release_blockers": blockers + [
+            "PINNED_COMPATIBLE_HYPERVISOR_SOURCE_NOT_IMPLEMENTED"],
+        "safe_to_autoinstall_for_full_snapshot_contract": False,
     }
 
 
@@ -119,7 +125,7 @@ def main():
         report = plan()
         print(json.dumps(report, indent=2, sort_keys=True))
         # Failure must block use as a production full-snapshot installer.
-        return 0 if report["running_snapshot_stack_versions_admitted"] else 3
+        return 0 if report["safe_to_autoinstall_for_full_snapshot_contract"] else 3
     except (ReleaseBlocked, ValueError, OSError) as e:
         print(json.dumps({
             "result": "COMMAND123_HYPERVISOR_RELEASE_PRECHECK_BLOCKED",
