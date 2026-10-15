@@ -100,11 +100,15 @@ class CheckoutTests(unittest.TestCase):
                 c.extract_verified(archive, out, entries())
             archive.write_bytes(build_tar({"README.md": SOURCE["README.md"],
                                           "unknown": b"bad"}))
+            out2 = root / "out2"
+            out2.mkdir()
             with self.assertRaises(c.CheckoutBlocked):
-                c.extract_verified(archive, out, entries())
+                c.extract_verified(archive, out2, entries())
             archive.write_bytes(build_tar({"README.md": SOURCE["README.md"]}))
+            out3 = root / "out3"
+            out3.mkdir()
             with self.assertRaises(c.CheckoutBlocked):
-                c.extract_verified(archive, out, entries())
+                c.extract_verified(archive, out3, entries())
 
     def test_extract_rejects_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:
