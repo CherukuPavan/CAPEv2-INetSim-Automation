@@ -25,6 +25,8 @@ class ReleaseSnapshotVersionsTests(unittest.TestCase):
             "libvirt-daemon-system": "10.10.0-5ubuntu1",
         })
         self.assertTrue(report["running_snapshot_stack_versions_admitted"])
+        self.assertEqual(report["result"],
+                         "COMMAND123_HYPERVISOR_RELEASE_VERSIONS_OK_SOURCE_UNVERIFIED")
         self.assertFalse(report["snapshot_stack_package_provenance_approved"])
         self.assertFalse(report["safe_to_autoinstall_for_full_snapshot_contract"])
         self.assertIn("PINNED_COMPATIBLE_HYPERVISOR_SOURCE_NOT_IMPLEMENTED",
