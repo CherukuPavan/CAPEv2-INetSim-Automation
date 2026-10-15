@@ -1,5 +1,23 @@
 # CAPEv2 + INetSim Automation
 
+> **2026-10-15 new host final-release stop:** Ubuntu 24.04's standard
+> QEMU 8.2 / libvirt 10.0 packages do **not** meet the repo's native
+> running-checkpoint guard (QEMU >=9.0; libvirt >=10.10). The new
+> [candidate compatibility gate](scripts/command123_hypervisor_release_compat.py)
+> and `--require-snapshot-stack` option on
+> [virtualization bootstrap](scripts/bootstrap_virtualization_stack.sh)
+> fail **before package installation** when full-snapshot support is
+> requested. Both are offline-tested, but **a safely installable modern
+> hypervisor and TPM-consistent RUNNING snapshot restore remain missing**.
+> The private Google Drive service-account access grant and the
+> deployment-specific full rollback journal also remain prerequisites.
+> **Do not give or run three purportedly production-ready install
+> commands; these are not implemented as an end-to-end product yet.**
+> See [strict three-command contract](
+> docs/THREE_COMMAND_STRICT_OPERATOR_CONTRACT_20261014.md). Source Windows
+> and cloud backups stay protected. INetSim remains deferred.
+
+
 > **Operator clarification: ROLLBACK means UNDO THIS DEPLOYMENT ONLY.**
 > Do not reimage Ubuntu, delete unrelated VM disks, or reset the OS as a
 > substitute. The intended `repair` checks and fixes resources *created or
