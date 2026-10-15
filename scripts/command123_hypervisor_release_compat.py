@@ -34,6 +34,12 @@ def parse_deb_version(text):
     """Accept versioned Debian epochs; reject bogus/missing candidates."""
     if not isinstance(text, str):
         raise ReleaseBlocked("APT version was not a string")
+    # APT versions may look sufficiently new while delivering OLDER code:
+    # 9.0.0~rc1 is a pre-release; 9.0.0+really8.2.2 packages QEMU 8.2.2.
+    # Never accept these as proof of the conservative minimum version.
+    upstream = text.strip().split("-", 1)[0]
+    if "~" in upstream or re.search(r"\+really", upstream, re.IGNORECASE):
+        raise ReleaseBlocked("Prerelease or upstream-version replacement")
     match = re.fullmatch(r"(?:[0-9]{1,5}:)?([0-9]{1,4})\.([0-9]{1,4})"
                          r"(?:\.([0-9]{1,4}))?(?:[+~.\-A-Za-z0-9:]*)?",
                          text.strip())
