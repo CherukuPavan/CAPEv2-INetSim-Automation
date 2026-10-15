@@ -25,6 +25,10 @@ class ReleaseSnapshotVersionsTests(unittest.TestCase):
             "libvirt-daemon-system": "10.10.0-5ubuntu1",
         })
         self.assertTrue(report["running_snapshot_stack_versions_admitted"])
+        self.assertFalse(report["snapshot_stack_package_provenance_approved"])
+        self.assertFalse(report["safe_to_autoinstall_for_full_snapshot_contract"])
+        self.assertIn("PINNED_COMPATIBLE_HYPERVISOR_SOURCE_NOT_IMPLEMENTED",
+                      report["release_blockers"])
         self.assertFalse(report["cold_windows_boot_proven"])
         self.assertFalse(report["swtpm_restore_consistency_proven"])
         self.assertFalse(report["CAPE_three_commands_ready"])
