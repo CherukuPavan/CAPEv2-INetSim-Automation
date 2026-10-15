@@ -91,7 +91,7 @@ def candidate_matrix(candidates):
         if not usable:
             blockers.append(package + ":APT_CANDIDATE_TOO_OLD_OR_UNKNOWN")
     return {
-        "result": ("COMMAND123_HYPERVISOR_RELEASE_CANDIDATES_ADMITTED"
+        "result": ("COMMAND123_HYPERVISOR_RELEASE_VERSIONS_OK_SOURCE_UNVERIFIED"
                    if not blockers else
                    "COMMAND123_HYPERVISOR_RELEASE_CANDIDATES_BLOCKED"),
         "apt": rows, "blockers": blockers,
