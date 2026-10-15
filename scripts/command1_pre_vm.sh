@@ -16,6 +16,7 @@ Modes:
   apply-prereqs           Explicitly install only known-safe missing base packages.
   bootstrap-source        Fresh-host Git clone, or verify existing owned checkout.
   plan-virt               Read-only distro virtualization package preflight (Steps 6-9).
+  plan-release-hypervisor Read-only QEMU/libvirt version admission for REAL running-snapshot contract.
   apply-virt              Controlled distro QEMU/libvirt install (not custom build).
   audit-installers        Static risk audit of local upstream installer scripts.
   inspect-media FILE      Read-only completed Windows archive/ISO metadata and SHA256.
@@ -82,6 +83,10 @@ case "$MODE" in
     ;;
   plan-virt)
     exec bash "$HERE/bootstrap_virtualization_stack.sh" --plan "$@"
+    ;;
+  plan-release-hypervisor)
+    (($# == 0)) || { usage >&2; exit 2; }
+    exec python3 -B "$HERE/command123_hypervisor_release_compat.py" --mode plan
     ;;
   apply-virt)
     exec bash "$HERE/bootstrap_virtualization_stack.sh" --apply "$@"
