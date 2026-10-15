@@ -8,6 +8,7 @@ umask 077
 
 MODE=plan
 REPORT=''
+REQUIRE_SNAPSHOT_STACK=0
 usage() {
   cat <<'HELP'
 Usage: bash scripts/bootstrap_virtualization_stack.sh [--plan|--apply] [--report ABSOLUTE_NEW_TXT]
@@ -16,6 +17,11 @@ Usage: bash scripts/bootstrap_virtualization_stack.sh [--plan|--apply] [--report
 --apply: explicitly install only missing distro QEMU/libvirt/virt-manager
          packages IF no custom/source-managed binary is already present and
          APT simulation proposes no removals or upgrades.
+--require-snapshot-stack: fail CLOSED before any installation if the
+         APT QEMU/libvirt candidates are below the project's full running
+         snapshot version gate (QEMU>=9.0, libvirt>=10.10). This MUST be
+         used by any complete three-command release; default partial cold
+         guest provisioning intentionally does not impose it.
 Requires Ubuntu 24.04 x86_64 for apply; an independent CAPE compatibility and
 VM/guest isolation acceptance test is still required. NO host-wide firmware,
 power, GRUB, sysctl, network, KVM modprobe or package-purge changes are made
@@ -26,6 +32,7 @@ while (($#)); do
   case "$1" in
     --plan) MODE=plan; shift ;;
     --apply) MODE=apply; shift ;;
+    --require-snapshot-stack) REQUIRE_SNAPSHOT_STACK=1; shift ;;
     --report)
       (($#>=2)) || { echo 'Missing report path' >&2; exit 2; }
       REPORT=$2; shift 2 ;;
@@ -43,6 +50,23 @@ if [[ $MODE == apply && ("${VERSION_ID:-}" != 24.04 || $(uname -m) != x86_64) ]]
   exit 2
 fi
 command -v apt-get >/dev/null || { echo 'APT missing' >&2; exit 2; }
+
+# A complete three-command deployment promises *running* Windows snapshots.
+# The Ubuntu Noble distro QEMU/libvirt version pair is generally too old.
+# Check the actual candidate versions before any apt install transaction,
+# even if ordinary cold-guest provisioning would otherwise succeed.
+if (( REQUIRE_SNAPSHOT_STACK )); then
+  command -v python3 >/dev/null || {
+    echo '[BLOCKED] Python3 needed for full running snapshot version admission.' >&2
+    exit 7
+  }
+  HERE=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+  if ! python3 -B "$HERE/command123_hypervisor_release_compat.py" --mode plan; then
+    echo '[BLOCKED] Full running-snapshot hypervisor stack is not available from current APT candidates.' >&2
+    echo 'No QEMU/libvirt package installation has occurred; DO NOT bypass version or TPM gates.' >&2
+    exit 7
+  fi
+fi
 
 if [[ -n "$REPORT" ]]; then
   [[ $REPORT == /* && ! -e $REPORT && ! -L $REPORT ]] || { echo 'Report path exists or is not absolute' >&2; exit 2; }
