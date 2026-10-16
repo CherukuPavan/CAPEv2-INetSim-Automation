@@ -263,6 +263,22 @@ def acquire(commit_sha: str, token: str | None, home: Path) -> Path:
         raise
 
 
+def has_controlling_tty() -> bool:
+    """Here-doc Python has redirected stdin, but may still own /dev/tty.
+
+    Never fall back to an untrusted pipe when requesting hidden credentials.
+    """
+    try:
+        fd = os.open("/dev/tty", os.O_RDONLY | os.O_NOCTTY |
+                     os.O_CLOEXEC)
+    except OSError:
+        return False
+    try:
+        return os.isatty(fd)
+    finally:
+        os.close(fd)
+
+
 def main(*, bootstrap_token=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--revision", required=True)
@@ -270,8 +286,8 @@ def main(*, bootstrap_token=None):
                         help="Unauthenticated, integrity-checked PUBLIC repository checkout")
     args = parser.parse_args()
     try:
-        require(os.geteuid() != 0 and sys.stdin.isatty(),
-                "Run on a local non-root interactive terminal")
+        require(os.geteuid() != 0 and has_controlling_tty(),
+                "Use an interactive non-root controlling terminal")
         require(os.uname().machine == "x86_64",
                 "Checkout only supported on x86_64")
         # The one-command private bootstrap may pass the token in memory;
