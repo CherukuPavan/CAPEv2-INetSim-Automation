@@ -27,10 +27,64 @@ import command1_tracked_prerequisite_stage as base
 import command1_private_master_handoff_sequence as master
 import command1_worldwide_drive_reader as reader
 import command123_deployment_transaction as tx
+import command1_cape_runtime_rootless_stage as runtime
 
 RECEIPTS = Path("/var/lib/cape-command1-integrated-cold")
 APPROVAL = "INTEGRATE-CAPE-SOURCE-AND-PRIVATE-COLD-MASTER"
 PHASES = ("tracked_host_and_cape_source", "private_exact_master_import")
+RUNTIME_PHASE = "rootless_cape_python_runtime"
+RUNTIME_FIELDS = (
+    "runtime_manifest", "runtime_lock", "runtime_wheelhouse",
+    "runtime_approved_manifest_sha256", "runtime_uv",
+    "runtime_approved_uv_sha256", "runtime_python",
+    "runtime_approved_python_sha256",
+)
+
+
+def runtime_arguments(args):
+    """Optional CAPE runtime requires the complete eight-field profile."""
+    values = [getattr(args, key, None) for key in RUNTIME_FIELDS]
+    if not any(item is not None for item in values):
+        return None
+    need(all(value is not None and bool(str(value)) for value in values),
+         "Partial CAPE runtime input profile refused")
+    return dict(zip(RUNTIME_FIELDS, values))
+
+
+def phases_for(args):
+    return (PHASES[0], RUNTIME_PHASE, PHASES[1]) if (
+        runtime_arguments(args) is not None) else PHASES
+
+
+def runtime_preflight(args):
+    """Admit reviewed wheel bytes/uv/Python before any APT changes."""
+    fields = runtime_arguments(args)
+    if fields is None:
+        return {"requested": False, "runtime_stage_performed": False}
+    admission = runtime.wheels.plan(
+        fields["runtime_manifest"], fields["runtime_lock"],
+        fields["runtime_wheelhouse"],
+        fields["runtime_approved_manifest_sha256"])
+    need(admission["source_sha"] == args.cape_revision,
+         "Offline runtime source differs from pinned CAPE commit")
+    need(runtime.sha_file(fields["runtime_uv"]) ==
+         fields["runtime_approved_uv_sha256"],
+         "Unapproved uv binary")
+    need(runtime.sha_file(fields["runtime_python"]) ==
+         fields["runtime_approved_python_sha256"],
+         "Unapproved isolated Python binary")
+    account = runtime.user_account(getattr(args, "runtime_user", "cape"))
+    return {
+        "requested": True,
+        "packages_verified": admission["packages_verified"],
+        "approved_manifest_sha256":
+            fields["runtime_approved_manifest_sha256"],
+        "runtime_uid": account.pw_uid,
+        "runtime_user": account.pw_name,
+        "offline_only": True,
+        "source_matches_exact_revision": True,
+        "runtime_stage_performed": False,
+    }
 
 class IntegratedBlocked(RuntimeError):
     pass
