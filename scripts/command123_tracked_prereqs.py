@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import uuid
@@ -106,12 +107,38 @@ def simulate(names, *, allow_virt26=False):
     return actions
 
 
+def no_shadowed_virtualization_executables():
+    """Prevent official APT binaries shadowed by unknown manual /opt builds.
+
+    No custom QEMU, swtpm or libvirt executable is overwritten or preferred.
+    It is safer to stop before APT than to install a parallel/conflicting
+    hypervisor that would use another binary at runtime.
+    """
+    required = (
+        "qemu-system-x86_64", "qemu-img", "virsh",
+        "swtpm", "swtpm_setup", "virt-install",
+    )
+    paths = {}
+    for name in required:
+        found = shutil.which(name)
+        if found is None:
+            paths[name] = None
+            continue
+        expected = Path("/usr/bin") / name
+        need(Path(found).resolve() == expected.resolve() and
+             expected.is_file() and not expected.is_symlink(),
+             "External or shadowed virtualization executable: " + name)
+        paths[name] = str(expected)
+    return paths
+
+
 def plan():
     release = verify_host()
     # Meeting the package versions does NOT imply TPM-safe snapshot restore.
     compat = None
     allowed = BASE
     if release == "26.04":
+        no_shadowed_virtualization_executables()
         try:
             compat = hypervisor.plan()
         except hypervisor.ReleaseBlocked as error:
