@@ -37,6 +37,7 @@ Modes:
   worldwide-drive-reader  Set up private, read-only service-account crypt access on ANY approved other host.
   master-private-handoff   INTERNAL guarded reader -> encrypted download -> shutoff exact master import.
   integrated-cold-host-master INTERNAL guarded tracked APT/CAPE source -> private golden cold master.
+  verify-pinned-python-wheels Internal read-only exact manifest/170-wheel SHA verification before offline CAPE runtime install.
   repair-doctor           READ-ONLY new-host CAPE+VM+service+snapshot diagnostic (no repair writes).
   recovery                Tracked six-CAPE-config baseline/seal/plan-repair/repair/plan-rollback/rollback ONLY.
   coverage                Show human-reviewed automation coverage/status documentation.
@@ -175,6 +176,9 @@ case "$MODE" in
   integrated-cold-host-master)
     [[ $EUID -eq 0 ]] || { echo 'Cold host and master sequence requires root.' >&2; exit 2; }
     exec python3 -B "$HERE/command1_integrated_cold_sequence.py" "$@"
+    ;;
+  verify-pinned-python-wheels)
+    exec python3 -B "$HERE/command1_cape_runtime_offline_admission.py" "$@"
     ;;
   repair-doctor)
     exec python3 -B "$HERE/command123_repair_doctor.py" "$@"
