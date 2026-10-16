@@ -104,12 +104,38 @@ def no_foreign_domain_uses_images(vm,disk,nvram):
         root=ET.fromstring(stager.virsh("dumpxml","--inactive",other))
         need(root.tag=="domain" and root.findtext("name")==other,
              "Cannot review other domain storage")
-        disks={elem.get("file") for elem in
-               root.findall("./devices/disk/source") if elem.get("file")}
+        sources=root.findall("./devices/disk")
+        paths=[]
+        for elem in sources:
+            source=elem.find("source")
+            if source is None or not source.attrib:
+                need(elem.get("device") == "cdrom",
+                     "Foreign VM disk has no inspectable source")
+                continue
+            name=source.get("file")
+            need(type(name) is str and bool(name) and
+                 len(source.attrib)==1 and
+                 Path(name).is_absolute(),
+                 "Foreign VM uses opaque/unknown storage; reverse staging blocked")
+            paths.append(name)
         fw=root.findtext("./os/nvram")
-        need(disk not in disks and nvram not in disks and
-             fw not in (disk,nvram),
+        loader=root.findtext("./os/loader")
+        protected={Path(disk).resolve(),Path(nvram).resolve()}
+        need(not any(Path(name).resolve() in protected
+                     for name in (*paths,fw,loader)
+                     if name is not None),
              "Another defined VM references this clone's OS/UEFI storage")
+        # XML only exposes a foreign disk's TOP layer. A foreign QCOW2
+        # overlay may reference either owned image through its backing chain.
+        # This metadata inspection is read-only and fails closed.
+        for path in paths:
+            try:
+                disk_audit.require_no_foreign_qcow2_backing_reference(
+                    path,(disk,nvram))
+            except disk_audit.DiskAdmissionBlocked as error:
+                raise CloneRollbackBlocked(
+                    "Another defined VM's backing chain is shared or unverified"
+                ) from error
 
 
 def live_admission(row):
