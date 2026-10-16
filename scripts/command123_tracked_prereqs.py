@@ -88,8 +88,10 @@ def installed():
     return result
 
 
-def simulate(names):
-    need(set(names) <= set(BASE) | set(VIRT26), "Unapproved package")
+def simulate(names, *, allow_virt26=False):
+    need(type(allow_virt26) is bool and
+         set(names) <= (set(BASE) | (set(VIRT26) if allow_virt26 else set())),
+         "Unapproved package")
     output = read_command(["apt-get", "-s", "-o", "Debug::NoLocking=true",
                            "install", "--no-install-recommends", *names])
     actions = []
@@ -121,7 +123,10 @@ def plan():
         allowed += VIRT26
     before = installed()
     missing = sorted(pkg for pkg in allowed if pkg not in before)
-    simulated = simulate(missing) if missing else []
+    simulated = (
+        (simulate(missing, allow_virt26=True) if release == "26.04"
+         else simulate(missing))
+        if missing else [])
     need(not set(simulated) & set(before),
          "APT would upgrade or reinstall a preexisting package")
     return {"result": "CAPE_BASE_APT_REVIEW_ONLY",
