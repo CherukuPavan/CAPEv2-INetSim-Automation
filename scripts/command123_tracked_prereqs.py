@@ -110,7 +110,12 @@ def plan():
     compat = None
     allowed = BASE
     if release == "26.04":
-        compat = hypervisor.plan()
+        try:
+            compat = hypervisor.plan()
+        except hypervisor.ReleaseBlocked as error:
+            raise ledger.TransactionBlocked(
+                "Resolute signed APT candidate inventory unavailable"
+            ) from error
         need(compat["running_snapshot_stack_versions_admitted"],
              "Resolute QEMU/libvirt APT candidates below floor")
         allowed += VIRT26
