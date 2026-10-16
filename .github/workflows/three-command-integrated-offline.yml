@@ -4,6 +4,8 @@ on:
   push:
     branches: [development]
     paths:
+      - "scripts/ci_normalize_python_tlsh_wheel.py"
+      - "scripts/test_ci_normalize_python_tlsh_wheel.py"
       - "scripts/command1_*.py"
       - "scripts/command2_*.py"
       - "scripts/command3_*.py"
