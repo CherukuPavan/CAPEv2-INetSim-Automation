@@ -92,6 +92,53 @@ def user_account(name):
     return account
 
 
+def verify_root_immutable_inputs(*, manifest, lock, wheelhouse,
+                                 uv, python, cape_source):
+    """Reject a CAPE-user-writable wheelhouse or a replaceable executable.
+
+    Hashing before running uv is not enough: the unprivileged CAPE
+    account must not be able to replace a wheel or rename any parent
+    directory between the reviewed plan and the actual offline install.
+    Every ancestor is root-owned, not group/other writable, and is a
+    real directory; each input must itself be root-owned/nonwritable.
+    This also deliberately rejects /tmp and other world-writable staging
+    parents on real hosts. Provision readable material under a protected
+    system location instead.
+    """
+    examined = set()
+    files = (Path(manifest), Path(lock), Path(uv), Path(python))
+    dirs = (Path(wheelhouse), Path(cape_source))
+    for p in (*files, *dirs):
+        need(p.is_absolute() and ".." not in p.parts,
+             "Runtime source path is not canonical/absolute")
+        for node in (p, *p.parents):
+            if node in examined:
+                continue
+            st = node.lstat()
+            need(st.st_uid == 0 and not st.st_mode & 0o022 and
+                 not stat.S_ISLNK(st.st_mode),
+                 "Runtime source file or ancestor is writable/untrusted")
+            if node == p and p in files:
+                need(stat.S_ISREG(st.st_mode) and st.st_nlink == 1,
+                     "Runtime source file must be a single regular inode")
+            else:
+                need(stat.S_ISDIR(st.st_mode),
+                     "Runtime source parent must be a directory")
+            examined.add(node)
+    artifacts = list(Path(wheelhouse).iterdir())
+    need(160 <= len(artifacts) <= wheels.MAX_WHEELS,
+         "Runtime wheelhouse must contain only reviewed wheel files")
+    for artifact in artifacts:
+        st = artifact.lstat()
+        need(artifact.name.endswith(".whl") and
+             stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and
+             st.st_uid == 0 and not st.st_mode & 0o022 and
+             st.st_size > 0,
+             "CAPE wheel is not root-owned and immutable to runtime user")
+    return {"immutable_input_paths_verified": len(examined),
+            "immutable_root_owned_wheels_verified": len(artifacts)}
+
+
 def source_entry(doc):
     matches = [x for x in doc["entries"] if x.get("kind") == "cape_source"]
     need(len(matches) == 1 and matches[0].get("status") == "sealed",
@@ -125,6 +172,12 @@ def plan(host, transaction, manifest, lock, wheelhouse, approved_manifest,
          sha_file(python) == approved_python_sha,
          "Isolated Python binary does not match approved SHA256")
     packages=wheels.plan(manifest,lock,wheelhouse,approved_manifest)
+    protected=verify_root_immutable_inputs(
+        manifest=manifest,lock=lock,wheelhouse=wheelhouse,uv=uv,
+        python=python,cape_source=original)
+    need(protected["immutable_root_owned_wheels_verified"] ==
+         packages["packages_verified"],
+         "Reviewed wheel inventory and protected source count differ")
     need(packages["source_sha"] == entry["revision"],
          "Approved wheel set is not for this CAPE source revision")
     account=user_account(user)
@@ -144,6 +197,7 @@ def plan(host, transaction, manifest, lock, wheelhouse, approved_manifest,
         "reviewed_uv_sha256":approved_uv_sha,
         "reviewed_python_sha256":approved_python_sha,
         "packages_verified":packages["packages_verified"],
+        "immutable_root_owned_assets_verified":True,
         "no_network_or_remote_package_builds":True,
         "upstream_install_scripts_not_used":True,
         "system_python_replaced":False,
