@@ -156,10 +156,14 @@ class RecoveryTests(unittest.TestCase):
     def test_live_vm_check_refuses_nonzero_running_domains(self):
         def fake_run(cmd, **kwargs):
             if cmd[0] == "systemctl":
-                return SimpleNamespace(returncode=3)
-            return SimpleNamespace(returncode=0, stdout="dummy-vm-uuid")
+                return SimpleNamespace(returncode=0,
+                    stdout="LoadState=not-found\nActiveState=inactive\n")
+            if "list" in cmd:
+                return SimpleNamespace(returncode=0,stdout="win11_1\n")
+            return SimpleNamespace(returncode=0,stdout="running\n")
         with mock.patch.object(m.subprocess, "run", side_effect=fake_run):
-            with self.assertRaises(m.RecoveryBlocked):
+            with self.assertRaisesRegex(
+                    m.RecoveryBlocked,"Cannot prove every CAPE service"):
                 m.no_live_workloads()
 
     def test_paused_and_suspended_guests_block_config_recovery(self):
@@ -167,24 +171,35 @@ class RecoveryTests(unittest.TestCase):
             with self.subTest(state=state):
                 def fake(cmd, **kwargs):
                     if cmd[0] == "systemctl":
-                        return SimpleNamespace(returncode=3)
+                        return SimpleNamespace(returncode=0,
+                            stdout="LoadState=not-found\nActiveState=inactive\n")
                     if "list" in cmd:
                         return SimpleNamespace(returncode=0,
                                                stdout="win11_1\n")
-                    return SimpleNamespace(returncode=0,
-                                           stdout=state+"\n")
+                    return SimpleNamespace(returncode=0,stdout=state+"\n")
                 with mock.patch.object(m.subprocess,"run",side_effect=fake):
                     with self.assertRaisesRegex(
-                            m.RecoveryBlocked,
-                            "refuses paused, suspended, live"):
+                            m.RecoveryBlocked,"Cannot prove every CAPE service"):
                         m.no_live_workloads()
+
+    def test_failed_unit_blocks_even_without_running_guest(self):
+        def fake(cmd, **kwargs):
+            if cmd[0] == "systemctl":
+                return SimpleNamespace(returncode=0,
+                    stdout="LoadState=loaded\nActiveState=failed\n")
+            raise AssertionError("Must refuse failed CAPE service first")
+        with mock.patch.object(m.subprocess,"run",side_effect=fake):
+            with self.assertRaisesRegex(
+                    m.RecoveryBlocked,"Cannot prove every CAPE service"):
+                m.no_live_workloads()
 
     def test_live_cape_unit_blocks(self):
         with mock.patch.object(m.subprocess, "run",
-                               return_value=SimpleNamespace(returncode=0)):
+                               return_value=SimpleNamespace(
+                                 returncode=0,
+                                 stdout="LoadState=loaded\nActiveState=active\n")):
             with self.assertRaises(m.RecoveryBlocked):
                 m.no_live_workloads()
-
 
 if __name__ == "__main__":
     unittest.main()
