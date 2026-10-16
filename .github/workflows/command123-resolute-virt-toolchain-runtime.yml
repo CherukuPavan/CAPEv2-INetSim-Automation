@@ -48,8 +48,8 @@ jobs:
               return subprocess.run(args,capture_output=True,text=True,timeout=15,check=True).stdout
           qemu=cmd('qemu-system-x86_64','--version')
           libvirt=cmd('virsh','--version')
-          qm=re.search(r'QEMU emulator version ([0-9]+)\\.([0-9]+)\\.([0-9]+)',qemu)
-          lv=re.search(r'([0-9]+)\\.([0-9]+)\\.([0-9]+)',libvirt)
+          qm=re.search(r'QEMU emulator version ([0-9]+)\.([0-9]+)\.([0-9]+)',qemu)
+          lv=re.search(r'([0-9]+)\.([0-9]+)\.([0-9]+)',libvirt)
           assert qm is not None and lv is not None
           q=tuple(map(int,qm.groups()))
           l=tuple(map(int,lv.groups()))
