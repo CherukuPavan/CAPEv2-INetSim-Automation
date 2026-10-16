@@ -77,9 +77,20 @@ def no_guest_using_network():
         root = ET.fromstring(virsh("dumpxml", "--inactive", vm))
         need(root.tag == "domain" and root.findtext("name") == vm,
              "Libvirt guest identity differs from inventory")
-        for nic in root.findall("./devices/interface/source"):
-            need(nic.get("network") != NETWORK,
-                 "A VM still references isolated network; remove owned VM first")
+        # Direct bridge and macvtap attachments are NOT represented as
+        # <source network="...">. Undefining our libvirt network would also
+        # destroy cape-lab0 beneath any independently defined guest.
+        for nic in root.findall("./devices/interface"):
+            for source in nic.findall("source"):
+                need(source.get("network") != NETWORK and
+                     source.get("bridge") != network.BRIDGE and
+                     source.get("dev") != network.BRIDGE,
+                     "A VM still references isolated network/bridge; "
+                     "remove owned VM first")
+            for target in nic.findall("target"):
+                need(target.get("dev") != network.BRIDGE,
+                     "A VM still references isolated network/bridge; "
+                     "remove owned VM first")
     need(not virsh("list", "--name").strip(),
          "Running VM detected; no network deletion authorized")
 
