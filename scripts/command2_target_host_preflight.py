@@ -172,7 +172,7 @@ def directory_free_gib(path):
 
 def local_ref_host():
     return platform.node().split(".", 1)[0].casefold() in (
-        "cse-ssl-55", "ssl-55")
+        "cse-ssl-55", "ssl-55", "cse-ssl-46", "ssl-46")
 
 
 def template_metadata(path):
@@ -310,7 +310,10 @@ def evaluate(profile, count, disk_dir, nvram_dir, cidr):
     osrel = profile.get("os") or {}
     require(osrel.get("id") == "ubuntu", "NOT_UBUNTU")
     # Candidate Ubuntu releases only; full support matrix not host-accepted.
-    require(osrel.get("version") in ("22.04", "24.04"),
+    # Official Ubuntu 26.04 signed QEMU/libvirt/OVMF/swtpm binaries
+    # passed the isolated compatibility probes. This inventory admission
+    # is still not a real Windows/TPM running-snapshot release gate.
+    require(osrel.get("version") in ("22.04", "24.04", "26.04"),
             "UBUNTU_RELEASE_NOT_IN_CANDIDATE_MATRIX")
     require(profile.get("architecture") == "x86_64", "HOST_NOT_X86_64")
     require(profile.get("vmx_svm_cpu_flag") is True, "CPU_VIRTUALIZATION_NOT_EXPOSED")
