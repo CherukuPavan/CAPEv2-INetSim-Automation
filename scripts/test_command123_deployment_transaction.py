@@ -1,5 +1,6 @@
 """Offline transaction safety tests; never need sudo or a real CAPE VM."""
 from pathlib import Path
+from types import SimpleNamespace
 import hashlib
 import os
 import tempfile
@@ -23,6 +24,7 @@ class TransactionTests(unittest.TestCase):
         self.config = self.base / "kvm.conf"
         self.user_id = os.getuid()
         self.group_id = os.getgid()
+        self.real_fstat = os.fstat
         self.patchers = [
             mock.patch.object(t, "ROOT", self.root),
             mock.patch.object(t, "host_guard", return_value="rakshati"),
@@ -30,11 +32,26 @@ class TransactionTests(unittest.TestCase):
             mock.patch.object(t, "owner_dir", side_effect=self.check_owned),
             mock.patch.object(t, "allowed_file", side_effect=self.restricted),
             mock.patch.object(t.os, "geteuid", return_value=0),
+            mock.patch.object(t.os, "fstat",
+                              side_effect=self.mock_root_owned_ledger_fstat),
         ]
         for p in self.patchers:
             p.start()
             self.addCleanup(p.stop)
         self.transaction = t.begin("rakshati")["transaction_id"]
+
+    def mock_root_owned_ledger_fstat(self, fd):
+        # Exercise the actual production verification on a non-root CI
+        # runner while emulating only root ownership of its test ledger.
+        st = self.real_fstat(fd)
+        try:
+            linked = os.readlink("/proc/self/fd/" + str(fd))
+        except OSError:
+            linked = ""
+        if linked.endswith("/ledger.json"):
+            return SimpleNamespace(st_mode=st.st_mode, st_nlink=st.st_nlink,
+                                   st_uid=0, st_size=st.st_size)
+        return st
 
     def mkdir_root(self):
         self.root.mkdir(mode=0o700, exist_ok=True)
