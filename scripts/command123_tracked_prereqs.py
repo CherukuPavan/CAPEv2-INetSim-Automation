@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Root-private APT provenance wrapper for ONLY reviewed Ubuntu base prerequisites.
+"""Root-private tracked APT prerequisite and Ubuntu26 virtualization binaries.
 
-Requires an existing Command 1 transaction. Captures complete dpkg inventory
-before and after the subprocess, including transitive packages. Any incomplete
-or unexpected transaction remains blocked. No package removal is attempted.
-This component does NOT install a CAPE hypervisor or analysis VMs.
-"""
+Ubuntu 24.04 stages ONLY the prior seven base prerequisites. Official Ubuntu
+26.04 additionally offers reviewed QEMU/libvirt/OVMF/swtpm binary packages
+after positive version admission. The operator must separately approve before
+mutation; full dpkg inventory is journaled. No guest/TPM state is touched and
+no complete CAPE or running-snapshot deployment is claimed.
+""
 from __future__ import annotations
 
 import argparse
