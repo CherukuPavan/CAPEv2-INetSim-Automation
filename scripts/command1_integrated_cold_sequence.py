@@ -246,6 +246,18 @@ def main():
     p.add_argument("--receipt-dir",type=Path,default=RECEIPTS)
     p.add_argument("--handoff-receipt-dir",type=Path,
                    default=master.RECEIPTS)
+    # Read-only assessment of the signed/hard-pinned offline CAPE runtime
+    # is available. Execution of this optional phase is intentionally
+    # refused until its integrated rollback is physically qualified.
+    p.add_argument("--runtime-manifest",type=Path)
+    p.add_argument("--runtime-lock",type=Path)
+    p.add_argument("--runtime-wheelhouse",type=Path)
+    p.add_argument("--runtime-approved-manifest-sha256")
+    p.add_argument("--runtime-uv",type=Path)
+    p.add_argument("--runtime-approved-uv-sha256")
+    p.add_argument("--runtime-python",type=Path)
+    p.add_argument("--runtime-approved-python-sha256")
+    p.add_argument("--runtime-user",default="cape")
     args=p.parse_args()
     try:
         response=preflight(args) if args.mode=="plan" else execute(args)
