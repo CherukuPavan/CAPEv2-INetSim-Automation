@@ -129,14 +129,30 @@ distinct from active/failed/ambiguous units); a running libvirt guest still
 blocks the operation. The current source code includes isolated unit and
 integrated regression tests, but there is NO physical guest qualification.
 
+**2026-10-16 additional reversible base-APT subset:** the new
+`scripts/command123_tracked_apt_rollback.py` validates the immutable
+before and after root-private dpkg snapshots, refuses ANY other installed
+package change since deployment, confirms an `apt-get -s remove
+--no-auto-remove` plan touches exactly newly added packages, and only then
+offers an interactive root-only real package removal. It stores durable
+in-flight/after receipts and refuses a second attempt when partial or
+uncertain; existing package versions must return EXACTLY to baseline.
+The `scripts/command123_scoped_recovery.py` operator entrypoint
+orchestrates a tracked **file-first** rollback followed by that
+independently reviewed **base-APT** rollback and finalization.
+Completed package rollback is reverified against current dpkg state on
+later reviews. Any guest, network, firewall, account or unowned transaction
+entry causes the scoped controller to STOP without attempting deletion.
+This remains an incremental recovery subset, not universal uninstall.
+
 **These are NOT final release features.** The new ledger does NOT yet
 automatically start inside a fully implemented fresh-host Command 1
-bootstrap; it cannot safely roll back packages, user/account changes,
-VM disks/TPM, networks, firewall policy or systemd enable/running state,
-and intentionally marks those resource categories unsupported rather
-than attempting removal. There is no three-command deployment-wide undo,
-complete host repair, or genuine hardware qualification. Offline
-regression success only verifies software behavior under test fixtures.
+bootstrap; it cannot safely undo other CAPE dependencies/packages,
+user/account changes, VM disks/TPM, isolated networks, firewall policy or
+systemd enable/running state. Those resource categories remain unsupported.
+The three-command deployment-wide undo, complete host repair, and
+physical running-snapshot qualification remain missing. Offline regression
+success only verifies software behavior under test fixtures.
 
 The earlier `scripts/command123_repair_rollback.py` remains a separately
 guarded reversible **six CAPE-configuration-files-only** tool. It can capture a root-private
