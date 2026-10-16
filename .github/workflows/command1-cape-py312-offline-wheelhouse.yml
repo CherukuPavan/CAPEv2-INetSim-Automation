@@ -141,6 +141,24 @@ jobs:
           grep -q -- '--help' /tmp/cape-offline-help
           test "$(python3 --version)" = "Python 3.14.4"
           echo "CAPE_PINNED_UNPRIVILEGED_CLI_HELP_SUCCEEDED_WITH_OFFLINE_WHEELS"
+          # This second fresh venv has neither pip nor an online installer.
+          # It verifies the offline 'uv venv' + 'uv pip install' sequence
+          # reusable by an unprivileged Command1 runtime substage.
+          /tmp/cape-uv-tool/bin/uv venv --offline \
+            --python /tmp/cape-build/bin/python \
+            /tmp/cape-uv-offline
+          UV_NO_CACHE=1 /tmp/cape-uv-tool/bin/uv pip install \
+            --offline --python /tmp/cape-uv-offline/bin/python \
+            --no-index --no-deps --require-hashes \
+            --find-links /tmp/cape-built-wheels \
+            --requirement /tmp/cape-offline-wheels-hash.lock
+          /tmp/cape-uv-offline/bin/python - <<'PY'
+          import sys, gevent, greenlet, django, sqlalchemy, yara
+          assert sys.version_info[:2] == (3,12)
+          assert gevent.__version__=='24.2.1'
+          assert greenlet.__version__=='3.0.3'
+          print("CAPE_OFFLINE_UV_NO_PIP_FRESH_RUNTIME_INSTALLED")
+          PY
       - name: Preserve SHA256 manifest and strict offline lock for independent review
         if: always()
         uses: actions/upload-artifact@v4
