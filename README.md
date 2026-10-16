@@ -29,6 +29,16 @@
 > and deployment-wide VM/network/service-state undo remain UNIMPLEMENTED.
 > **No final three-command installer is approved for use.**
 >
+> **2026-10-16 additional rollback refusal coverage:** the guarded
+> [zero-NIC clone reverse-stager](scripts/command2_portable_zero_nic_rollback.py)
+> now checks independent QCOW2 metadata and foreign guests' full
+> backing-image chains before allowing a never-booted clone to be
+> undefined. The isolated [network rollback](
+> scripts/command2_portable_network_rollback.py) also refuses removal
+> while any foreign domain attaches its bridge directly or kernel TAP/veth
+> ports remain enslaved to it. This preserves foreign disk and network
+> dependencies; it does NOT unlock booted/TPM/snapshotted VM rollback.
+>
 > **2026-10-15 new host final-release stop:** Ubuntu 24.04's standard
 > QEMU 8.2 / libvirt 10.0 packages do **not** meet the repo's native
 > running-checkpoint guard (QEMU >=9.0; libvirt >=10.10). The new
