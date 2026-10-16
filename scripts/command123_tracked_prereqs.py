@@ -103,6 +103,8 @@ def plan():
             "requested_missing": missing,
             "simulated_installations": simulated,
             "installed_package_count": len(before),
+            "baseline_inventory_sha256": hashlib.sha256(
+                snap_bytes(before)).hexdigest(),
             "host_modified": False,
             "snapshot_stack_authorized": False}
 
@@ -146,6 +148,9 @@ def apply(transaction, host):
              "APT package installation declined")
         need(plan() == proposal, "Package plan changed after approval")
         before = installed()
+        need(hashlib.sha256(snap_bytes(before)).hexdigest() ==
+             proposal["baseline_inventory_sha256"],
+             "Installed package versions changed after approval")
         step_id = uuid.uuid4().hex
         folder = receipt.parent
         original = snap_bytes(before)
