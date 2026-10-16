@@ -118,6 +118,16 @@ class AttachTests(unittest.TestCase):
                 with self.assertRaisesRegex(n.NicBlocked,"SSL55_REFERENCE_ONLY"):
                     n.plan(VM,name,UUID,MAC,SUBNET)
 
+    def test_ssl46_backup_host_also_blocked_before_guest_access(self):
+        for name in ("ssl-46", "cse-ssl-46"):
+            with patch.object(n.socket, "gethostname", return_value=name), \
+                 patch.object(n, "SENTINEL",
+                              Path(__file__).with_name("_absent_ssl46_")), \
+                 patch.object(n, "virsh",
+                              side_effect=AssertionError("Protected host must not be inspected")):
+                with self.assertRaisesRegex(n.NicBlocked, "SSL46 protected"):
+                    n.plan(VM, name, UUID, MAC, SUBNET)
+
     def test_unreviewed_subnet_or_vm_rejected(self):
         for vm,subnet in (("win11_17",SUBNET),
                           (VM,"8.8.8.0/24"),
