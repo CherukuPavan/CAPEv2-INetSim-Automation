@@ -76,6 +76,85 @@ class ScopedRecoveryTests(unittest.TestCase):
             with self.assertRaises(m.ScopedRecoveryBlocked):
                 m.owned_stage_plan("rakshati", TX)
 
+    def test_new_owned_source_is_validated_before_scoped_undo(self):
+        doc_with_source = doc()
+        doc_with_source["entries"].append({
+            "kind": "cape_source", "id": "d" * 32, "status": "sealed"})
+        with ExitStack() as stack:
+            self.patch_stage(stack, doc_with_source)
+            verified = stack.enter_context(mock.patch.object(
+                m.cape_source, "undo_plan", return_value={
+                    "action": "quarantine_owned_checkout"}))
+            plan = m.owned_stage_plan("rakshati", TX)
+        self.assertTrue(plan["source_rollback_needed"])
+        verified.assert_called_once_with("rakshati", TX)
+
+    def test_already_recovered_source_is_rechecked(self):
+        doc_with_source = doc()
+        doc_with_source["entries"].append({
+            "kind": "cape_source", "id": "d" * 32,
+            "status": "rollback_verified"})
+        with ExitStack() as stack:
+            self.patch_stage(stack, doc_with_source)
+            stack.enter_context(mock.patch.object(
+                m.cape_source, "undo_plan",
+                return_value={"action": "already_quarantined"}))
+            result = m.owned_stage_plan("rakshati", TX)
+        self.assertFalse(result["source_rollback_needed"])
+
+    def test_source_unverified_quarantine_blocks_any_undo(self):
+        doc_with_source = doc()
+        doc_with_source["entries"].append({
+            "kind": "cape_source", "id": "d" * 32,
+            "status": "rollback_verified"})
+        with ExitStack() as stack:
+            self.patch_stage(stack, doc_with_source)
+            stack.enter_context(mock.patch.object(
+                m.cape_source, "undo_plan",
+                side_effect=m.cape_source.SourceBlocked("modified source")))
+            with self.assertRaises(m.cape_source.SourceBlocked):
+                m.owned_stage_plan("rakshati", TX)
+
+    def test_interleaves_source_before_package_removal(self):
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(m.os, "geteuid",
+                                                  return_value=0))
+            stack.enter_context(mock.patch.object(m.sys.stdin, "isatty",
+                                                  return_value=True))
+            stack.enter_context(mock.patch.object(m.transaction, "host_guard"))
+            stage = {"transaction": TX, "file_rollback_steps_needed": 1,
+                     "source_rollback_needed": True,
+                     "apt_rollback_needed": True}
+            stack.enter_context(mock.patch.object(
+                m, "owned_stage_plan", return_value=stage))
+            stack.enter_context(mock.patch("builtins.input",
+                return_value="ROLLBACK-TRACKED-CAPE-FILES-AND-BASE-APT-" + TX))
+            actions = []
+            stack.enter_context(mock.patch.object(
+                m.transaction, "rollback_files_first",
+                side_effect=lambda *args: actions.append("files") or
+                {"transaction_still_active": True}))
+            stack.enter_context(mock.patch.object(
+                m.cape_source, "undo",
+                side_effect=lambda *args: actions.append("source") or
+                {"result": "COMMAND1_OWNED_SOURCE_UNDEPLOYED_QUARANTINED"}))
+            stack.enter_context(mock.patch.object(
+                m.packages, "rollback",
+                side_effect=lambda *args: actions.append("apt") or
+                {"preexisting_package_inventory_restored": True}))
+            stack.enter_context(mock.patch.object(
+                m.transaction, "rollback_plan",
+                side_effect=lambda *args: actions.append("verify") or
+                {"can_rollback": True, "actions": [{"action": "keep"}]}))
+            stack.enter_context(mock.patch.object(
+                m.transaction, "rollback",
+                side_effect=lambda *args: actions.append("complete") or
+                {"result": "CAPE_TRACKED_FILE_CHANGES_ROLLED_BACK"}))
+            final = m.run("rakshati", TX)
+        self.assertEqual(actions,
+                         ["files", "source", "apt", "verify", "complete"])
+        self.assertFalse(final["full_three_command_rollback_verified"])
+
     def test_rejects_unknown_vm_domain_entry(self):
         with ExitStack() as stack:
             self.patch_stage(stack, doc(unknown=True))
