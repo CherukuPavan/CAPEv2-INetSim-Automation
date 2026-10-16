@@ -23,8 +23,18 @@ EXPECTED_BLOB = "__PINNED_HELPER_BLOB__"
 REPOSITORY = "CherukuPavan/CAPEv2-INetSim-Automation"
 PATH = "scripts/command123_private_pinned_checkout.py"
 
-if os.geteuid() == 0 or not sys.stdin.isatty():
-    raise SystemExit("Use a local interactive non-root terminal")
+def controlling_tty():
+    try:
+        fd = os.open("/dev/tty", os.O_RDONLY | os.O_NOCTTY | os.O_CLOEXEC)
+    except OSError:
+        return False
+    try:
+        return os.isatty(fd)
+    finally:
+        os.close(fd)
+
+if os.geteuid() == 0 or not controlling_tty():
+    raise SystemExit("Use a local interactive non-root controlling terminal")
 try:
     url = ("https://api.github.com/repos/" + REPOSITORY +
            "/contents/" + PATH + "?ref=" + REVISION)
