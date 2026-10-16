@@ -24,6 +24,8 @@ import subprocess
 import sys
 import uuid
 
+import command123_libvirt_quiescence as libvirt_quiescence
+
 UNITS = (
     "cape.service", "cape-processor.service", "cape-rooter.service",
     "cape-web.service", "suricata.service",
@@ -180,14 +182,11 @@ def trusted_receipt(path):
 
 def no_live_guest():
     try:
-        response = subprocess.run(
-            ["virsh","-c","qemu:///system","list","--state-running","--name"],
-            capture_output=True,text=True,timeout=20,check=False)
-    except (OSError,subprocess.TimeoutExpired) as exc:
-        raise ServiceOwnershipBlocked("Cannot prove guest inactivity") from exc
-    need(response.returncode == 0 and not response.stdout.strip(),
-         "Cannot stop service while libvirt guest running")
-
+        return libvirt_quiescence.no_nonshutoff_domains()
+    except libvirt_quiescence.QuiescenceBlocked as exc:
+        raise ServiceOwnershipBlocked(
+            "Cannot reverse CAPE services while any VM is non-shutoff "
+            "or libvirt inventory is uncertain") from exc
 
 def stop_owned(unit):
     need(unit in UNITS,"Unknown service")
