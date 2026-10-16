@@ -184,10 +184,13 @@ There are numerous guarded subcommands and green offline tests, but:
   on a second physical host.
 - Command3 `command3_from_operator_reference.py` needs separate modes
   to configure/restart, and unsafe Internet/virbr0 routing is blocked.
-- Private GitHub and private crypt Google Drive inherently need
-  authentication. The worldwide crypt reader helper currently needs a
-  separately provisioned service-account key; it is **not** transparently
-  bootstrapped from a truly clean host with no authorization setup.
+- The GitHub **source repository was verified public on 2026-10-16**;
+  its code can be fetched without personal login but still requires an
+  immutable SHA pin and authenticity review. The **encrypted master image
+  in private Google Drive remains separately restricted**. The worldwide
+  crypt reader helper currently needs a securely provisioned service-account
+  key, approved Viewer grant and crypt password/salt; those do not appear
+  automatically on a truly clean host. Never publish them.
 - No complete cross-command resource ownership journal and
   deployment-only rollback implementation exists.
 
