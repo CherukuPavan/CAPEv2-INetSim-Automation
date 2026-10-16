@@ -135,6 +135,45 @@ def simulated_remove(names):
     return removals
 
 
+def no_unowned_libvirt_assets_before_virtualization_removal(packages):
+    """No virtual stack uninstall while foreign guests/networks remain.
+
+    APT dpkg provenance does not automatically imply ownership of libvirt
+    network, pool or secret definitions. Even a shut-off VM may depend on
+    QEMU/libvirt binaries. Until each libvirt asset has its own authenticated
+    before/after receipt, stop package removal rather than impair it.
+    """
+    need(type(packages) is list, "Invalid package removal inventory")
+    if not set(packages).intersection(apt.VIRT26):
+        return
+    for args in (
+            ("list", "--all", "--name"),
+            ("net-list", "--all", "--name"),
+            ("pool-list", "--all", "--name")):
+        try:
+            result = subprocess.run(
+                ["virsh", "-c", "qemu:///system", *args],
+                capture_output=True, text=True, check=False, timeout=20)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise ledger.TransactionBlocked(
+                "Cannot prove absence of libvirt assets before removal"
+            ) from error
+        need(result.returncode == 0 and not result.stdout.strip(),
+             "Existing libvirt guest/network/pool is not owned for APT rollback")
+    # libvirt secrets must not be orphaned by the package uninstall.
+    try:
+        secrets = subprocess.run(
+            ["virsh", "-c", "qemu:///system", "secret-list", "--all"],
+            capture_output=True, text=True, check=False, timeout=20)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ledger.TransactionBlocked(
+            "Cannot inspect libvirt secrets before removal") from error
+    need(secrets.returncode == 0 and
+         not [line for line in secrets.stdout.splitlines()
+              if line.strip() and not line.strip().startswith(("UUID", "---"))],
+         "Unknown libvirt secrets still defined before hypervisor removal")
+
+
 def inspect(transaction, host):
     apt.verify_host()
     receipt, doc = ledger.load(transaction, host)
@@ -157,6 +196,7 @@ def inspect(transaction, host):
     need(current == after,
          "Installed package inventory drifted since deployment")
     added = sorted(changes["new_packages"])
+    no_unowned_libvirt_assets_before_virtualization_removal(added)
     simulated_remove(added)
     return {"result": "CAPE_ATTESTED_BASE_APT_ROLLBACK_PLAN",
             "transaction": transaction,
