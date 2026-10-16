@@ -5,7 +5,31 @@ the fresh-host three-command installation has passed physical acceptance.
 **Never use SSL-55 as the target host.** Preserve `win11`,
 `win11_trial_1`, `win11_1` and all named snapshots.
 
-## Important GitHub fact
+## 2026-10-16 source visibility update — supersedes old private-only advice
+
+The GitHub repository currently reports **PUBLIC** visibility. No GitHub
+personal-access token, GitHub CLI login or SSH key is needed to obtain
+read-only PUBLIC source code, provided its exact reviewed commit and file
+blob hashes are validated. All older instructions below claiming this
+source repository is private were written before the visibility change;
+they remain relevant **only if the owner makes it private again**.
+
+`scripts/command123_private_pinned_checkout.py --revision SHA40 --public`
+now performs a credential-free, SHA-pinned Git tree and archive member
+verification; the legacy module filename is retained for compatibility.
+`scripts/command123_emit_public_bootstrap.py` emits a single verified
+public bootstrap command from the reviewed source commit SHA plus the
+helper's Git BLOB SHA. Its output is source acquisition only, **not the
+finished three-command installer**. GitHub Actions now tests the exact
+public commit fetch and per-file byte comparison on Ubuntu 24.04 without
+Git credentials or special deployment secrets.
+
+**Important distinction:** the exported Windows 11 image, OVMF and swtpm
+backup remain **separately private and encrypted in Google Drive**. Public
+GitHub access does not unlock that backup and must never trigger changes
+to Drive sharing, credentials, source masters or reference hosts.
+
+## Important GitHub fact (historical private-source instructions)
 
 This automation repository, `CherukuPavan/CAPEv2-INetSim-Automation`,
 is **PRIVATE**, and its default branch is `main`.
