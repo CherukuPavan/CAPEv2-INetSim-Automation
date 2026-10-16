@@ -26,6 +26,8 @@ import sys
 import tempfile
 import uuid
 
+import command123_libvirt_quiescence as libvirt_quiescence
+
 ROOT = Path("/var/lib/cape-deployment-transactions")
 CONFIG_FILES = frozenset(("api.conf", "auxiliary.conf", "cuckoo.conf",
                           "kvm.conf", "mitmdump.conf", "routing.conf"))
@@ -699,14 +701,11 @@ def no_live_work():
              service_inactive_from_systemd(p.stdout),
              "CAPE service is active, failed, masked or state is unknown")
     try:
-        p = subprocess.run(["virsh", "-c", "qemu:///system", "list",
-                            "--state-running", "--name"],
-                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                           text=True, timeout=12)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise TransactionBlocked("Cannot inspect running libvirt VMs") from error
-    need(p.returncode == 0 and not p.stdout.strip(),
-         "Rollback requires no running libvirt domain")
+        libvirt_quiescence.no_nonshutoff_domains()
+    except libvirt_quiescence.QuiescenceBlocked as error:
+        raise TransactionBlocked(
+            "Rollback requires every libvirt domain shut off, not merely "
+            "the absence of running domains") from error
 
 
 def restore_original(path, raw, state):
