@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict rollback of tracked Command1 base APT additions (Ubuntu 24.04).
+"""Strict rollback of tracked Command1 APT additions (Ubuntu 24.04/26.04).
 
 Undo ONLY newly installed, transaction-attributed packages. Never purge,
 autoremove, upgrade, or touch preexisting packages. Refuse when the installed
@@ -7,7 +7,9 @@ package inventory differs from the exact sealed post-install snapshot, APT
 would remove anything outside the attested set, or VMs/services are active.
 All changes require explicit root operator approval and durable receipts.
 
-This is intentionally NOT a universal CAPE package or VM rollback.
+Virtualization package removal on Ubuntu26 also requires exact APT plan,
+all guests/services stopped, and a separately reviewed lab-network
+ownership handoff. This is NOT a universal CAPE/VM/swtpm rollback.
 """
 from __future__ import annotations
 
