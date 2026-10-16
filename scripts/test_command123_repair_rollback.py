@@ -162,6 +162,23 @@ class RecoveryTests(unittest.TestCase):
             with self.assertRaises(m.RecoveryBlocked):
                 m.no_live_workloads()
 
+    def test_paused_and_suspended_guests_block_config_recovery(self):
+        for state in ("paused", "pmsuspended", "crashed"):
+            with self.subTest(state=state):
+                def fake(cmd, **kwargs):
+                    if cmd[0] == "systemctl":
+                        return SimpleNamespace(returncode=3)
+                    if "list" in cmd:
+                        return SimpleNamespace(returncode=0,
+                                               stdout="win11_1\n")
+                    return SimpleNamespace(returncode=0,
+                                           stdout=state+"\n")
+                with mock.patch.object(m.subprocess,"run",side_effect=fake):
+                    with self.assertRaisesRegex(
+                            m.RecoveryBlocked,
+                            "refuses paused, suspended, live"):
+                        m.no_live_workloads()
+
     def test_live_cape_unit_blocks(self):
         with mock.patch.object(m.subprocess, "run",
                                return_value=SimpleNamespace(returncode=0)):
