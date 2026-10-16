@@ -29,8 +29,18 @@ REVISION = "__COMMIT_SHA__"
 EXPECTED_HELPER_BLOB = "__BLOB_SHA__"
 REPO = "CherukuPavan/CAPEv2-INetSim-Automation"
 PATH = "scripts/command123_private_pinned_checkout.py"
-if os.geteuid() == 0 or not sys.stdin.isatty():
-    raise SystemExit("Use an interactive non-root terminal")
+def controlling_tty():
+    try:
+        fd = os.open("/dev/tty", os.O_RDONLY | os.O_NOCTTY | os.O_CLOEXEC)
+    except OSError:
+        return False
+    try:
+        return os.isatty(fd)
+    finally:
+        os.close(fd)
+
+if os.geteuid() == 0 or not controlling_tty():
+    raise SystemExit("Use a local interactive non-root controlling terminal")
 token = getpass.getpass("Private GitHub read-only token: ")
 if not (8 <= len(token) <= 500) or "\n" in token or "\r" in token:
     raise SystemExit("Invalid token supplied")
