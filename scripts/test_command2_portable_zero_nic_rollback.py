@@ -119,10 +119,14 @@ class CloneRecoveryTests(unittest.TestCase):
 
     def test_other_vm_image_or_nvram_reference_blocks_cleanup(self):
         for kind in ("disk","nvram"):
-            shared=(f'<disk device="disk"><source file="{self.disk}"/></disk>'
-                    if kind=="disk" else
-                    f'<os><nvram>{self.nvram}</nvram></os>')
-            xml='<domain><name>unrelated</name><devices>'+shared+'</devices></domain>'
+            if kind=="disk":
+                xml=(f'<domain><name>unrelated</name><devices>'
+                     f'<disk device="disk"><source file="{self.disk}"/></disk>'
+                     '</devices></domain>')
+            else:
+                xml=(f'<domain><name>unrelated</name>'
+                     f'<os><nvram>{self.nvram}</nvram></os>'
+                     '<devices></devices></domain>')
             def mocked_virsh(*args):
                 if args==("list","--all","--name"):
                     return "win11_1\nunrelated\n"
