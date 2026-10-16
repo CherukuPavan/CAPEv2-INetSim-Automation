@@ -29,6 +29,25 @@
 > and deployment-wide VM/network/service-state undo remain UNIMPLEMENTED.
 > **No final three-command installer is approved for use.**
 >
+> **2026-10-16 exercised CAPE Python + real libvirt snapshot experiments:**
+> On disposable Ubuntu 26.04, a separately managed Python 3.12.12
+> successfully resolved and installed **170 upstream CAPEv2 dependencies**
+> and imported `gevent`, `greenlet`, Django, SQLAlchemy and YARA without
+> changing system Python 3.14. A genuinely libvirt-registered full-system
+> RUNNING checkpoint with benign QCOW2 OS disk, QCOW2 OVMF VARS and swtpm
+> also survived **two actual virsh snapshot-revert --running invocations**.
+> The synthetic CI container allowed restricted lab-only DAC/cgroup changes
+> and timed out while destroying/undefining its VM; the whole disposable
+> container was discarded. These are feasibility milestones, **not**
+> Windows 11 TPM-state witnesses, normal physical-host security or
+> deployment-scoped rollback proofs. See [exact CI evidence and constraints](
+> docs/RESOLUTE_CAPE_RUNTIME_AND_LIBVIRT_ACCEPTANCE_20261016.md).
+> The internal [combined Command1 cold stage](
+> scripts/command1_integrated_cold_sequence.py) now sequences receipt-backed
+> base APT, pinned CAPE source and authorized encrypted-master import;
+> the latter remains SHUT OFF and requires a separately provided restricted
+> private master access credential.
+>
 > **2026-10-16 new signed distro hypervisor baseline candidate:**
 > Canonical Cloud Archive Epoxy/Flamingo/Gazpacho did not upgrade the
 > QEMU/libvirt versions selected on Ubuntu 24.04 to the conservative
