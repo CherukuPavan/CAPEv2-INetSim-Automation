@@ -49,12 +49,31 @@ class NetworkOwnershipTests(unittest.TestCase):
     def test_five_steps_monotonic_and_replay_refused(self):
         owned.begin(HOST, self.journal, dict(PLAN))
         for before, after in zip(owned.PHASES, owned.PHASES[1:]):
-            update = owned.advance(self.journal, before, after)
+            kwargs = ({"post_state": {
+                "post_live_libvirt_xml_sha256": "c" * 64,
+                "post_nft_stateless_sha256": "d" * 64}}
+                if after == "verified" else {})
+            update = owned.advance(self.journal, before, after, **kwargs)
             self.assertEqual(update["status"], after)
         self.assertEqual(owned.read(owned.record_path(self.journal))["status"],
                          "verified")
         with self.assertRaises(owned.NetworkTransactionBlocked):
             owned.advance(self.journal, "prepared", "nft_applied")
+
+    def test_rollback_journal_requires_exact_live_post_hashes(self):
+        owned.begin(HOST, self.journal, dict(PLAN))
+        for before, after in zip(owned.PHASES[:4], owned.PHASES[1:5]):
+            if after == "verified":
+                with self.assertRaises(owned.NetworkTransactionBlocked):
+                    owned.advance(self.journal, before, after)
+                owned.advance(self.journal, before, after, post_state={
+                    "post_live_libvirt_xml_sha256": "f" * 64,
+                    "post_nft_stateless_sha256": "e" * 64})
+            else:
+                owned.advance(self.journal, before, after)
+        result = owned.advance(self.journal, "verified", "rollback_started")
+        self.assertEqual(result["post_nft_stateless_sha256"], "e" * 64)
+        self.assertEqual(result["status"], "rollback_started")
 
     def test_attempted_skipped_network_step_blocks(self):
         owned.begin(HOST, self.journal, dict(PLAN))
@@ -99,7 +118,7 @@ class NetworkOwnershipTests(unittest.TestCase):
                 'owned_network.advance(journal,"prepared","nft_applied")',
                 'owned_network.advance(journal,"nft_applied","network_defined")',
                 'owned_network.advance(journal,"network_defined","network_started")',
-                'owned_network.advance(journal,"network_started","verified")'):
+                'owned_network.advance(journal,"network_started","verified",'):
             self.assertIn(step, source)
 
 
