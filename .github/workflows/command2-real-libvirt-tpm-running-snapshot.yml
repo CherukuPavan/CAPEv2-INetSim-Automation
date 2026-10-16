@@ -31,6 +31,11 @@ jobs:
           test "$ID" = ubuntu && test "$VERSION_ID" = 26.04
           apt-get update -o APT::Get::Update::Error-Mode=any
           apt-get install -y --no-install-recommends             python3 libvirt-daemon-system libvirt-clients qemu-system-x86             qemu-utils swtpm swtpm-tools ovmf
+          # No systemd in a disposable GitHub container: libvirt needs
+          # its independent log daemon (virtlogd) before any guest starts.
+          virtlogd -d
+          if command -v virtlockd >/dev/null 2>&1; then virtlockd -d; fi
+          test -S /run/libvirt/virtlogd-sock
           libvirtd -d
           for i in $(seq 1 25); do
             if virsh -c qemu:///system version >/dev/null 2>&1; then break; fi
