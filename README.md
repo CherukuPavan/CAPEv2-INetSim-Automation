@@ -29,6 +29,16 @@
 > and deployment-wide VM/network/service-state undo remain UNIMPLEMENTED.
 > **No final three-command installer is approved for use.**
 >
+> **2026-10-16 source acquisition now physically exercised in CI:**
+> The GitHub source repository is public and supports a
+> [token-free pinned checkout](scripts/command123_private_pinned_checkout.py)
+> with a [single-paste public bootstrap emitter](
+> scripts/command123_emit_public_bootstrap.py). A new GitHub Actions job
+> on Ubuntu 24.04 downloaded an exact commit via public GitHub APIs and
+> verified Git blob hashes, without a GitHub token. This is **only**
+> source-code acquisition; it does not unlock the private encrypted
+> Windows master, install CAPE, start Windows or certify TPM snapshots.
+>
 > **2026-10-16 additional rollback refusal coverage:** the guarded
 > [zero-NIC clone reverse-stager](scripts/command2_portable_zero_nic_rollback.py)
 > now checks independent QCOW2 metadata and foreign guests' full
