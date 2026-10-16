@@ -1,0 +1,44 @@
+name: Real TCG OVMF-QCOW2 and swtpm two-revert experiment
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/test_command2_real_ovmf_tpm_tcg.py"
+      - "scripts/test_command2_real_swtpm_snapshot_tcg.py"
+      - ".github/workflows/command2-real-ovmf-qcow2-tpm-tcg.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ephemeral-ovmf-and-tpm:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install official signed OVMF/QEMU and swtpm binaries in runner
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu && test "$VERSION_ID" = 26.04
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get install -y --no-install-recommends python3 qemu-system-x86 qemu-utils ovmf swtpm
+          qemu-system-x86_64 --version
+          swtpm --version
+      - name: Revert harmless OS+UEFI QCOW2+TPM QEMU internal snapshot twice
+        env:
+          PYTHONPATH: scripts
+          PYTHONDONTWRITEBYTECODE: "1"
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -B -m unittest -v test_command2_real_ovmf_tpm_tcg
