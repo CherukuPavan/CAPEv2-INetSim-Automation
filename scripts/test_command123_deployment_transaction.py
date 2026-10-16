@@ -48,7 +48,9 @@ class TransactionTests(unittest.TestCase):
             linked = os.readlink("/proc/self/fd/" + str(fd))
         except OSError:
             linked = ""
-        if linked.endswith("/ledger.json"):
+        if (linked.endswith("/ledger.json") or
+                "/transactions/" in linked and
+                ("/before-" in linked or "/after-" in linked)):
             return SimpleNamespace(st_mode=st.st_mode, st_nlink=st.st_nlink,
                                    st_uid=0, st_size=st.st_size)
         return st
