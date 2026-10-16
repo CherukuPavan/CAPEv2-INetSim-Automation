@@ -46,7 +46,8 @@ class RollbackTests(unittest.TestCase):
         self.journal.write_bytes(b"exact private journal")
         self.doc = sealed(self.journal)
 
-    def stubs(self, stack, *, nft=NFT, xml=NET_XML, guest=False):
+    def stubs(self, stack, *, nft=NFT, xml=NET_XML, guest=False,
+              guest_xml=GUEST_XML):
         stack.enter_context(mock.patch.object(
             m.workflow, "canonical_host", return_value=HOST))
         stack.enter_context(mock.patch.object(
@@ -63,7 +64,7 @@ class RollbackTests(unittest.TestCase):
             if args == ("list", "--name"):
                 return ""
             if args == ("dumpxml", "--inactive", "win11_1"):
-                return GUEST_XML
+                return guest_xml
             raise AssertionError("Unexpected libvirt call "+str(args))
         stack.enter_context(mock.patch.object(m, "virsh", side_effect=libvirt))
         stack.enter_context(mock.patch.object(m, "nft", return_value=nft))
@@ -89,6 +90,39 @@ class RollbackTests(unittest.TestCase):
             with self.assertRaisesRegex(m.NetworkRollbackBlocked,
                                         "still references"):
                 m.inspect(HOST,self.journal)
+
+    def test_refuse_direct_bridge_or_macvtap_attachment(self):
+        for source in (
+                '<source bridge="cape-lab0"/>',
+                '<source dev="cape-lab0" mode="bridge"/>',
+                '<source network="cape-analysis-isolated"/>'):
+            domain = ('<domain><name>win11_1</name><devices>'
+                      '<interface type="bridge">' + source +
+                      '</interface></devices></domain>')
+            with self.subTest(source=source), ExitStack() as stack:
+                self.stubs(stack, guest=True, guest_xml=domain)
+                with self.assertRaisesRegex(
+                        m.NetworkRollbackBlocked, "still references"):
+                    m.inspect(HOST, self.journal)
+
+    def test_refuse_interface_target_using_owned_bridge(self):
+        domain = ('<domain><name>win11_1</name><devices>'
+                  '<interface type="ethernet"><target dev="cape-lab0"/>'
+                  '</interface></devices></domain>')
+        with ExitStack() as stack:
+            self.stubs(stack, guest=True, guest_xml=domain)
+            with self.assertRaisesRegex(
+                    m.NetworkRollbackBlocked, "still references"):
+                m.inspect(HOST, self.journal)
+
+    def test_allow_unrelated_defined_guest_with_other_bridge(self):
+        domain = ('<domain><name>win11_1</name><devices>'
+                  '<interface type="bridge"><source bridge="virbr0"/>'
+                  '</interface></devices></domain>')
+        with ExitStack() as stack:
+            self.stubs(stack, guest=True, guest_xml=domain)
+            result = m.inspect(HOST, self.journal)
+        self.assertTrue(result["no_domain_references_network"])
 
     def test_refuse_if_live_network_xml_drifted(self):
         with ExitStack() as stack:
