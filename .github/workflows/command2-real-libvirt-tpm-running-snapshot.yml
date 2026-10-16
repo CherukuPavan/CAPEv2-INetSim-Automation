@@ -63,6 +63,7 @@ jobs:
         env:
           PYTHONPATH: scripts
           PYTHONDONTWRITEBYTECODE: "1"
+          CAPE_DISPOSABLE_LIBVIRT_CONTAINER: "1"
         shell: bash
         run: |
           set -Eeuo pipefail
