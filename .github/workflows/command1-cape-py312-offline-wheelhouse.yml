@@ -88,6 +88,19 @@ jobs:
           print("CAPE_TWICE_BUILT_WHEEL_DIFF_COUNT",len(changed))
           for name in changed:
               print("DIFFERENT_WHEEL_HASH",name)
+              from zipfile import ZipFile
+              left=Path('/tmp/cape-built-wheels')/name
+              right=Path('/tmp/cape-replayed-wheels')/name
+              with ZipFile(left) as a_zip, ZipFile(right) as b_zip:
+                  a_names=set(a_zip.namelist())
+                  b_names=set(b_zip.namelist())
+                  print("ZIP_MEMBER_NAME_DIFFERENCE",sorted(a_names^b_names)[:20])
+                  for item in sorted(a_names & b_names):
+                      da=hashlib.sha256(a_zip.read(item)).hexdigest()
+                      db=hashlib.sha256(b_zip.read(item)).hexdigest()
+                      if da!=db:
+                          print("ZIP_MEMBER_BYTES_DIFFER",item,da,db,
+                                len(a_zip.read(item)),len(b_zip.read(item)))
           assert not changed, "Wheel files must be bit-reproducible in one reviewed build"
           print("CAPE_170_WHEELS_REBUILT_WITH_IDENTICAL_SHA256")
           PY
@@ -143,6 +156,16 @@ jobs:
             --wheelhouse /tmp/cape-built-wheels \
             --approved-manifest-sha256 "$synthetic_review_hash"
           echo "CAPE_170_REAL_WHEELS_AND_LOCK_PASSED_FULL_BYTE_ADMISSION"
+      - name: Preserve only differing native wheel builds for byte-level reproducibility diagnosis
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-python-tlsh-differing-native-wheels
+          path: |
+            /tmp/cape-built-wheels/python_tlsh-*.whl
+            /tmp/cape-replayed-wheels/python_tlsh-*.whl
+          if-no-files-found: warn
+          retention-days: 3
       - name: Fresh isolated Python 3.12 can install and execute pinned CAPE dependency CLI with NO network
         env:
           UV_NO_CACHE: "1"
