@@ -133,6 +133,31 @@ class JoinedCommand3Tests(unittest.TestCase):
                 m.configure(args)
             self.assertFalse(args.witness_dir.exists())
 
+    def test_command3_resolves_active_transaction_without_user_id(self):
+        from contextlib import ExitStack
+        with tempfile.TemporaryDirectory() as td, ExitStack() as stack:
+            args = self.context(td)
+            args.use_active_transaction = True
+            for p in self.patch_plans(self):
+                stack.enter_context(p)
+            stack.enter_context(patch.object(m.os, "geteuid", return_value=0))
+            stack.enter_context(patch.object(m.sys.stdin, "isatty",
+                                             return_value=True))
+            stack.enter_context(patch.object(m.socket, "gethostname",
+                                             return_value="other-host"))
+            resolver = stack.enter_context(patch.object(
+                m.deployment_transaction, "active_transaction",
+                return_value="f" * 32))
+            loader = stack.enter_context(patch.object(
+                m.deployment_transaction, "load",
+                return_value=(Path(td) / "ledger.json", {"phase": "active"})))
+            stack.enter_context(patch("builtins.input", return_value="DECLINE"))
+            with self.assertRaisesRegex(m.Command3PipelineBlocked,
+                                        "not approved"):
+                m.configure(args)
+            resolver.assert_called_once_with("other-host")
+            loader.assert_called_once_with("f" * 32, "other-host")
+
     def test_optional_deployment_transaction_attests_each_change(self):
         from contextlib import ExitStack
         with tempfile.TemporaryDirectory() as td, ExitStack() as stack:
