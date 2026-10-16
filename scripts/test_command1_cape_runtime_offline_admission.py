@@ -34,8 +34,8 @@ class WheelAdmissionTests(unittest.TestCase):
                 with zipfile.ZipFile(path, "w") as output:
                     output.writestr(
                         name+"-"+version+".dist-info/METADATA",
-                        "Name: "+name+"\\nVersion: "+version+"\\n")
-                    output.writestr(name+"/__init__.py", "OK=True\\n")
+                        "Name: "+name+"\nVersion: "+version+"\n")
+                    output.writestr(name+"/__init__.py", "OK=True\n")
             b = path.read_bytes()
             metadata[name] = {
                 "wheel": filename,
@@ -44,7 +44,7 @@ class WheelAdmissionTests(unittest.TestCase):
                 "sha256": hashlib.sha256(b).hexdigest()
             }
         data = "".join(
-            k+"=="+v["version"]+" --hash=sha256:"+v["sha256"]+"\\n"
+            k+"=="+v["version"]+" --hash=sha256:"+v["sha256"]+"\n"
             for k,v in sorted(metadata.items()))
         self.lock.write_text(data)
         payload = {
