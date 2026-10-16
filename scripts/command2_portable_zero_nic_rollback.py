@@ -125,10 +125,10 @@ def no_foreign_domain_uses_images(vm,disk,nvram):
                      for name in (*paths,fw,loader)
                      if name is not None),
              "Another defined VM references this clone's OS/UEFI storage")
-        # XML only exposes a foreign disk's TOP layer. A foreign QCOW2
-        # overlay may reference either owned image through its backing chain.
-        # This metadata inspection is read-only and fails closed.
-        for path in paths:
+        # XML only exposes a foreign disk/UEFI image's TOP layer. A
+        # QCOW2 OVMF variable store is just as capable of referring to
+        # another image as a normal QCOW2 disk is. Inspect BOTH classes.
+        for path in (*paths,*([fw] if fw else [])):
             try:
                 disk_audit.require_no_foreign_qcow2_backing_reference(
                     path,(disk,nvram))
