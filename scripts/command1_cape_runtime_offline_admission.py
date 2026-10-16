@@ -113,8 +113,8 @@ def safe_wheel(p, expected_length, expected_sha):
                     seen_names = set()
                     for member in members:
                         name = member.filename
-                        need(name and not name.startswith(("/", "\\\\")) and
-                             "\\\\" not in name and "\\x00" not in name and
+                        need(name and not name.startswith(("/", "\\")) and
+                             "\\" not in name and "\x00" not in name and
                              all(part not in ("", ".", "..")
                                  for part in name.rstrip("/").split("/")),
                              "Untrusted wheel ZIP member")
