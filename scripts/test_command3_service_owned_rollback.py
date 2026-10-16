@@ -107,6 +107,15 @@ class ServiceOwnershipTests(TestCase):
                     rollback.ServiceOwnershipBlocked, "protected"):
                 rollback.host_guard(protected)
 
+    def test_paused_vm_blocks_service_stop_even_if_no_running_vms(self):
+        with patch.object(
+                rollback.libvirt_quiescence, "no_nonshutoff_domains",
+                side_effect=rollback.libvirt_quiescence.QuiescenceBlocked(
+                    "A paused vm exists")):
+            with self.assertRaisesRegex(
+                    rollback.ServiceOwnershipBlocked, "non-shutoff"):
+                rollback.no_live_guest()
+
     def test_rollback_stops_exactly_two_newly_started_services(self):
         doc=sample()
         current=deepcopy(doc["service_states_after"])
