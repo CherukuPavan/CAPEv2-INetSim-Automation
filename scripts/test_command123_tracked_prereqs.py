@@ -69,6 +69,8 @@ class TrackedAPTTests(unittest.TestCase):
                     "requested_missing": ["python3-pip"],
                     "simulated_installations": ["python3-pip", "python3-wheel"],
                     "installed_package_count": len(before),
+                    "baseline_inventory_sha256": __import__("hashlib").sha256(
+                        a.snap_bytes(before)).hexdigest(),
                     "host_modified": False, "snapshot_stack_authorized": False}
         stack = ExitStack()
         self.addCleanup(stack.close)
@@ -137,6 +139,20 @@ class TrackedAPTTests(unittest.TestCase):
                          "PARTIAL_OR_UNEXPECTED_NO_AUTO_RETRY")
         self.assertIn("git", saved[-1]["entries"][0]
                       ["observed_change"]["preexisting_changed"])
+
+    def test_inventory_drift_after_consent_blocks_before_mutation(self):
+        old = {"dpkg": "1", "git": "2"}
+        changed = {"dpkg": "1", "git": "3"}
+        doc, saved, runner, home = self.run_apply(old, old)
+        # The plan was approved for the original state, but dpkg reports
+        # same number of packages with a changed version just before apt.
+        with mock.patch.object(a, "installed", return_value=changed):
+            with self.assertRaises(__import__(
+                    "command123_deployment_transaction"
+                ).TransactionBlocked):
+                a.apply("a" * 32, "rakshati")
+        self.assertEqual(saved, [])
+        runner.assert_not_called()
 
     def test_refuses_missing_interactive_root(self):
         with mock.patch.object(a.os, "geteuid", return_value=1000):
