@@ -20,6 +20,10 @@ import uuid
 import xml.etree.ElementTree as ET
 
 
+@unittest.skipUnless(
+    all(shutil.which(x) for x in (
+        "qemu-img","qemu-system-x86_64","swtpm","libvirtd","virsh")),
+    "Requires dedicated disposable libvirt/TPM CI runtime")
 class RealLibvirtSnapshot(unittest.TestCase):
     def run_virsh(self,*args,timeout=75):
         proc=subprocess.run(["virsh","-c","qemu:///system",*args],
