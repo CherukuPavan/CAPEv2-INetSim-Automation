@@ -96,6 +96,22 @@ jobs:
               json.dumps(manifest,sort_keys=True,indent=2)+'\n')
           print("OFFLINE_WHEELHOUSE_LOCKED",len(wheels),manifest["lock_sha256"])
           PY
+      - name: Validate every actual binary wheel and hash lock with the deployment admission parser
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -Eeuo pipefail
+          # The hash is computed here only to exercise the read-only
+          # validator. A production target MUST independently pin an
+          # approved manifest hash, not trust a downloaded file itself.
+          synthetic_review_hash="$(sha256sum /tmp/cape-wheel-manifest.json | cut -d ' ' -f1)"
+          python3 -B scripts/command1_cape_runtime_offline_admission.py \
+            --manifest /tmp/cape-wheel-manifest.json \
+            --lock /tmp/cape-offline-wheels-hash.lock \
+            --wheelhouse /tmp/cape-built-wheels \
+            --approved-manifest-sha256 "$synthetic_review_hash"
+          echo "CAPE_170_REAL_WHEELS_AND_LOCK_PASSED_FULL_BYTE_ADMISSION"
       - name: Fresh isolated Python 3.12 can install and execute pinned CAPE dependency CLI with NO network
         env:
           UV_NO_CACHE: "1"
@@ -135,3 +151,12 @@ jobs:
             /tmp/cape-offline-wheels-hash.lock
           if-no-files-found: warn
           retention-days: 14
+      - name: Preserve disposable platform wheelhouse for manual binary provenance review
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-ubuntu26-py312-wheels-temporary-review
+          path: /tmp/cape-built-wheels/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
