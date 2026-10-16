@@ -29,6 +29,22 @@
 > and deployment-wide VM/network/service-state undo remain UNIMPLEMENTED.
 > **No final three-command installer is approved for use.**
 >
+> **2026-10-16 new signed distro hypervisor baseline candidate:**
+> Canonical Cloud Archive Epoxy/Flamingo/Gazpacho did not upgrade the
+> QEMU/libvirt versions selected on Ubuntu 24.04 to the conservative
+> running-snapshot floor. Official Ubuntu **26.04 LTS** supplies QEMU
+> 10.2.1 and libvirt 12.0.0. Both exact signed-APT candidate simulation
+> and real binary installation in a disposable 26.04 container passed,
+> including OVMF/swtpm and complete base+virt package simulation.
+> [Guarded base APT transactions](
+> scripts/command123_tracked_prereqs.py) now support an experimental 26.04
+> virtualization package scope, with external-binary shadowing refusal,
+> exact dpkg before/after receipts and no preexisting package upgrades.
+> This has **not** proven Windows/TPM full-system snapshots, guest egress
+> isolation, or whole-deployment rollback, and does not change the strict
+> three-command release gate. See the [signed distro assessment](
+> docs/CLOUD_ARCHIVE_SIGNED_PROBE.md).
+>
 > **2026-10-16 Command1 private master handoff integration:** the new
 > [one-invocation restricted reader → SHA-verified download → cold import](
 > scripts/command1_private_master_handoff_sequence.py) is available through
