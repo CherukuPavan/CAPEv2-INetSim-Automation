@@ -132,6 +132,53 @@ class TwoCycleTests(unittest.TestCase):
         self.assertEqual(entries[-1][2],
                          "TWO_BENIGN_REVERT_CYCLES_AGENT_ONLY_VERIFIED")
 
+    def test_disk_marker_challenge_seeds_then_reverts_both_mutations(self):
+        calls, entries = self.scenario()
+        with mock.patch.object(m, "seed_marker_from_stopped_guest",
+                               side_effect=lambda *a: calls.append("seed") or True) as seed, \
+             mock.patch.object(m.marker, "read_marker",
+                               side_effect=[False, True, False]) as reader, \
+             mock.patch.object(m.marker, "create_marker",
+                               side_effect=lambda *a: calls.append("mark") or True):
+            result = m.run(HOST, JOURNAL, VM, COLD, SHA,
+                           Path("/fake/private"), prove_disk_marker=True)
+        self.assertEqual(calls, ["seed", "revert", "mark", "shutdown",
+                                 "revert", "shutdown"])
+        self.assertTrue(result["disk_mutation_rollback_proven"])
+        self.assertFalse(result["TPM_UEFI_full_state_revert_proven"])
+        seed.assert_called_once()
+        self.assertEqual(reader.call_count, 3)
+        self.assertEqual(entries[-1][2],
+                         "TWO_BENIGN_REVERT_CYCLES_AGENT_ONLY_VERIFIED")
+
+    def test_disk_marker_surviving_first_revert_stops_without_next_cycle(self):
+        calls, entries = self.scenario()
+        with mock.patch.object(m, "seed_marker_from_stopped_guest",
+                               return_value=True), \
+             mock.patch.object(m.marker, "read_marker", return_value=True):
+            with self.assertRaises(m.TwoCycleBlocked):
+                m.run(HOST, JOURNAL, VM, COLD, SHA,
+                      Path("/fake/private"), prove_disk_marker=True)
+        self.assertEqual(calls, ["revert"])
+        self.assertEqual(entries[-1][2], "TWO_CYCLE_PARTIAL_OR_UNKNOWN")
+
+    def test_marker_initial_boot_never_forces_guest_shutdown(self):
+        states = iter(["shut off", "running"])
+        def virsh(*args):
+            if args[0] == "domstate":
+                return next(states)
+            return ""
+        with mock.patch.object(m.once, "virsh", side_effect=virsh) as virsh, \
+             mock.patch.object(m, "wait_agent_after_boot", return_value=True), \
+             mock.patch.object(m.marker, "read_marker",
+                               side_effect=[False, True]), \
+             mock.patch.object(m.marker, "create_marker", return_value=True), \
+             mock.patch.object(m, "shut_down_without_force", return_value=True):
+            self.assertTrue(m.seed_marker_from_stopped_guest(
+                VM, "192.168.241.101", "192.168.241.1"))
+        self.assertIn(mock.call("start", VM), virsh.call_args_list)
+        self.assertNotIn(mock.call("destroy", VM), virsh.call_args_list)
+
     def test_failure_on_cycle_two_keeps_one_completed_and_partial_state(self):
         calls, entries = self.scenario(return_bad=True)
         with self.assertRaisesRegex(m.TwoCycleBlocked, "Incomplete cycle"):
