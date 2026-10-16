@@ -30,6 +30,26 @@ def systemd_ok(unit):
             "installed_fragment":True}
 
 class RestartTests(unittest.TestCase):
+    def setUp(self):
+        self.owned_states={
+            unit:{
+                "Id":unit,"LoadState":"loaded","ActiveState":"active",
+                "UnitFileState":"enabled",
+                "FragmentPath":"/usr/lib/systemd/system/"+unit,
+                "InvocationID":"a"*32
+            } for unit in m.UNITS
+        }
+        from copy import deepcopy
+        self.p1=patch.object(m.owned,"snapshot",
+                             side_effect=lambda:deepcopy(self.owned_states))
+        self.p2=patch.object(m.owned,"unit_state",
+                             side_effect=lambda name:
+                             deepcopy(self.owned_states[name]))
+        self.p1.start()
+        self.p2.start()
+        self.addCleanup(self.p1.stop)
+        self.addCleanup(self.p2.stop)
+
     def test_exact_operator_five_service_order(self):
         self.assertEqual(list(m.UNITS),[
             "cape.service","cape-processor.service",
@@ -162,6 +182,11 @@ class RestartTests(unittest.TestCase):
         self.assertFalse(output["CAPE_READY_FOR_SAMPLE_ANALYSIS"])
         self.assertEqual(seen[-1]["completed"],list(m.UNITS))
         self.assertTrue(seen[-1]["all_five_active_after_restart_verified"])
+        self.assertEqual(seen[-1]["service_states_before"],
+                         self.owned_states)
+        self.assertEqual(seen[-1]["service_states_after"],
+                         self.owned_states)
+        self.assertTrue(output["owned_service_rollback_receipt_available"])
 
     def test_unit_failure_stops_and_records_partial_without_retry(self):
         seq=[]
