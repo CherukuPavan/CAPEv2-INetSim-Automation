@@ -29,6 +29,19 @@
 > and deployment-wide VM/network/service-state undo remain UNIMPLEMENTED.
 > **No final three-command installer is approved for use.**
 >
+> **2026-10-16 deployment-scoped CAPE service restart ownership:**
+> The guarded Command3 five-unit restarter records exact before/after
+> systemd invocation IDs, active/enabled states and installed unit paths in
+> a root-private journal. The new
+> [owned service reversal](scripts/command3_service_owned_rollback.py)
+> stops only units that this deployment started from an inactive state,
+> after rechecking the recorded invocation and confirming no libvirt
+> guest is running. Already active third-party/preexisting services are
+> never stopped or re-enabled. [Recovery rules and limits](
+> docs/COMMAND3_SCOPED_SYSTEMD_RESTART_ROLLBACK.md).
+> Also fixed the Command2 preflight to recognize Ubuntu 26.04 and refuse
+> modifications to **both** SSL-55 and SSL-46.
+>
 > **2026-10-16 independently rebuilt, hash-locked CAPE Python wheelhouse:**
 > Disposable Ubuntu 26.04 CI independently built **170 CAPEv2 dependency
 > wheels twice**, normalized only `python-tlsh==4.5.0` non-runtime
