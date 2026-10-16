@@ -1,0 +1,62 @@
+name: Official Ubuntu 26.04 signed virtualization candidates
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/command123-resolute-official-virt-candidates.yml"
+      - "scripts/command123_hypervisor_release_compat.py"
+      - "scripts/command2_native_snapshot_stack_guard.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resolute-apt-proof:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify official signed Resolute APT metadata and simulate without install
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          PYTHONDONTWRITEBYTECODE: "1"
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = 26.04
+          test "$(dpkg --print-architecture)" = amd64
+          # Ubuntu's included trusted archive keys authenticate InRelease.
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get install -y --no-install-recommends python3
+          apt-get -s install --no-install-recommends qemu-system-x86 libvirt-daemon-system > /tmp/virt-plan.txt
+          python3 -B - <<'PY'
+          import sys
+          sys.path.insert(0, 'scripts')
+          import command123_hypervisor_release_compat as compatibility
+          import json
+          from pathlib import Path
+          candidates = {pkg:compatibility.read_policy(pkg) for pkg in compatibility.PACKAGES}
+          result=compatibility.candidate_matrix(candidates)
+          assert result["running_snapshot_stack_versions_admitted"], result
+          plan=Path('/tmp/virt-plan.txt').read_text()
+          assert 'Remv ' not in plan and 'Purg ' not in plan, "APT simulation removes packages"
+          print(json.dumps({
+             "release": "Ubuntu 26.04 LTS",
+             "source": "official Ubuntu signed distro APT index",
+             "versions_satisfy_existing_floor": True,
+             "candidates": candidates,
+             "apt_simulated_without_removals": True,
+             "no_hypervisor_installed": True,
+             "guest_cold_boot_proven": False,
+             "firmware_tpm_snapshot_restore_proven": False,
+             "deployment_release_ready": False
+          }, indent=2,sort_keys=True))
+          PY
