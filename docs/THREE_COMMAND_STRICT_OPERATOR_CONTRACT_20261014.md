@@ -18,6 +18,17 @@ subprocesses and dependencies must be audited and captured in one private
 report for each command. Never require the user to hand-run helper modules,
 edit Python/bash files, or diagnose/install packages by themselves.
 
+## Verified source-bootstrap progress (2026-10-16)
+
+The source repository is public, so Command 1 does not need to ask for a
+GitHub token. Source bootstrap now supports a public, unauthenticated
+SHA-pinned download with per-blob integrity verification; the disposable
+Ubuntu 24.04 GitHub Actions job also exercised actual credential-free API
+and tarball retrieval. This removes a **source access dependency only**:
+the golden-master Google Drive data stays private, Windows/TPM checkpoint
+restoration is still unverified, and this helper must not be represented as
+the complete first deployment command.
+
 ## Command 1 — Fresh host + exact master
 
 A **single operator command** with a secure, independently verifiable
