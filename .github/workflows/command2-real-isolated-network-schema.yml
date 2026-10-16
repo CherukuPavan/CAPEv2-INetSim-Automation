@@ -1,0 +1,48 @@
+name: Real isolated-network XML and nft syntax on Ubuntu
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command2_isolated_network_xml_plan.py"
+      - "scripts/command2_cape_egress_guard_plan.py"
+      - "scripts/test_command2_real_isolated_network_schema.py"
+      - ".github/workflows/command2-real-isolated-network-schema.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  schema-no-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install libvirt XML validator and nft syntax checker in disposable runner
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libvirt-clients libvirt-daemon-config-network nftables
+          virt-xml-validate --version
+          nft --version
+      - name: Read-only real libvirt schema and nft syntax checks
+        env:
+          PYTHONPATH: scripts
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          sudo --preserve-env=PYTHONPATH,PYTHONDONTWRITEBYTECODE python3 -B -m unittest -v test_command2_real_isolated_network_schema
+      - name: Check generated plan never contains a VM start or host mutation
+        run: |
+          python3 -B - <<'PY'
+          from pathlib import Path
+          for name in (
+              "scripts/command2_isolated_network_xml_plan.py",
+              "scripts/command2_cape_egress_guard_plan.py"):
+              code=Path(name).read_text(encoding="utf-8")
+              for unsafe in ("subprocess.run(", "virsh net-define", "virsh net-start", "nft -f",
+                             "os.system(", "systemctl restart", "iptables -F"):
+                  assert unsafe not in code, (name,unsafe)
+          print("NETWORK_SYNTAX_ONLY_NO_VM_STARTED_OR_HOST_RULES_CHANGED")
+          PY
