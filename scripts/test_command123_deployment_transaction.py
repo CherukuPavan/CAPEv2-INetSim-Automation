@@ -427,8 +427,8 @@ class ServiceRecoveryGuards(unittest.TestCase):
             raise AssertionError("unexpected host command")
         with mock.patch.object(t.subprocess, "run", side_effect=run) as proc:
             t.no_live_work()
-        # Libvirt all-domains inventory is checked twice to reject drift.
-        self.assertEqual(proc.call_count, len(t.SERVICE_STOPS) + 2)
+        # Two UUID/state passes and three inventories detect name/UUID drift.
+        self.assertEqual(proc.call_count, len(t.SERVICE_STOPS) + 3)
 
     def test_no_live_work_rejects_paused_libvirt_guest(self):
         libvirt_calls=[]
@@ -440,6 +440,9 @@ class ServiceRecoveryGuards(unittest.TestCase):
                 libvirt_calls.append(cmd)
                 if "list" in cmd:
                     return SimpleNamespace(returncode=0,stdout="win11_1\n")
+                if "domuuid" in cmd:
+                    return SimpleNamespace(returncode=0,stdout=(
+                        "289d89be-68ec-4c62-90e1-ea930849266f\n"))
                 return SimpleNamespace(returncode=0,stdout="paused\n")
             raise AssertionError("Unexpected command")
         with mock.patch.object(t.subprocess,"run",side_effect=run):
@@ -448,6 +451,9 @@ class ServiceRecoveryGuards(unittest.TestCase):
                 t.no_live_work()
         self.assertEqual(
             libvirt_calls[1],
+            ["virsh","-c","qemu:///system","domuuid","win11_1"])
+        self.assertEqual(
+            libvirt_calls[2],
             ["virsh","-c","qemu:///system","domstate","win11_1"])
 
     def test_no_live_work_refuses_active_cape_unit(self):
