@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Transaction-scoped partial CAPE recovery orchestrator.
 
-A single operator invocation for the currently implemented file + seven
-base-prerequisite package undo. Strict dependency order: STOPPED services
-and guests -> restore file originals -> remove only proven new APT additions
+A single operator invocation for tracked CAPE files, one source checkout
+and seven base-prerequisite packages. Dependency order: STOPPED services
+and guests -> restore file originals -> quarantine owned pristine CAPE source
+-> remove only proven new APT additions
 -> finalize owned subset. Individual steps retain their own direct typed
 consent and durable receipts. Never removes VM/TPM/network/firewall or
 unproven resources. NOT a full three-command deployment rollback.
@@ -17,6 +18,7 @@ import sys
 
 import command123_deployment_transaction as transaction
 import command123_tracked_apt_rollback as packages
+import command1_tracked_cape_source as cape_source
 
 
 class ScopedRecoveryBlocked(RuntimeError):
@@ -36,7 +38,7 @@ def owned_stage_plan(host, txid):
     names = [item.get("kind") for item in doc["entries"]]
     # Reject unknown/unfinished assets even if the helper subcommands
     # might independently permit a subset. No blind cleanup of VMs/etc.
-    need(set(names) <= {"file", "package"},
+    need(set(names) <= {"file", "package", "cape_source"},
          "Deployment includes unsupported VM/network/account/resource steps")
     prepared_files = [
         entry for entry in doc["entries"]
@@ -59,6 +61,19 @@ def owned_stage_plan(host, txid):
     if package_rows:
         need(package_rows[0].get("status") in ("sealed", "rollback_verified"),
              "Unverified or partial package installation/undo")
+    source_rows = [entry for entry in doc["entries"]
+                   if entry.get("kind") == "cape_source"]
+    need(len(source_rows) <= 1, "Cannot attribute repeated upstream CAPE checkout")
+    if source_rows:
+        need(source_rows[0].get("status") in ("sealed", "rollback_verified"),
+             "Unverified or partially reverted source")
+        source_inspection = cape_source.undo_plan(host, txid)
+        need(source_inspection["action"] ==
+             ("quarantine_owned_checkout" if
+              source_rows[0]["status"] == "sealed" else "already_quarantined"),
+             "CAPE source provenance and quarantine disagree")
+    else:
+        source_inspection = None
     first = transaction.rollback_plan(txid, host, files_only=True)
     need(first["can_rollback"],
          "File originals are missing or changed; recovery refused")
@@ -80,6 +95,11 @@ def owned_stage_plan(host, txid):
         "apt_new_packages_to_remove": (
             apt_inspection["packages_to_remove"] if apt_inspection else []),
         "apt_rollback_needed": apt_inspection is not None,
+        "source_rollback_needed": source_inspection is not None and
+                                  source_inspection["action"] ==
+                                  "quarantine_owned_checkout",
+        "source_rollback_action": (source_inspection["action"]
+                                   if source_inspection else None),
         "file_actions": first["actions"],
         "all_non_file_non_apt_resource_types_supported": False,
         "no_host_changes": True,
@@ -104,6 +124,10 @@ def run(host, txid):
         result = transaction.rollback_files_first(txid, host, True)
         need(result["transaction_still_active"] is True,
              "File rollback not verified")
+    if initial["source_rollback_needed"]:
+        result = cape_source.undo(host, txid)
+        need(result["result"] == "COMMAND1_OWNED_SOURCE_UNDEPLOYED_QUARANTINED",
+             "Owned CAPE source checkout was not quarantined")
     if initial["apt_rollback_needed"]:
         result = packages.rollback(txid, host)
         need(result["preexisting_package_inventory_restored"] is True,
@@ -118,7 +142,9 @@ def run(host, txid):
     return {
         "result": "CAPE_ATTESTED_FILE_AND_BASE_APT_SUBSET_REVERSED",
         "transaction": txid,
-        "resource_types_reversed": ["reviewed_CAPE_files", "base_apt_additions"],
+        "resource_types_reversed": [
+            "reviewed_CAPE_files", "pinned_owned_CAPEv2_source_quarantined",
+            "base_apt_additions"],
         "other_resource_rollback_not_included": True,
         "full_three_command_rollback_verified": False,
     }
