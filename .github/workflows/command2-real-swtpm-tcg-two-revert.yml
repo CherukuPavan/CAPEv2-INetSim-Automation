@@ -1,0 +1,53 @@
+name: Harmless real QEMU swtpm TPM RAM two-revert laboratory
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/test_command2_real_swtpm_snapshot_tcg.py"
+      - ".github/workflows/command2-real-swtpm-tcg-two-revert.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-qemu-tcg:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install signed distro benign QEMU and swtpm tools
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu && test "$VERSION_ID" = 26.04
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get install -y --no-install-recommends             python3 qemu-system-x86 qemu-utils swtpm seabios
+          qemu-system-x86_64 --version
+          swtpm --version
+      - name: Run real TCG QEMU blank-disk RAM snapshot with swtpm and two restores
+        env:
+          PYTHONPATH: scripts
+          PYTHONDONTWRITEBYTECODE: "1"
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -B -m unittest -v test_command2_real_swtpm_snapshot_tcg
+      - name: Verify no golden assets or cloud credentials entered the runner
+        shell: bash
+        run: |
+          python3 -B - <<'PY'
+          from pathlib import Path
+          for path in Path('scripts').rglob('*'):
+              if path.is_file() and path.suffix.lower() in ('.qcow2','.pfx','.p12','.key','.iso'):
+                  raise SystemExit('Unexpected bundled golden or private asset')
+          print('ONLY_EPHEMERAL_SYNTHETIC_QEMU_TPM')
+          PY
