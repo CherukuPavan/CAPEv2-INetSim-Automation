@@ -190,7 +190,10 @@ class CloneRecoveryTests(unittest.TestCase):
                                                  side_effect=guest))
             stack.enter_context(mock.patch.object(u.os,"fstat",
                                                  side_effect=fake_root))
-            records=stack.enter_context(mock.patch.object(u,"record"))
+            recorded_steps=[]
+            records=stack.enter_context(mock.patch.object(
+                u,"record",side_effect=lambda path,payload,*extra:
+                recorded_steps.append(payload["status"])))
             stack.enter_context(mock.patch("builtins.input",
                 return_value="QUARANTINE-ONLY-UNTOUCHED-WIN11_1"))
             result=u.revert(HOST,self.folder,VM)
@@ -202,7 +205,7 @@ class CloneRecoveryTests(unittest.TestCase):
         self.assertFalse(self.nvram.exists())
         self.assertEqual(operations[0],
                          ("undefine",VM,"--keep-nvram"))
-        self.assertEqual([x.args[1]["status"] for x in records.call_args_list],
+        self.assertEqual(recorded_steps,
                          ["prepared","domain_undefined","disk_quarantined",
                           "nvram_quarantined","verified"])
 
