@@ -29,7 +29,7 @@ class BootstrapEmitterTests(unittest.TestCase):
         self.assertIn('/contents/" + PATH + "?ref=" + REVISION', command)
         self.assertIn('hashlib.sha1(', command)
         self.assertIn('if got != EXPECTED_HELPER_BLOB:', command)
-        self.assertIn('base64.b64decode(doc["content"], validate=True)', command)
+        self.assertIn('base64.b64decode("".join(encoded.splitlines()), validate=True)', command)
         self.assertIn('Bearer " + token', command)
         self.assertIn('getpass.getpass(', command)
         self.assertIn('namespace["main"](bootstrap_token=token)', command)
