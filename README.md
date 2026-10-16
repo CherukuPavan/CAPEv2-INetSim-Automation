@@ -29,6 +29,20 @@
 > and deployment-wide VM/network/service-state undo remain UNIMPLEMENTED.
 > **No final three-command installer is approved for use.**
 >
+> **2026-10-16 Command1 private master handoff integration:** the new
+> [one-invocation restricted reader → SHA-verified download → cold import](
+> scripts/command1_private_master_handoff_sequence.py) is available through
+> `command1_pre_vm.sh master-private-handoff`. It journals each child BEFORE
+> execution, preserves individual typed approvals, halts on any partial
+> action, and never auto-retries or removes sensitive artifacts. It operates
+> only on a separately approved new host with working virtualization tools,
+> an already securely provisioned restricted Drive service-account key, and
+> a cloud folder shared with that account. The resulting exact Windows
+> master remains **SHUT OFF**; the combined stage does **not** install
+> the entire CAPE stack or prove a TPM-consistent RUNNING snapshot.
+> Python offline tests exercise ordering, preserved partial receipts and
+> no unapproved child execution.
+>
 > **2026-10-16 source acquisition now physically exercised in CI:**
 > The GitHub source repository is public and supports a
 > [token-free pinned checkout](scripts/command123_private_pinned_checkout.py)
