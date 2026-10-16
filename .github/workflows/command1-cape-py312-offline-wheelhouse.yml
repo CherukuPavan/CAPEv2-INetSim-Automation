@@ -73,6 +73,16 @@ jobs:
             --require-hashes \
             --wheel-dir /tmp/cape-replayed-wheels \
             --requirement /tmp/cape-hashed-source-deps.txt
+          # The sole volatile native dependency, python-tlsh==4.5.0,
+          # embeds random /tmp/pip-wheel-* absolute paths in DWARF and
+          # consequently has a differing GNU build-ID. Keep both original
+          # signed-sdist attestations; remove debug/build-ID sections ONLY
+          # from this wheel, update PEP427 RECORD and prove both independent
+          # normalized outputs have identical SHA256 before locking.
+          test -x /usr/bin/objcopy
+          python3 -B scripts/ci_normalize_python_tlsh_wheel.py \
+            /tmp/cape-built-wheels/python_tlsh-4.5.0-cp312-cp312-linux_x86_64.whl \
+            /tmp/cape-replayed-wheels/python_tlsh-4.5.0-cp312-cp312-linux_x86_64.whl
           python3 -B - <<'PY'
           from pathlib import Path
           import hashlib
