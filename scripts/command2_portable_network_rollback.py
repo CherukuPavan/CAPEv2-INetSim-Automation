@@ -177,10 +177,17 @@ def rollback(host, journal):
                  [x.strip() for x in virsh("net-list", "--all", "--name").splitlines()],
                  "Network unexpectedly reappeared")
             listing = json.loads(nft("-j", "list", "tables"))
+            need(type(listing) is dict and
+                 type(listing.get("nftables")) is list and
+                 all(type(x) is dict and
+                     (x.get("table") is None or
+                      type(x.get("table")) is dict)
+                     for x in listing["nftables"]),
+                 "Malformed nft post-deletion inventory; stop")
             need(not any(
                 x.get("table", {}).get("family") == "inet" and
                 x.get("table", {}).get("name") == TABLE
-                for x in listing.get("nftables", []) if isinstance(x, dict)),
+                for x in listing["nftables"] if "table" in x),
                 "Dedicated nft table still present")
             receipt.advance(journal, "nft_table_removed", "rollback_verified")
             return {"result": "COMMAND2_OWNED_NETWORK_AND_NFT_REVERSED",
