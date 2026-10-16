@@ -204,7 +204,7 @@ class CloneRecoveryTests(unittest.TestCase):
              '</devices></domain>')
         def fake_virsh(*args):
             if args==("list","--all","--name"):
-                return VM+"\\nunrelated\\n"
+                return VM+"\nunrelated\n"
             if args==("dumpxml","--inactive","unrelated"):
                 return xml
             raise AssertionError("Unexpected libvirt query")
@@ -232,7 +232,7 @@ class CloneRecoveryTests(unittest.TestCase):
              '</devices></domain>')
         def fake_virsh(*args):
             if args==("list","--all","--name"):
-                return VM+"\\nunrelated\\n"
+                return VM+"\nunrelated\n"
             if args==("dumpxml","--inactive","unrelated"):
                 return xml
             raise AssertionError("Unexpected libvirt query")
@@ -252,7 +252,7 @@ class CloneRecoveryTests(unittest.TestCase):
              'name="pool/image"/></disk></devices></domain>')
         def fake_virsh(*args):
             if args==("list","--all","--name"):
-                return VM+"\\nunrelated\\n"
+                return VM+"\nunrelated\n"
             if args==("dumpxml","--inactive","unrelated"):
                 return xml
             raise AssertionError("Unexpected libvirt query")
