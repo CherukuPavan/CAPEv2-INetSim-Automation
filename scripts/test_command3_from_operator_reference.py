@@ -60,6 +60,114 @@ class JoinedCommand3Tests(unittest.TestCase):
                          return_value={"status":"TARGET_ON_MOUNT_READY"}),
         ]
 
+    def test_joined_run_writes_parent_before_config_and_service(self):
+        from contextlib import ExitStack
+        with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+            args=self.context(tmp)
+            args.witness_dir.mkdir(mode=0o700)
+            calls=[]
+            reports=[]
+            stack.enter_context(patch.object(m.os,"geteuid",return_value=0))
+            stack.enter_context(patch.object(m.sys.stdin,"isatty",
+                                             return_value=True))
+            stack.enter_context(patch.object(m.socket,"gethostname",
+                                             return_value="other-host"))
+            stack.enter_context(patch.object(m,"review",
+                  return_value={"verified_target_tmpfs_mounted":True}))
+            def write(path, row, **kwargs):
+                reports.append({
+                    "result":row["result"],"pending":row["pending"],
+                    "completed":list(row["completed"]),
+                    "config_witness":row["config_witness"],
+                    "restart_witness":row["restart_witness"],
+                })
+            stack.enter_context(patch.object(m,"write_witness",side_effect=write))
+            config=stack.enter_context(patch.object(m,"configure",
+                    side_effect=lambda args:(
+                      calls.append("configuration") or {
+                        "result":"COMMAND3_FIVE_CONFIG_FILES_APPLIED_NO_RESTART",
+                        "witness":"/var/lib/command3-config.json"})))
+            restart=stack.enter_context(patch.object(
+                    m,"restart_existing_config",
+                    side_effect=lambda args:(
+                      calls.append("restart") or {
+                        "result":"COMMAND3_EXISTING_CONFIG_FIVE_SERVICE_RESTART_COMPLETE",
+                        "witness":"/var/lib/command3-restart.json"})))
+            output=m.run_joined(args)
+        self.assertEqual(calls,["configuration","restart"])
+        self.assertEqual(reports[0]["result"],"COMMAND3_JOINED_STARTED")
+        self.assertEqual(reports[0]["completed"],[])
+        self.assertEqual(reports[-1]["completed"],
+                         ["five_configuration_files","five_service_restarts"])
+        self.assertEqual(output["config_receipt"],"/var/lib/command3-config.json")
+        self.assertEqual(output["service_receipt"],"/var/lib/command3-restart.json")
+        self.assertFalse(output["malware_analysis_ready"])
+        config.assert_called_once()
+        restart.assert_called_once()
+
+    def test_joined_run_never_restarts_after_failed_configuration(self):
+        from contextlib import ExitStack
+        with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+            args=self.context(tmp)
+            args.witness_dir.mkdir(mode=0o700)
+            seen=[]
+            stack.enter_context(patch.object(m.os,"geteuid",return_value=0))
+            stack.enter_context(patch.object(m.sys.stdin,"isatty",
+                                             return_value=True))
+            stack.enter_context(patch.object(m.socket,"gethostname",
+                                             return_value="other-host"))
+            stack.enter_context(patch.object(m,"review",
+                  return_value={"verified_target_tmpfs_mounted":True}))
+            stack.enter_context(patch.object(m,"write_witness",
+                        side_effect=lambda p,d,**kw:seen.append(dict(d))))
+            stack.enter_context(patch.object(m,"configure",
+                     side_effect=RuntimeError("synthetic config failure")))
+            restart=stack.enter_context(patch.object(m,"restart_existing_config"))
+            with self.assertRaisesRegex(
+                    m.Command3PipelineBlocked,"uncertain stage"):
+                m.run_joined(args)
+            restart.assert_not_called()
+        self.assertEqual(seen[-1]["result"],
+                         "COMMAND3_JOINED_PARTIAL_OR_UNKNOWN")
+        self.assertEqual(seen[-1]["pending"],"five_configuration_files")
+
+    def test_joined_run_preserves_config_receipt_after_restart_failure(self):
+        from contextlib import ExitStack
+        with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+            args=self.context(tmp)
+            args.witness_dir.mkdir(mode=0o700)
+            seen=[]
+            stack.enter_context(patch.object(m.os,"geteuid",return_value=0))
+            stack.enter_context(patch.object(m.sys.stdin,"isatty",
+                                             return_value=True))
+            stack.enter_context(patch.object(m.socket,"gethostname",
+                                             return_value="other-host"))
+            stack.enter_context(patch.object(m,"review",
+                  return_value={"verified_target_tmpfs_mounted":True}))
+            stack.enter_context(patch.object(m,"write_witness",
+                        side_effect=lambda p,d,**kw:seen.append(dict(d))))
+            stack.enter_context(patch.object(m,"configure",
+                     return_value={
+                       "result":"COMMAND3_FIVE_CONFIG_FILES_APPLIED_NO_RESTART",
+                       "witness":"/var/lib/cape-config.json"}))
+            stack.enter_context(patch.object(m,"restart_existing_config",
+                          side_effect=RuntimeError("synthetic restart failure")))
+            with self.assertRaises(m.Command3PipelineBlocked):
+                m.run_joined(args)
+        self.assertEqual(seen[-1]["result"],
+                         "COMMAND3_JOINED_PARTIAL_OR_UNKNOWN")
+        self.assertEqual(seen[-1]["completed"],["five_configuration_files"])
+        self.assertEqual(seen[-1]["pending"],"five_service_restarts")
+        self.assertEqual(seen[-1]["config_witness"],"/var/lib/cape-config.json")
+
+    def test_ssl46_protected_as_well_as_ssl55(self):
+        for name in ("ssl-46","CSE-SSL-46","ssl-55","CSE-SSL-55"):
+            with self.subTest(host=name), \
+                 patch.object(m.socket,"gethostname",return_value=name):
+                with self.assertRaisesRegex(
+                        m.Command3PipelineBlocked, "SSL-55"):
+                    m.approved_host(name)
+
     def test_config_path_layout_and_step_order(self):
         with tempfile.TemporaryDirectory() as tmp:
             args = self.context(tmp)
