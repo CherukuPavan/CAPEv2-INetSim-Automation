@@ -1,0 +1,62 @@
+name: Real pinned CAPEv2 dependency install in isolated Python3.12 Ubuntu26 CI
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/command1-resolute-cape-venv-install-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ephemeral-python312-cape:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Try actual pinned CAPE Python package environment without host service or guest
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          UV_PYTHON_INSTALL_DIR: /tmp/cape-python-versions
+          UV_PYTHON_INSTALL_BIN: "0"
+          UV_NO_CACHE: "1"
+          UPSTREAM_REV: 004d73c51dcd12dacb97b3657262bdea8376d710
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu && test "$VERSION_ID" = 26.04
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get install -y --no-install-recommends \
+            python3 python3-venv python3-pip git ca-certificates \
+            build-essential cmake pkg-config libssl-dev libffi-dev \
+            zlib1g-dev libjpeg-dev libmagic-dev libfuzzy-dev libyara-dev \
+            libpq-dev libxml2-dev libxslt1-dev
+          python3 -m venv /tmp/cape-uv-tool
+          /tmp/cape-uv-tool/bin/python -m pip install --only-binary=:all: "uv==0.9.15"
+          /tmp/cape-uv-tool/bin/uv python install "3.12.12" --no-bin
+          /tmp/cape-uv-tool/bin/uv venv --managed-python --python "3.12.12" /tmp/cape-py312
+          git clone -q --filter=blob:none --no-checkout https://github.com/kevoreilly/CAPEv2.git /tmp/cape-upstream
+          git -C /tmp/cape-upstream checkout -q --detach "$UPSTREAM_REV"
+          test "$(git -C /tmp/cape-upstream rev-parse HEAD)" = "$UPSTREAM_REV"
+          # Run SDist builders only in this disposable no-secrets runner:
+          # install into /tmp/cape-py312, NEVER default Python3.14 or /opt/CAPE.
+          /tmp/cape-uv-tool/bin/uv pip install \
+              --python /tmp/cape-py312/bin/python \
+              --editable /tmp/cape-upstream
+          /tmp/cape-py312/bin/python - <<'PY'
+          import sys
+          import gevent, greenlet, django, sqlalchemy, yara
+          assert sys.version_info[:2] == (3,12)
+          assert gevent.__version__ == '24.2.1'
+          assert greenlet.__version__ == '3.0.3'
+          print("PINNED_CAPE_CORE_NATIVE_DEPENDENCIES_INSTALLED_AND_IMPORTED")
+          PY
+          test "$(python3 --version)" = "Python 3.14.4"
+          echo "NOT_A_CAPE_SERVICE_OR_VM_ACCEPTANCE_TEST"
