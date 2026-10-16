@@ -28,6 +28,7 @@ import sys
 import tempfile
 import uuid
 
+import command123_deployment_transaction as transaction
 import command123_libvirt_quiescence as libvirt_quiescence
 
 ROOT = Path("/var/lib/cape-deployment-recovery")
@@ -308,22 +309,19 @@ def state_plan(receipt, approved, mode):
 
 
 def no_live_workloads():
-    """Never mutate CAPE settings while analysis services/VMs are running."""
-    for unit in UNIT_NAMES:
-        try:
-            p = subprocess.run(["systemctl", "is-active", "--quiet", unit],
-                               stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL, timeout=10)
-        except (OSError, subprocess.TimeoutExpired) as e:
-            raise RecoveryBlocked("Cannot confirm services are stopped") from e
-        require(p.returncode in (3, 4), "CAPE/Suricata service active or unknown: " + unit)
-    try:
-        libvirt_quiescence.no_nonshutoff_domains()
-    except libvirt_quiescence.QuiescenceBlocked as e:
-        raise RecoveryBlocked(
-            "Config recovery refuses paused, suspended, live or "
-            "unknown-state libvirt guests") from e
+    """Fail-closed service and complete libvirt quiescence inspection.
 
+    `systemctl is-active` exit code 3 alone is ambiguous between a
+    merely inactive unit and a failed one. Share the stricter systemd
+    LoadState/ActiveState and all-domains libvirt checks already used by
+    the root-private deployment transaction.
+    """
+    try:
+        transaction.no_live_work()
+    except transaction.TransactionBlocked as exc:
+        raise RecoveryBlocked(
+            "Cannot prove every CAPE service inactive and all guests shut off"
+        ) from exc
 
 def atomically_restore(target, blob, meta, *, missing_only):
     target = guard_file_path(target)
