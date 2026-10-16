@@ -120,6 +120,20 @@ def safe_wheel(p, expected_length, expected_sha):
                              "Untrusted wheel ZIP member")
                         need(name not in seen_names, "Duplicate ZIP member")
                         seen_names.add(name)
+                        # A hash-approved archive can still contain a Unix
+                        # symbolic link or a device entry. Do not let an
+                        # offline package installer follow such members
+                        # outside the dedicated CAPE virtual environment.
+                        type_bits = (member.external_attr >> 16) & 0o170000
+                        need(type_bits in (0, stat.S_IFREG, stat.S_IFDIR) and
+                             not (member.flag_bits & 0x0001),
+                             "Unsupported ZIP member type or encryption")
+                        if type_bits == stat.S_IFDIR:
+                            need(member.is_dir(),
+                                 "ZIP declares file path as directory")
+                        if type_bits == stat.S_IFREG:
+                            need(not member.is_dir(),
+                                 "ZIP declares directory as regular file")
                         uncompressed += member.file_size
                         need(uncompressed <= MAX_WHEEL_SIZE * 4,
                              "Oversized wheel expanded data")
