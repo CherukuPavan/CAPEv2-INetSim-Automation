@@ -16,7 +16,9 @@ import tempfile
 
 RECEIPT = "command2-isolated-network-deployment.json"
 PHASES = ("prepared", "nft_applied", "network_defined",
-          "network_started", "verified")
+          "network_started", "verified", "rollback_started",
+          "network_inactive", "network_undefined", "nft_table_removed",
+          "rollback_verified")
 MAX = 16384
 
 
@@ -71,6 +73,12 @@ def validate(data):
         need(type(data.get(field)) is str and
              re.fullmatch(r"[0-9a-f]{64}",data[field]),
              "Missing exact network source checksum")
+    if PHASES.index(data["status"]) >= PHASES.index("verified"):
+        for field in ("post_live_libvirt_xml_sha256",
+                      "post_nft_stateless_sha256"):
+            need(type(data.get(field)) is str and
+                 re.fullmatch(r"[0-9a-f]{64}", data[field]),
+                 "Post-state network readback digest missing")
     return data
 
 
@@ -160,13 +168,22 @@ def begin(host, journal, plan):
     return entry
 
 
-def advance(journal, prior, successor):
+def advance(journal, prior, successor, *, post_state=None):
     need(prior in PHASES and successor in PHASES and
          PHASES.index(successor)==PHASES.index(prior)+1,
          "Nonsequential network phase")
     target=record_path(journal)
     data=read(target)
     need(data["status"]==prior,"Network phase drifted or was replayed")
+    if successor == "verified":
+        need(type(post_state) is dict and
+             set(post_state) == {"post_live_libvirt_xml_sha256",
+                                 "post_nft_stateless_sha256"},
+             "Require exact immutable post-install network and nft hashes")
+        data.update(post_state)
+    else:
+        need(post_state is None,
+             "Unexpected network post-state for non-sealing phase")
     data["status"]=successor
     write(target,data)
     return data
