@@ -82,7 +82,6 @@ class RealLibvirtSnapshot(unittest.TestCase):
     </disk>
     <controller type='sata' index='0'/>
     <tpm model='tpm-tis'><backend type='emulator' version='2.0'/></tpm>
-    <graphics type='none'/>
     <memballoon model='none'/>
   </devices>
 </domain>"""
