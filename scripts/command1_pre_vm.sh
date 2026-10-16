@@ -14,6 +14,7 @@ Modes:
   audit                   Consolidated read-only Steps 1-11 report.
   plan-prereqs            Read-only missing-package plan.
   apply-prereqs           Explicitly install only known-safe missing base packages.
+  begin-tracked-prereqs   INTERNAL: create root-private Command1 ledger BEFORE guarded APT.
   bootstrap-source        Fresh-host Git clone, or verify existing owned checkout.
   plan-virt               Read-only distro virtualization package preflight (Steps 6-9).
   plan-release-hypervisor Read-only QEMU/libvirt version admission for REAL running-snapshot contract.
@@ -77,6 +78,15 @@ case "$MODE" in
     ;;
   apply-prereqs)
     exec bash "$HERE/bootstrap_pre_vm_prereqs.sh" --apply "$@"
+    ;;
+  begin-tracked-prereqs)
+    command -v python3 >/dev/null 2>&1 || {
+      echo 'Tracked new-host entrypoint requires distro Python3' >&2; exit 2
+    }
+    [[ $EUID -eq 0 ]] || {
+      echo 'Root required for host-bound pre-mutation transaction stage' >&2; exit 2
+    }
+    exec python3 -B "$HERE/command1_tracked_prerequisite_stage.py" --mode apply "$@"
     ;;
   bootstrap-source)
     exec bash "$HERE/bootstrap_cape_source.sh" "$@"
