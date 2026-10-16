@@ -246,6 +246,31 @@ class CloneRecoveryTests(unittest.TestCase):
                 VM,str(self.disk),str(self.nvram)))
         audit.assert_called_once()
 
+    def test_foreign_ovmf_backing_dependence_is_checked(self):
+        foreign_nvram=self.folder/"foreign-VARS.qcow2"
+        foreign_nvram.write_bytes(b"foreign OVMF fixture")
+        xml=(f'<domain><name>unrelated</name><os><nvram>'
+             f'{foreign_nvram}</nvram></os><devices></devices></domain>')
+        def fake_virsh(*args):
+            if args==("list","--all","--name"):
+                return VM+"\nunrelated\n"
+            if args==("dumpxml","--inactive","unrelated"):
+                return xml
+            raise AssertionError("Unexpected libvirt query")
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(
+                stager,"virsh",side_effect=fake_virsh))
+            auditor=stack.enter_context(mock.patch.object(
+                u.disk_audit,"require_no_foreign_qcow2_backing_reference",
+                side_effect=u.disk_audit.DiskAdmissionBlocked(
+                    "VM firmware backing references clone storage")))
+            with self.assertRaisesRegex(
+                    u.CloneRollbackBlocked,"backing chain"):
+                u.no_foreign_domain_uses_images(VM,str(self.disk),
+                                                str(self.nvram))
+        auditor.assert_called_once_with(str(foreign_nvram),
+                                        (str(self.disk),str(self.nvram)))
+
     def test_foreign_disk_protocol_is_not_silently_ignored(self):
         xml=('<domain><name>unrelated</name><devices>'
              '<disk device="disk"><source protocol="rbd" '
