@@ -49,6 +49,7 @@ class TransactionTests(unittest.TestCase):
         except OSError:
             linked = ""
         if (linked.endswith("/ledger.json") or
+                linked.endswith("/.transaction.lock") or
                 "/transactions/" in linked and
                 ("/before-" in linked or "/after-" in linked)):
             return SimpleNamespace(st_mode=st.st_mode, st_nlink=st.st_nlink,
@@ -171,6 +172,14 @@ class TransactionTests(unittest.TestCase):
                          ["can_rollback"])
         self.assertEqual(t.load(self.transaction, "rakshati")[1]
                          ["entries"][0]["status"], "UNSUPPORTED_NO_MUTATION")
+
+    def test_concurrent_transaction_writer_is_blocked(self):
+        with t.exclusive_transaction_lock(self.transaction):
+            with self.assertRaises(t.TransactionBlocked):
+                self.prepare()
+        # Lock is released after exiting the exclusive section.
+        self.config.write_bytes(b"original")
+        self.prepare()
 
     def test_cannot_repeat_same_file_or_unknown_stage(self):
         self.config.write_bytes(b"before")
