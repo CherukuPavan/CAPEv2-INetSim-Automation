@@ -65,6 +65,15 @@ class PrivateHandoffTests(unittest.TestCase):
         with self.assertRaises(h.HandoffBlocked):
             h.child_argv(self.args, "unreviewed-shell-command")
 
+    def test_ssl46_manifest_pinned_in_joined_download(self):
+        argv=h.child_argv(self.args,"encrypted_master_download")
+        self.assertIn("--expected-manifest-sha256",argv)
+        index=argv.index("--expected-manifest-sha256")
+        self.assertEqual(argv[index+1],h.REFERENCE_MANIFEST_SHA256)
+        self.args.bundle_id="cape-master-another-approved"
+        other=h.child_argv(self.args,"encrypted_master_download")
+        self.assertNotIn("--expected-manifest-sha256",other)
+
     def test_remote_and_local_bundle_identifiers_must_match(self):
         self.args.bundle_destination = (self.root / "downloads" /
                                         self.args.bundle_id)

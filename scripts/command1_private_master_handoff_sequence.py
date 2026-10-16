@@ -39,6 +39,12 @@ CHILD = {
     "cold_master_import": "command1_import_existing_master.py",
 }
 APPROVAL = "RUN-PRIVATE-MASTER-COLD-HANDOFF-NEW-HOST"
+# Original SSL46 export and remote-byte-compared crypt upload logs 2026-10-13.
+# A SHA256 digest is source provenance, NOT a cloud authentication secret.
+REFERENCE_BUNDLE_ID = "cape-master-SSL55-20261013-lan01"
+REFERENCE_MANIFEST_SHA256 = (
+    "709b67bd2ddbe85ffc957ab34bb97f5c4bc49f7b32b7eff2d08de4588a860d2a"
+)
 
 
 class HandoffBlocked(RuntimeError):
@@ -138,6 +144,10 @@ def child_argv(args, stage):
                  "--crypt-remote", "cape_crypt",
                  "--bundle-id", args.bundle_id,
                  "--rclone-config", str(args.config)]
+        if args.bundle_id == REFERENCE_BUNDLE_ID:
+            # Refuse a byte-consistent but substituted master source.
+            extra.extend(["--expected-manifest-sha256",
+                          REFERENCE_MANIFEST_SHA256])
     else:
         extra = ["--mode", "stage",
                  "--bundle", str(args.bundle_destination),

@@ -249,9 +249,13 @@ def apply_upload(host,bundle,remote,config):
         "remote":first["remote"],
     }
 
-def apply_download(host,dest,remote,bundle_id,config):
+def apply_download(host,dest,remote,bundle_id,config,expected_manifest_sha256=None):
     need(os.geteuid()==0 and sys.stdin.isatty(),
          "Root direct terminal and explicit consent required")
+    if expected_manifest_sha256 is not None:
+        need(type(expected_manifest_sha256) is str and
+             re.fullmatch(r"[0-9a-f]{64}",expected_manifest_sha256) is not None,
+             "Expected independently attested manifest must be lowercase SHA256")
     first=plan_download(host,dest,remote,bundle_id,config)
     print(json.dumps(first,sort_keys=True,indent=2),flush=True)
     need(input("Type "+APPROVE_DOWNLOAD+" for private new-host download: ")
@@ -268,6 +272,9 @@ def apply_download(host,dest,remote,bundle_id,config):
         proof=master.manifest_check(folder)
         need(proof.get("all_member_files_sha256_verified") is True,
              "Private golden bundle lacks all-member SHA256 manifest proof")
+        need(expected_manifest_sha256 is None or
+             proof.get("manifest_sha256") == expected_manifest_sha256,
+             "Downloaded master manifest differs from independent SSL46 SHA256")
         need(len(list(folder.iterdir()))==first["expected_file_count"],
              "Downloaded bundle count differs from remote inventory")
     except Exception as exc:
@@ -279,6 +286,8 @@ def apply_download(host,dest,remote,bundle_id,config):
         "result":"COMMAND1_PRIVATE_MASTER_DOWNLOADED_SHA256_VERIFIED",
         "private_bundle_path":str(folder),
         "bundle_manifest_sha256":proof["manifest_sha256"],
+        "independently_attested_manifest_pinned":
+            expected_manifest_sha256 is not None,
         "all_member_files_sha256_verified":True,
         "master_windows_disk_and_tpm_verified":True,
         "master_VM_imported":False,"master_running_snapshot_created":False,
@@ -295,6 +304,7 @@ def main():
     p.add_argument("--destination",type=Path)
     p.add_argument("--crypt-remote",required=True)
     p.add_argument("--bundle-id")
+    p.add_argument("--expected-manifest-sha256")
     p.add_argument("--rclone-config",type=Path,default=DEFAULT_RCLONE_CONFIG)
     a=p.parse_args()
     try:
@@ -313,7 +323,8 @@ def main():
                                   a.bundle_id,a.rclone_config)
                     if a.mode=="plan-download" else
                     apply_download(a.approved_host,a.destination,a.crypt_remote,
-                                   a.bundle_id,a.rclone_config))
+                                   a.bundle_id,a.rclone_config,
+                                   a.expected_manifest_sha256))
         print(json.dumps(result,sort_keys=True,indent=2),flush=True)
         return 0
     except (TransferBlocked,master.MasterExportBlocked,ValueError,

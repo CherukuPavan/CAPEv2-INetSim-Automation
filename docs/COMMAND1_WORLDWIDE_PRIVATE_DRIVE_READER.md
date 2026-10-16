@@ -143,3 +143,20 @@ to skip those release blockers. For source-of-truth progress see
   root_folder_id and sharing with service-account)
 * https://rclone.org/crypt/ (crypt password and salt compatibility)
 * https://rclone.org/commands/rclone_obscure/ (password via stdin, no CLI argv)
+
+## 2026-10-17 SHA-256 trust anchor for original SSL46 master
+
+The user's original 2026-10-13 export and encrypted upload logs independently
+record manifest SHA-256 `709b67bd2ddbe85ffc957ab34bb97f5c4bc49f7b32b7eff2d08de4588a860d2a`.
+A connected Drive metadata check found six ciphertext objects. The 32,057,353,456
+byte ciphertext object exactly matches the rclone crypt length for the originally
+exported 32,049,528,832-byte Windows QCOW2: 32-byte header plus 16 bytes per
+64 KiB chunk. This establishes size consistency, **not decrypted integrity**.
+
+The joined private handoff now automatically pins that independent SHA-256
+when restoring the known `cape-master-SSL55-20261013-lan01` bundle.
+A substituted *decrypted* manifest is rejected before VM import. The
+download retains partial private bytes for audit on failure. Standalone
+downloaders may use `--expected-manifest-sha256`. This does not supply
+private service-account access, the source crypt passphrase, guest boot,
+running-snapshot acceptance, isolated network routing or full rollback.

@@ -264,6 +264,33 @@ class PrivateDriveTests(unittest.TestCase):
             self.assertFalse(result["master_VM_imported"])
             self.assertTrue(target.is_dir())
 
+    def test_pinned_manifest_mismatch_refuses_download_and_preserves_bytes(self):
+        with tempfile.TemporaryDirectory() as td:
+            target=Path(td)/"cape-master-20261013_abcdef"
+            with patch.object(m.os,"geteuid",return_value=0), \
+                 patch.object(m.sys.stdin,"isatty",return_value=True), \
+                 patch.object(m,"plan_download",return_value={
+                     "expected_file_count":6,"remote":"mycrypt:"+target.name}), \
+                 patch("builtins.input",return_value=m.APPROVE_DOWNLOAD), \
+                 patch.object(m,"execute_rclone"), \
+                 patch.object(m.master,"manifest_check",return_value=PROOF), \
+                 self.assertRaisesRegex(m.TransferBlocked,"PARTIAL_OR_UNKNOWN"):
+                m.apply_download("target",target,"mycrypt",target.name,
+                                 Path("/root/cfg"),expected_manifest_sha256="b"*64)
+            self.assertTrue(target.is_dir())
+
+    def test_invalid_sha_pin_fails_before_any_remote_plan_or_file_write(self):
+        with tempfile.TemporaryDirectory() as td:
+            target=Path(td)/"cape-master-20261013_abcdef"
+            with patch.object(m.os,"geteuid",return_value=0), \
+                 patch.object(m.sys.stdin,"isatty",return_value=True), \
+                 patch.object(m,"plan_download",
+                              side_effect=AssertionError("should not plan")), \
+                 self.assertRaisesRegex(m.TransferBlocked,"lowercase SHA256"):
+                m.apply_download("target",target,"mycrypt",target.name,
+                                 Path("/root/cfg"),expected_manifest_sha256="no")
+            self.assertFalse(target.exists())
+
     def test_failed_download_preserves_private_partial_directory(self):
         with tempfile.TemporaryDirectory() as td:
             target=Path(td)/"cape-master-20261013_abcdef"
