@@ -41,6 +41,19 @@ def controlling_tty():
 
 if os.geteuid() == 0 or not controlling_tty():
     raise SystemExit("Use a local interactive non-root controlling terminal")
+
+# A Python here-document consumes fd 0 for source text. Before handing
+# control to the checkout and future nested installer helpers, reconnect
+# stdin to the original, explicitly verified terminal for approval prompts.
+fd = os.open("/dev/tty", os.O_RDONLY | os.O_NOCTTY | os.O_CLOEXEC)
+try:
+    if not os.isatty(fd):
+        raise SystemExit("Cannot bind a controlling terminal")
+    os.dup2(fd, 0)
+finally:
+    os.close(fd)
+if not sys.stdin.isatty():
+    raise SystemExit("Interactive stdin restoration failed")
 token = getpass.getpass("Private GitHub read-only token: ")
 if not (8 <= len(token) <= 500) or "\n" in token or "\r" in token:
     raise SystemExit("Invalid token supplied")
