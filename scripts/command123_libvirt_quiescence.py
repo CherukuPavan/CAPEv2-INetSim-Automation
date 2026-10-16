@@ -11,6 +11,7 @@ No guest is ever started, destroyed, reverted, undefined or modified.
 from __future__ import annotations
 
 import subprocess
+import re
 
 MAX_DOMAINS = 256
 MAX_OUTPUT = 65536
@@ -51,21 +52,43 @@ def enumerate_domains():
     return tuple(sorted(rows))
 
 
-def no_nonshutoff_domains():
-    """Return evidence only if all libvirt domains remain strictly shut off."""
-    before = enumerate_domains()
-    for name in before:
+def scan_domain_identities(names):
+    """Snapshot exact UUIDs and state. Never trust a name alone as identity."""
+    identities = {}
+    for name in names:
+        raw_id = read_virsh("domuuid", name).strip()
+        need(re.fullmatch(
+            r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}",
+            raw_id) is not None,
+            "Libvirt domain UUID absent or invalid")
+        uuid = raw_id.lower()
+        need(uuid not in identities.values(),
+             "Two libvirt domains share one UUID")
         state = read_virsh("domstate", name).strip()
         need(state == "shut off",
              "Libvirt domain is live, paused, suspended or state unknown")
-    # A domain may start or be newly defined while the state scan runs.
-    # This double inventory cannot close all races; callers still need
-    # exclusive lifecycle ownership for a physical full rollback.
+        identities[name] = uuid
+    return identities
+
+
+def no_nonshutoff_domains():
+    """Fail closed if names, UUIDs, or state drift during two read-only scans."""
+    before = enumerate_domains()
+    first = scan_domain_identities(before)
+    need(enumerate_domains() == before,
+         "Libvirt guest inventory drift during quiescence check")
+    second = scan_domain_identities(before)
+    need(second == first,
+         "Libvirt domain identity replaced under an unchanged name")
+    # A second state sweep catches stopped->running transitions after the
+    # first pass. It does not provide an exclusive libvirt lifecycle lock.
     need(enumerate_domains() == before,
          "Libvirt guest inventory drift during quiescence check")
     return {
         "only_shutoff_domains_observed": True,
         "defined_domain_count": len(before),
+        "domain_uuid_verified_twice": True,
+        "domain_state_verified_twice": True,
         "no_live_guest_mutation_performed": True,
         "not_an_exclusive_libvirt_lock": True,
     }

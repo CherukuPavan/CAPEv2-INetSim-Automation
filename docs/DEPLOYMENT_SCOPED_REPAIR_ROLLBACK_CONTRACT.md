@@ -264,3 +264,16 @@ stages, and do not treat existing limited `rollback` as full deployment undo.
 Never execute destructive resource removal simply because a resource was
 absent from a preflight report; true ownership requires authenticated
 step-level creation receipts, not mere before/after difference.
+
+## 2026-10-17 libvirt quiescence identity hardening
+
+The shared `command123_libvirt_quiescence.no_nonshutoff_domains()` guard
+performs two independent read-only per-domain UUID and state scans,
+interleaved with three complete name inventories. Paused, running, suspended,
+unknown-state, newly defined, or same-named-but-redefined guests block
+file/package/source/runtime and other recovery operations. This closes a
+specific *observed-name-equality* weakness: changing a domain UUID while
+keeping its name can no longer masquerade as the same stopped VM.
+It **does not** create a libvirt lifecycle lock, so concurrent guest
+activation after final admission remains a physical orchestration concern.
+No user/source VM or firewall is modified by this read-only guard.
