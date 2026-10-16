@@ -28,6 +28,8 @@ import sys
 import tempfile
 import uuid
 
+import command123_libvirt_quiescence as libvirt_quiescence
+
 ROOT = Path("/var/lib/cape-deployment-recovery")
 CONF = Path("/opt/CAPEv2/conf")
 NAMES = ("api.conf", "auxiliary.conf", "cuckoo.conf", "kvm.conf",
@@ -316,13 +318,11 @@ def no_live_workloads():
             raise RecoveryBlocked("Cannot confirm services are stopped") from e
         require(p.returncode in (3, 4), "CAPE/Suricata service active or unknown: " + unit)
     try:
-        p = subprocess.run(["virsh", "-c", "qemu:///system",
-                            "list", "--state-running", "--uuid"],
-                           capture_output=True, text=True, timeout=12)
-    except (OSError, subprocess.TimeoutExpired) as e:
-        raise RecoveryBlocked("Cannot confirm libvirt guests are stopped") from e
-    require(p.returncode == 0 and not p.stdout.strip(),
-            "Running libvirt guests or libvirt status unavailable")
+        libvirt_quiescence.no_nonshutoff_domains()
+    except libvirt_quiescence.QuiescenceBlocked as e:
+        raise RecoveryBlocked(
+            "Config recovery refuses paused, suspended, live or "
+            "unknown-state libvirt guests") from e
 
 
 def atomically_restore(target, blob, meta, *, missing_only):
