@@ -209,6 +209,48 @@ class TransactionTests(unittest.TestCase):
         with self.assertRaises(t.TransactionBlocked):
             t.rollback_plan(self.transaction, "rakshati", files_only=True)
 
+    def test_file_first_deferred_owned_cape_source(self):
+        path, doc = t.load(self.transaction, "rakshati")
+        doc["entries"].append({
+            "id": "e" * 32, "kind": "cape_source",
+            "stage": "command1", "status": "sealed"})
+        t.atomic_receipt(path, doc)
+        self.config.write_bytes(b"original")
+        step = self.prepare()
+        self.config.write_bytes(b"modified")
+        self.seal(step)
+        plan = t.rollback_plan(self.transaction, "rakshati", files_only=True)
+        self.assertTrue(plan["can_rollback"])
+        self.assertEqual([item["action"] for item in plan["actions"]],
+                         ["restore_before", "defer_source"])
+        with mock.patch.object(t, "no_live_work"), \
+             mock.patch.object(t.sys.stdin, "isatty", return_value=True), \
+             mock.patch("builtins.input",
+                return_value="ROLLBACK-CAPE-FILES-BEFORE-APT-" +
+                             self.transaction):
+            out = t.rollback_files_first(self.transaction, "rakshati", True)
+        self.assertTrue(out["transaction_still_active"])
+        self.assertEqual(self.config.read_bytes(), b"original")
+        self.assertEqual(t.load(self.transaction, "rakshati")[1]
+                         ["entries"][0]["status"], "sealed")
+
+    def test_source_rollback_flag_is_not_sufficient_without_pristine_proof(self):
+        path, doc = t.load(self.transaction, "rakshati")
+        doc["entries"].append({
+            "id": "e" * 32, "kind": "cape_source",
+            "stage": "command1", "status": "rollback_verified"})
+        t.atomic_receipt(path, doc)
+        with mock.patch("command1_tracked_cape_source.undo_plan",
+                        return_value={
+                            "action": "already_quarantined",
+                            "step_id": "e" * 32}):
+            plan = t.rollback_plan(self.transaction, "rakshati")
+        self.assertTrue(plan["can_rollback"])
+        with mock.patch("command1_tracked_cape_source.undo_plan",
+                        side_effect=OSError("tampered code")):
+            with self.assertRaises(t.TransactionBlocked):
+                t.rollback_plan(self.transaction, "rakshati")
+
     def test_first_undo_stops_on_foreign_file_drift(self):
         self.attach_package()
         self.config.write_bytes(b"before")
