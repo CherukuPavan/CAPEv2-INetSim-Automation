@@ -1,0 +1,72 @@
+name: Real QEMU/libvirt/OVMF/swtpm tools from signed Ubuntu 26.04
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/command123-resolute-virt-toolchain-runtime.yml"
+      - "scripts/command2_native_snapshot_stack_guard.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-toolchain-on-disposable-container:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install official signed Resolute virtualization binaries in throwaway container only
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          PYTHONDONTWRITEBYTECODE: "1"
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = 26.04
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get -y install --no-install-recommends             python3 qemu-system-x86 qemu-utils libvirt-clients             libvirt-daemon-system ovmf swtpm swtpm-tools libxml2-utils
+          qemu-system-x86_64 --version
+          qemu-img --version
+          virsh --version
+          swtpm --version
+          python3 -B - <<'PY'
+          import subprocess
+          from pathlib import Path
+          import re
+          import sys
+          sys.path.insert(0, 'scripts')
+          from command2_native_snapshot_stack_guard import MIN_QEMU, MIN_LIBVIRT
+          def cmd(*args):
+              return subprocess.run(args,capture_output=True,text=True,timeout=15,check=True).stdout
+          qemu=cmd('qemu-system-x86_64','--version')
+          libvirt=cmd('virsh','--version')
+          qm=re.search(r'QEMU emulator version ([0-9]+)\\.([0-9]+)\\.([0-9]+)',qemu)
+          lv=re.search(r'([0-9]+)\\.([0-9]+)\\.([0-9]+)',libvirt)
+          assert qm is not None and lv is not None
+          q=tuple(map(int,qm.groups()))
+          l=tuple(map(int,lv.groups()))
+          assert q>=MIN_QEMU and l>=MIN_LIBVIRT, (q,l)
+          firmware=Path('/usr/share/OVMF')
+          assert firmware.is_dir()
+          code=list(firmware.glob('OVMF_CODE*.fd'))
+          variable=list(firmware.glob('OVMF_VARS*.fd'))
+          assert code and variable, (code,variable)
+          tpm_help=cmd('swtpm','--version')
+          print({
+              "verified_QEMU":q, "verified_libvirt_client":l,
+              "ovmf_firmware_code_available":len(code),
+              "ovmf_firmware_vars_available":len(variable),
+              "swtpm_binary_available":bool(tpm_help),
+              "lab_guest_started":False,
+              "native_full_snapshot_with_swtpm_proven":False,
+              "production_release_authorized":False
+          })
+          PY
