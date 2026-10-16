@@ -37,10 +37,13 @@ jobs:
           apt-get -s install --no-install-recommends \
             python3 python3-venv python3-pip git cpu-checker msr-tools acpica-tools \
             qemu-system-x86 qemu-utils libvirt-clients libvirt-daemon-system \
-            libvirt-daemon-config-network ovmf swtpm swtpm-tools virtinst \
+            libvirt-daemon-config-network ovmf swtpm swtpm-tools virtinst rclone \
             > /tmp/cape-26-full-prereq-plan.txt
           ! grep -Eq '^(Remv|Purg|Hold) ' /tmp/cape-26-full-prereq-plan.txt
-          apt-get -y install --no-install-recommends             python3 qemu-system-x86 qemu-utils libvirt-clients             libvirt-daemon-system ovmf swtpm swtpm-tools libxml2-utils
+          apt-get -y install --no-install-recommends \
+            python3 qemu-system-x86 qemu-utils libvirt-clients \
+            libvirt-daemon-system ovmf swtpm swtpm-tools rclone libxml2-utils
+          rclone version
           qemu-system-x86_64 --version
           qemu-img --version
           virsh --version
