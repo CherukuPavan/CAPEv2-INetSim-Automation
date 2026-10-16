@@ -108,6 +108,7 @@ class CloneRecoveryTests(unittest.TestCase):
         def virsh(*args):
             if args==("domuuid",VM):return UID
             if args==("domstate",VM):return "shut off"
+            if args==("list","--all","--name"):return VM
             if args==("list","--name"):return ""
             if args==("snapshot-list",VM,"--name"):return "old_snapshot"
             if args==("dominfo",VM):return "Managed save: no"
@@ -297,6 +298,7 @@ class CloneRecoveryTests(unittest.TestCase):
         def virsh(*args):
             mapping={
                 ("domuuid",VM):UID,("domstate",VM):"shut off",
+                ("list","--all","--name"):VM,
                 ("list","--name"):"",("snapshot-list",VM,"--name"):"",
                 ("dominfo",VM):"Managed save: no",
                 ("dumpxml","--inactive",VM):xml,
@@ -305,6 +307,22 @@ class CloneRecoveryTests(unittest.TestCase):
         with mock.patch.object(stager,"virsh",side_effect=virsh):
             with self.assertRaisesRegex(u.CloneRollbackBlocked,"zero-NIC"):
                 u.live_admission(self.row)
+
+    def test_other_paused_domain_blocks_staged_clone_undo(self):
+        for live in ("paused","pmsuspended","running","crashed"):
+            with self.subTest(live=live):
+                def virsh(*args):
+                    if args==("list","--all","--name"):
+                        return VM+"\nforeign\n"
+                    if args==("domstate",VM):
+                        return "shut off"
+                    if args==("domstate","foreign"):
+                        return live
+                    raise AssertionError("Unexpected virsh call "+str(args))
+                with mock.patch.object(stager,"virsh",side_effect=virsh):
+                    with self.assertRaisesRegex(
+                        u.CloneRollbackBlocked,"Non-shutoff foreign"):
+                        u.no_other_guest_live()
 
     def test_durable_receipt_rejects_skipped_reverse_step(self):
         # Initial record uses root-private stager.atomic_note; following
