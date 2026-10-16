@@ -1,0 +1,69 @@
+name: Canonical-signed Noble Cloud Archive hypervisor feasibility
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/command123-cloud-archive-compat-probe.yml"
+      - "scripts/command123_hypervisor_release_compat.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-candidate-probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        pocket: [epoxy, flamingo, gazpacho]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Probe Canonical signed package indexes in disposable Ubuntu runner
+        env:
+          POCKET: ${{ matrix.pocket }}
+          DEBIAN_FRONTEND: noninteractive
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends software-properties-common ubuntu-cloud-keyring
+          sudo add-apt-repository -y "cloud-archive:${POCKET}"
+          # Any invalid signature or missing signed index must terminate this job.
+          sudo apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-cache policy qemu-system-x86 libvirt-daemon-system | tee "$RUNNER_TEMP/candidates.txt"
+          apt-get -s install --no-install-recommends qemu-system-x86 libvirt-daemon-system | tee "$RUNNER_TEMP/install-simulation.txt"
+          mkdir -p "$RUNNER_TEMP/release-probe"
+          python3 -B - "$POCKET" "$RUNNER_TEMP/release-probe" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, "scripts")
+          import command123_hypervisor_release_compat as comp
+          pocket, folder = sys.argv[1:]
+          candidates = {p: comp.read_policy(p) for p in comp.PACKAGES}
+          report = comp.candidate_matrix(candidates)
+          report.update({
+              "source_pocket": pocket,
+              "signed_index_accepted_by_APT": True,
+              "apt_simulation_executed": True,
+              "not_a_production_install_approval": True,
+              "no_hypervisor_packages_installed_by_probe": True,
+              "TPM_UEFI_running_restore_proven": False,
+          })
+          target = Path(folder) / ("pocket-"+pocket+".json")
+          target.write_text(json.dumps(report, indent=2, sort_keys=True)+"\\n")
+          print(target.read_text())
+          PY
+          cp "$RUNNER_TEMP/candidates.txt" "$RUNNER_TEMP/release-probe/"
+          cp "$RUNNER_TEMP/install-simulation.txt" "$RUNNER_TEMP/release-probe/"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signed-cloud-archive-${{ matrix.pocket }}
+          path: ${{ runner.temp }}/release-probe/
+          if-no-files-found: warn
