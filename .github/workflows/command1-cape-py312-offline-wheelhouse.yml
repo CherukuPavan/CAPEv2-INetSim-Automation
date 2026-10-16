@@ -79,7 +79,7 @@ jobs:
           assert records['greenlet']['version']=='3.0.3'
           lock=Path('/tmp/cape-offline-wheels-hash.lock')
           lock.write_text(''.join(
-              f"{name}=={data['version']} --hash=sha256:{data['sha256']}\\n"
+              f"{name}=={data['version']} --hash=sha256:{data['sha256']}\n"
               for name,data in sorted(records.items())))
           manifest={
              "source_commit":"004d73c51dcd12dacb97b3657262bdea8376d710",
@@ -93,7 +93,7 @@ jobs:
              "not_an_approved_host_installer":True
           }
           Path('/tmp/cape-wheel-manifest.json').write_text(
-              json.dumps(manifest,sort_keys=True,indent=2)+'\\n')
+              json.dumps(manifest,sort_keys=True,indent=2)+'\n')
           print("OFFLINE_WHEELHOUSE_LOCKED",len(wheels),manifest["lock_sha256"])
           PY
       - name: Fresh isolated Python 3.12 can install and execute pinned CAPE dependency CLI with NO network
