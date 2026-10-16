@@ -65,6 +65,9 @@ class JoinedCommand3Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
             args=self.context(tmp)
             args.witness_dir.mkdir(mode=0o700)
+            # Filesystem ownership is mocked; no real root chown in tests.
+            stack.enter_context(patch.object(
+                m,"private_witness_dir",return_value=args.witness_dir))
             calls=[]
             reports=[]
             stack.enter_context(patch.object(m.os,"geteuid",return_value=0))
@@ -110,6 +113,9 @@ class JoinedCommand3Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
             args=self.context(tmp)
             args.witness_dir.mkdir(mode=0o700)
+            # Filesystem ownership is mocked; no real root chown in tests.
+            stack.enter_context(patch.object(
+                m,"private_witness_dir",return_value=args.witness_dir))
             seen=[]
             stack.enter_context(patch.object(m.os,"geteuid",return_value=0))
             stack.enter_context(patch.object(m.sys.stdin,"isatty",
@@ -136,6 +142,9 @@ class JoinedCommand3Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
             args=self.context(tmp)
             args.witness_dir.mkdir(mode=0o700)
+            # Filesystem ownership is mocked; no real root chown in tests.
+            stack.enter_context(patch.object(
+                m,"private_witness_dir",return_value=args.witness_dir))
             seen=[]
             stack.enter_context(patch.object(m.os,"geteuid",return_value=0))
             stack.enter_context(patch.object(m.sys.stdin,"isatty",
