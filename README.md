@@ -10,9 +10,17 @@
 > Ubuntu prerequisite install. The internal
 > [Command1 base stage](scripts/command1_tracked_prerequisite_stage.py)
 > can create that receipt before any APT mutation. Command3 config
-> can join the same active transaction. Latest integrated synthetic CI
-> checks have passed; the full fresh-host CAPE/Windows/TPM snapshot
-> deployment and complete package/VM/network undo remain unimplemented.
+> can join the same active transaction. A new
+> [attested base-package rollback](scripts/command123_tracked_apt_rollback.py)
+> dry-runs exact-only APT removals and refuses any drift from the sealed
+> dpkg state. The [scoped recovery controller](
+> scripts/command123_scoped_recovery.py) performs already-tracked file
+> rollback first, then permitted newly installed base-package removal,
+> then final recorded-state checks. It refuses any VM/network/account
+> ownership entries and does NOT implement full deployment-wide recovery.
+> Integrated offline tests passed; the fresh-host CAPE/Windows/TPM
+> running-checkpoint deployment, foreign package dependency lifecycle,
+> and deployment-wide VM/network/service-state undo remain UNIMPLEMENTED.
 > **No final three-command installer is approved for use.**
 >
 > **2026-10-15 new host final-release stop:** Ubuntu 24.04's standard
