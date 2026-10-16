@@ -1,0 +1,170 @@
+"""Offline-only clone cleanup proof: no real libvirt guest or VM touched."""
+from contextlib import ExitStack
+import hashlib
+import os
+from pathlib import Path
+from types import SimpleNamespace
+import tempfile
+import unittest
+from unittest import mock
+
+import command2_portable_zero_nic_rollback as u
+import command2_portable_zero_nic_stager as stager
+
+HOST="rakshati"
+VM="win11_1"
+UID="12345678-1234-4234-8234-123456789abc"
+GENID="22345678-1234-4234-8234-123456789abc"
+
+
+class CloneRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        td=tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        self.folder=Path(td.name)
+        self.disk=self.folder/(VM+".command2.qcow2")
+        self.nvram=self.folder/(VM+".command2_VARS.fd")
+        self.disk.write_bytes(b"benign qcow2 unit fixture")
+        self.nvram.write_bytes(b"benign firmware unit fixture")
+        self.row={"libvirt_name":VM,"libvirt_uuid_candidate":UID,
+                  "smbios_generation_id_candidate":GENID,
+                  "disk_target":str(self.disk),"uefi_nvram_target":str(self.nvram)}
+        self.receipt={
+            "schema":1,"status":"prepared","vm":VM,"uuid":UID,
+            "before":{"disk_sha256":u.sha256_file(self.disk)},
+        }
+        self.safe=[]
+        self.original_fstat=os.fstat
+
+    def test_unmodified_guest_bytes_can_be_quarantined_without_deletion(self):
+        target=self.folder/"."+VM+".quarantine-"+UID
+        digest=u.sha256_file(self.disk)
+        self.assertTrue(u.quarantine_noreplace(self.disk,target,digest))
+        self.assertFalse(self.disk.exists())
+        self.assertTrue(target.is_file())
+        self.assertEqual(u.sha256_file(target),digest)
+        self.assertEqual(target.stat().st_nlink,1)
+
+    def test_existing_quarantine_never_overwritten(self):
+        target=self.folder/"."+VM+".quarantine-"+UID
+        target.write_bytes(b"foreign valuable data")
+        with self.assertRaises(u.CloneRollbackBlocked):
+            u.quarantine_noreplace(self.disk,target,u.sha256_file(self.disk))
+        self.assertEqual(target.read_bytes(),b"foreign valuable data")
+        self.assertTrue(self.disk.exists())
+
+    def test_source_disk_drift_prevents_any_quarantine_mutation(self):
+        expected=u.sha256_file(self.disk)
+        self.disk.write_bytes(b"modified after approved plan")
+        target=self.folder/"."+VM+".quarantine-"+UID
+        with self.assertRaises(u.CloneRollbackBlocked):
+            u.quarantine_noreplace(self.disk,target,expected)
+        self.assertFalse(target.exists())
+        self.assertTrue(self.disk.exists())
+
+    def test_exact_staging_intent_and_complete_records_required(self):
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(stager,"host_guard"))
+            stack.enter_context(mock.patch.object(stager,"exact_dir",
+                                                   return_value=self.folder))
+            stack.enter_context(mock.patch.object(stager,"reservation_entries",
+                                                   return_value=[self.row]))
+            intent={
+                "name":VM,"stage":"BEFORE_ANY_CLONE_FILES",
+                "disk":str(self.disk),"nvram":str(self.nvram),
+                "uuid":UID,"zero_nics":True,
+            }
+            done={
+                "name":VM,"status":"SHUT_OFF_ZERO_NICS_STAGED",
+                "uuid":UID,"tpm_persistent_state_created":False,
+                "guest_personalized":False,"network_attached":False,
+                "clean_restore_verified":False,
+            }
+            data=stack.enter_context(mock.patch.object(
+                u,"private_json",side_effect=[intent,done]))
+            self.assertEqual(u.expected(HOST,self.folder,VM),self.row)
+        self.assertEqual(data.call_count,2)
+
+    def test_foreign_staging_intent_refuses_ownership(self):
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(stager,"host_guard"))
+            stack.enter_context(mock.patch.object(stager,"exact_dir",
+                                                   return_value=self.folder))
+            stack.enter_context(mock.patch.object(stager,"reservation_entries",
+                                                   return_value=[self.row]))
+            stack.enter_context(mock.patch.object(
+                u,"private_json",side_effect=[
+                    {"name":VM,"stage":"PREEXISTING_VM_UNKNOWN"},{}]))
+            with self.assertRaises(u.CloneRollbackBlocked):
+                u.expected(HOST,self.folder,VM)
+
+    def test_plan_refuses_snapshots_or_foreign_vm_identity(self):
+        xml=(f'<domain type="kvm"><name>{VM}</name><uuid>{UID}</uuid>'
+             f'<genid>{GENID}</genid>'
+             f'<os><nvram>{self.nvram}</nvram></os>'
+             f'<devices><disk device="disk"><source file="{self.disk}"/></disk>'
+             '<tpm><backend type="emulator" version="2.0"/></tpm>'
+             '</devices></domain>')
+        def virsh(*args):
+            if args==("domuuid",VM):return UID
+            if args==("domstate",VM):return "shut off"
+            if args==("list","--name"):return ""
+            if args==("snapshot-list",VM,"--name"):return "old_snapshot"
+            if args==("dominfo",VM):return "Managed save: no"
+            if args==("dumpxml","--inactive",VM):return xml
+            raise AssertionError("Unexpected virsh args")
+        with mock.patch.object(stager,"virsh",side_effect=virsh):
+            with self.assertRaisesRegex(u.CloneRollbackBlocked,"Snapshot"):
+                u.live_admission(self.row)
+
+    def test_inactive_guest_xml_with_nic_cannot_be_removed(self):
+        xml=(f'<domain type="kvm"><name>{VM}</name><uuid>{UID}</uuid>'
+             f'<genid>{GENID}</genid>'
+             f'<os><nvram>{self.nvram}</nvram></os>'
+             f'<devices><disk device="disk"><source file="{self.disk}"/></disk>'
+             '<tpm><backend type="emulator" version="2.0"/></tpm>'
+             '<interface type="network"/></devices></domain>')
+        def virsh(*args):
+            mapping={
+                ("domuuid",VM):UID,("domstate",VM):"shut off",
+                ("list","--name"):"",("snapshot-list",VM,"--name"):"",
+                ("dominfo",VM):"Managed save: no",
+                ("dumpxml","--inactive",VM):xml,
+            }
+            return mapping[args]
+        with mock.patch.object(stager,"virsh",side_effect=virsh):
+            with self.assertRaisesRegex(u.CloneRollbackBlocked,"zero-NIC"):
+                u.live_admission(self.row)
+
+    def test_durable_receipt_rejects_skipped_reverse_step(self):
+        # Initial record uses root-private stager.atomic_note; following
+        # updates check a full predecessor receipt and exact status advance.
+        original_fstat=self.original_fstat
+        def fstat(fd):
+            st=original_fstat(fd)
+            return SimpleNamespace(st_mode=st.st_mode,st_uid=0,
+                                   st_nlink=st.st_nlink,st_size=st.st_size)
+        path=self.folder/"undo.json"
+        with mock.patch.object(u.os,"fstat",side_effect=fstat):
+            u.record(path,self.receipt,True)
+            future={**self.receipt,"status":"nvram_quarantined"}
+            with self.assertRaises(u.CloneRollbackBlocked):
+                u.record(path,future)
+            future={**self.receipt,"status":"domain_undefined"}
+            u.record(path,future)
+        self.assertIn(b"domain_undefined",path.read_bytes())
+
+    def test_decline_does_not_undefine_or_quarantine_vm(self):
+        with mock.patch.object(u.os,"geteuid",return_value=0), \
+             mock.patch.object(u.sys.stdin,"isatty",return_value=True), \
+             mock.patch.object(u,"plan",return_value={
+                 "result":"safe review","vm":VM}), \
+             mock.patch("builtins.input",return_value="DECLINE"), \
+             mock.patch.object(stager,"virsh",
+                               side_effect=AssertionError("No write")):
+            with self.assertRaisesRegex(u.CloneRollbackBlocked,"declined"):
+                u.revert(HOST,self.folder,VM)
+
+
+if __name__=="__main__":
+    unittest.main()
