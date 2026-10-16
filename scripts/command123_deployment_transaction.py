@@ -409,6 +409,12 @@ def rollback_plan(transaction, host):
     actions, blocked = [], []
     for entry in reversed(doc["entries"]):
         kind, step_id = entry["kind"], entry["id"]
+        if kind == "package" and entry["status"] == "rollback_verified":
+            # Package removals have their own separate verified recovery,
+            # with exact before/after dpkg state evidence.
+            actions.append({"id": step_id, "action": "keep",
+                            "already_reversed_by": "tracked_apt_rollback"})
+            continue
         if kind != "file" or entry["status"] != "sealed":
             blocked.append(step_id)
             actions.append({"id": step_id, "action": "BLOCKED_UNOWNED_OR_INCOMPLETE"})
@@ -488,7 +494,11 @@ def repair(transaction, host, approved=False):
             entry = next(x for x in doc["entries"] if x["id"] == step)
             doc["current_step"] = step
             atomic_receipt(receipt, doc)
-            if action["action"] == "keep":
+            if entry["kind"] == "package":
+                need(action["action"] == "keep" and
+                     entry["status"] == "rollback_verified",
+                     "Cannot reapply package rollback from file recovery")
+            elif action["action"] == "keep":
                 pass
             elif action["action"] == "recreate_from_sealed":
                 _, observed = observed_file(entry["path"])
