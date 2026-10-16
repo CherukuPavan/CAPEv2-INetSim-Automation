@@ -97,6 +97,57 @@ def fsync_dir(folder):
 
 
 @contextmanager
+def global_begin_lock():
+    """Serialize first-command transaction allocation on a new host."""
+    setup_root()
+    path = ROOT / ".active.lock"
+    fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW |
+                 os.O_CLOEXEC, 0o600)
+    try:
+        st = os.fstat(fd)
+        need(stat.S_ISREG(st.st_mode) and st.st_uid == 0 and
+             st.st_nlink == 1 and stat.S_IMODE(st.st_mode) == 0o600,
+             "Untrusted active deployment lock")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise TransactionBlocked("Another deployment is starting") from error
+        try:
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+
+
+def active_transaction(host):
+    """Root-only authenticated current deployment ID; no guessed baseline."""
+    host = host_guard(host)
+    setup_root()
+    marker = ROOT / "active.json"
+    need(not marker.is_symlink(), "Active transaction pointer is a symlink")
+    fd = os.open(marker, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        need(stat.S_ISREG(st.st_mode) and st.st_uid == 0 and
+             stat.S_IMODE(st.st_mode) == 0o600 and st.st_nlink == 1 and
+             0 < st.st_size < 4096, "Untrusted active transaction pointer")
+        raw = os.read(fd, 4096)
+        need(len(raw) == st.st_size, "Active pointer changed while reading")
+    finally:
+        os.close(fd)
+    data = json.loads(raw)
+    need(type(data) is dict and data.get("schema") == 1 and
+         data.get("host") == host and
+         re.fullmatch(r"[0-9a-f]{32}", data.get("transaction_id", "")),
+         "Untrusted active transaction mapping")
+    transaction = data["transaction_id"]
+    receipt, doc = load(transaction, host)
+    need(doc["phase"] == "active", "Active deployment record not usable")
+    return transaction
+
+
+@contextmanager
 def exclusive_transaction_lock(transaction):
     """Prevent overlapping root-owned writers from racing on one ledger."""
     path = receipt_path(transaction)
@@ -188,19 +239,28 @@ def load(transaction, host):
 
 def begin(host):
     host = host_guard(host)
-    setup_root()
-    uid = uuid.uuid4().hex
-    folder = ROOT / uid
-    folder.mkdir(mode=0o700)
-    fsync_dir(ROOT)
-    data = {"schema": 1, "transaction_id": uid, "host": host,
-            "phase": "active", "entries": [],
-            "unsupported_resource_rollback": ["package", "libvirt_domain",
-                "libvirt_network", "nft_table", "service_state", "account"],
-            "whole_deployment_rollback_ready": False}
-    atomic_receipt(folder / "ledger.json", data, new=True)
+    with global_begin_lock():
+        marker = ROOT / "active.json"
+        need(not marker.exists() and not marker.is_symlink(),
+             "An active or unresolved deployment already exists; no new baseline")
+        uid = uuid.uuid4().hex
+        folder = ROOT / uid
+        folder.mkdir(mode=0o700)
+        fsync_dir(ROOT)
+        data = {"schema": 1, "transaction_id": uid, "host": host,
+                "phase": "active", "entries": [],
+                "unsupported_resource_rollback": ["package", "libvirt_domain",
+                    "libvirt_network", "nft_table", "service_state", "account"],
+                "whole_deployment_rollback_ready": False}
+        atomic_receipt(folder / "ledger.json", data, new=True)
+        pointer = {"schema": 1, "host": host, "transaction_id": uid}
+        # The active pointer is created only after the durable ledger.
+        # If interrupted before this write, only an empty orphaned private
+        # ledger remains; no host resources have been changed by begin().
+        atomic_receipt(marker, pointer, new=True)
     return {"result": "CAPE_TRANSACTION_STARTED",
             "transaction_id": uid, "root_private": True,
+            "automatic_cross_command_discovery": True,
             "host_mutations": False}
 
 
@@ -580,7 +640,7 @@ def rollback(transaction, host, approved=False):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--mode", required=True,
-                   choices=("begin", "prepare-file", "seal-file",
+                   choices=("begin", "current", "prepare-file", "seal-file",
                             "record-unsupported", "plan-repair", "repair",
                             "plan-rollback", "rollback"))
     p.add_argument("--approved-host", required=True)
@@ -595,6 +655,10 @@ def main():
         if args.mode == "begin":
             need(args.transaction is None, "Begin must create its own ID")
             output = begin(args.approved_host)
+        elif args.mode == "current":
+            ident = active_transaction(args.approved_host)
+            output = {"result": "CAPE_CURRENT_TRANSACTION_VERIFIED",
+                      "transaction_id": ident, "host": args.approved_host}
         else:
             need(args.transaction, "Explicit transaction ID required")
             if args.mode == "prepare-file":
