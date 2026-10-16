@@ -1,5 +1,20 @@
 # CAPEv2 + INetSim Automation
 
+> **2026-10-16 development update (NOT a final deployment):** the
+> [transaction engine](scripts/command123_deployment_transaction.py) now
+> creates a root-private, host-bound active deployment ID, tracks approved
+> CAPE unit/configuration files, supports guarded missing-file repair and
+> file-only rollback, and automatically hands its ID to later stages.
+> [Tracked base APT](scripts/command123_tracked_prereqs.py) records ALL
+> installed packages (including dependencies) before/after its reviewed
+> Ubuntu prerequisite install. The internal
+> [Command1 base stage](scripts/command1_tracked_prerequisite_stage.py)
+> can create that receipt before any APT mutation. Command3 config
+> can join the same active transaction. Latest integrated synthetic CI
+> checks have passed; the full fresh-host CAPE/Windows/TPM snapshot
+> deployment and complete package/VM/network undo remain unimplemented.
+> **No final three-command installer is approved for use.**
+>
 > **2026-10-15 new host final-release stop:** Ubuntu 24.04's standard
 > QEMU 8.2 / libvirt 10.0 packages do **not** meet the repo's native
 > running-checkpoint guard (QEMU >=9.0; libvirt >=10.10). The new
@@ -26,9 +41,11 @@
 > packages, VMs, networks and data intact. See the
 > [deployment-only repair/rollback contract](
 > docs/DEPLOYMENT_SCOPED_REPAIR_ROLLBACK_CONTRACT.md). Today the guarded
-> recovery code covers SIX tracked CAPE configuration files only;
-> complete per-step ownership receipts and reverse-order package/VM/
-> service/network undo are still UNIMPLEMENTED. A full-host image is
+> recovery code includes a new transaction-scoped, file-only
+> repair/rollback implementation, plus the earlier six-config helper.
+> Base package installation is now journaled, but removal/undo of packages,
+> guest disks/TPM, services' running/enabled state and network resources
+> are still UNIMPLEMENTED. A full-host image is
 > optional test insurance, **not** the required rollback interface.
 
 > **New-host audit / recovery utilities (2026-10-13):** The
