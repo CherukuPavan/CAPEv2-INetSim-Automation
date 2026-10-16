@@ -175,7 +175,15 @@ def install(host,journal):
              BRIDGE in nft,"CAPEv2 dedicated nft guard runtime differs")
         need(not virsh("list","--name").strip(),
              "Unexpected guest started during safe network staging")
-        owned_network.advance(journal,"network_started","verified")
+        readback = {
+            "post_live_libvirt_xml_sha256": hashlib.sha256(
+                virsh("net-dumpxml",NETWORK).encode()).hexdigest(),
+            "post_nft_stateless_sha256": hashlib.sha256(
+                command("nft","-j","-s","list","table","inet",TABLE).encode()
+            ).hexdigest(),
+        }
+        owned_network.advance(journal,"network_started","verified",
+                              post_state=readback)
         return {
            "result":"COMMAND2_PORTABLE_CAPE_LAB_DEFINED_ACTIVE_NOT_REBOOT_VERIFIED",
            "approved_host":host,"subnet":initial["analysis_subnet"],
