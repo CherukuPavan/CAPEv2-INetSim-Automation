@@ -15,6 +15,9 @@ Usage: bash scripts/bootstrap_pre_vm_prereqs.sh [--plan|--apply] [--report FILE]
 --report     Store private TXT output at this new absolute path (never overwrite).
 --deployment-transaction ID
              Existing root-private transaction created before Command1.
+--use-active-transaction
+             Resolve the previous Command1 transaction from root-private
+             active pointer. Mutually exclusive with explicit ID.
 --approved-host HOST
              Actual approved target hostname. REQUIRED with transaction.
 
@@ -31,6 +34,7 @@ HELP
 MODE=plan
 REPORT=''
 DEPLOYMENT_TRANSACTION=''
+USE_ACTIVE_TRANSACTION=0
 APPROVED_HOST=''
 while (($#)); do
   case "$1" in
@@ -39,6 +43,7 @@ while (($#)); do
     --deployment-transaction)
       (($# >= 2)) || { echo 'Missing transaction ID' >&2; exit 2; }
       DEPLOYMENT_TRANSACTION=$2; shift 2 ;;
+    --use-active-transaction) USE_ACTIVE_TRANSACTION=1; shift ;;
     --approved-host)
       (($# >= 2)) || { echo 'Missing host' >&2; exit 2; }
       APPROVED_HOST=$2; shift 2 ;;
@@ -50,14 +55,26 @@ while (($#)); do
   esac
 done
 
-if [[ -n $DEPLOYMENT_TRANSACTION || -n $APPROVED_HOST ]]; then
-  [[ $MODE == apply && -n $DEPLOYMENT_TRANSACTION && -n $APPROVED_HOST ]] || {
+if [[ -n $DEPLOYMENT_TRANSACTION || -n $APPROVED_HOST ||
+      $USE_ACTIVE_TRANSACTION == 1 ]]; then
+  [[ $MODE == apply && -n $APPROVED_HOST ]] || {
     echo 'Transaction tracking requires --apply and BOTH transaction/host flags' >&2
     exit 2
   }
-  [[ $DEPLOYMENT_TRANSACTION =~ ^[0-9a-f]{32}$ ]] || {
-    echo 'Invalid transaction ID' >&2; exit 2
-  }
+  if (( USE_ACTIVE_TRANSACTION )); then
+    [[ -z $DEPLOYMENT_TRANSACTION ]] || {
+      echo 'Active transaction and explicit ID are mutually exclusive' >&2
+      exit 2
+    }
+  else
+    [[ -n $DEPLOYMENT_TRANSACTION ]] || {
+      echo 'Transaction tracking requires --apply and BOTH transaction/host flags' >&2
+      exit 2
+    }
+    [[ $DEPLOYMENT_TRANSACTION =~ ^[0-9a-f]{32}$ ]] || {
+      echo 'Invalid transaction ID' >&2; exit 2
+    }
+  fi
   [[ $APPROVED_HOST =~ ^[a-z0-9][a-z0-9-]{1,62}$ ]] || {
     echo 'Invalid approved host' >&2; exit 2
   }
@@ -119,12 +136,16 @@ fi
 
 command -v sudo >/dev/null || { echo 'sudo unavailable; cannot apply.' >&2; exit 3; }
 sudo -v || { echo 'sudo permission unavailable; no packages changed.' >&2; exit 3; }
-if [[ -n $DEPLOYMENT_TRANSACTION ]]; then
+if [[ -n $DEPLOYMENT_TRANSACTION || $USE_ACTIVE_TRANSACTION == 1 ]]; then
   HERE=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
   command -v python3 >/dev/null 2>&1 || {
     echo 'Tracked APT installation requires preinstalled Python3' >&2; exit 3
   }
   echo '[APPLY] Using root-only complete-dpkg provenance in deployment transaction.'
+  if (( USE_ACTIVE_TRANSACTION )); then
+    exec sudo python3 -B "$HERE/command123_tracked_prereqs.py" --mode apply \
+      --use-active-transaction --approved-host "$APPROVED_HOST"
+  fi
   exec sudo python3 -B "$HERE/command123_tracked_prereqs.py" --mode apply \
     --transaction "$DEPLOYMENT_TRANSACTION" --approved-host "$APPROVED_HOST"
 fi
