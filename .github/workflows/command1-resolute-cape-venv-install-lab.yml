@@ -66,4 +66,25 @@ jobs:
           print("PINNED_CAPE_CORE_NATIVE_DEPENDENCIES_INSTALLED_AND_IMPORTED")
           PY
           test "$(python3 --version)" = "Python 3.14.4"
+          # Import-level smoke test executes CAPE's actual CLI --help as
+          # an unprivileged account. It does not start a CAPE scheduler,
+          # virtual machine, rooter, web service, or malware analysis.
+          test -x /tmp/cape-py312/bin/python
+          cd /tmp/cape-upstream
+          mkdir -p /tmp/cape-test-user
+          chown nobody:nogroup /tmp/cape-test-user
+          set +e
+          runuser -u nobody -- env HOME=/tmp/cape-test-user \
+            /tmp/cape-py312/bin/python -B /tmp/cape-upstream/cuckoo.py --help \
+            > /tmp/cape-cli-help.out 2> /tmp/cape-cli-help.err
+          cape_help_status=$?
+          set -e
+          echo "CAPE_REAL_CLI_IMPORT_STATUS=$cape_help_status"
+          sed -n '1,35p' /tmp/cape-cli-help.err
+          if [ "$cape_help_status" -ne 0 ]; then
+            echo "CAPE_CLI_IMPORT_OR_OS_COMPATIBILITY_BLOCKED"
+            exit "$cape_help_status"
+          fi
+          grep -E -- 'usage:|--help|Usage:' /tmp/cape-cli-help.out | head -n 6
+          echo "CAPE_UNPRIVILEGED_PINNED_CLI_HELP_IMPORTED"
           echo "NOT_A_CAPE_SERVICE_OR_VM_ACCEPTANCE_TEST"
