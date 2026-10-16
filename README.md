@@ -14,10 +14,16 @@
 > [attested base-package rollback](scripts/command123_tracked_apt_rollback.py)
 > dry-runs exact-only APT removals and refuses any drift from the sealed
 > dpkg state. The [scoped recovery controller](
-> scripts/command123_scoped_recovery.py) performs already-tracked file
-> rollback first, then permitted newly installed base-package removal,
-> then final recorded-state checks. It refuses any VM/network/account
-> ownership entries and does NOT implement full deployment-wide recovery.
+> scripts/command123_scoped_recovery.py) performs attested file
+> rollback first, then quarantine of a pristine, deployment-owned
+> [pinned upstream CAPE checkout](scripts/command1_tracked_cape_source.py),
+> then removal of permitted newly installed base packages, and final
+> recorded-state checks. The upstream checkout now shares the Command1
+> prerequisite transaction, is pinned to an exact commit, and has local
+> Git fixture tests. Quarantined source remains preserved for safe disposal;
+> pure-Python integrity checks work even if APT removed Git.
+> The controller refuses any VM/network/account ownership entries and
+> does NOT implement full deployment-wide recovery.
 > Integrated offline tests passed; the fresh-host CAPE/Windows/TPM
 > running-checkpoint deployment, foreign package dependency lifecycle,
 > and deployment-wide VM/network/service-state undo remain UNIMPLEMENTED.
