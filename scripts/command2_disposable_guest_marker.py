@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fixed-command benign Windows disk-marker check through an ISOLATED CAPE Agent.
 
-Only reads/creates C:\Users\Public\Documents\CAPE_Command2_BenignSnapshotMutation.marker.
+Only reads/creates C:/Users/Public/Documents/CAPE_Command2_BenignSnapshotMutation.marker.
 Never accepts a command from input, changes Windows security, downloads a
 binary, touches samples or claims swtpm/UEFI state consistency.
 Caller MUST first prove isolated host libvirt/nft network and exact guest.
