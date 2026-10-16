@@ -55,7 +55,7 @@ def need(ok, why):
         raise SourceBlocked(why)
 
 
-def safe_root():
+def safe_root(*, create=False):
     need(DEST_ROOT.is_absolute() and not DEST_ROOT.is_symlink() and
          DEST_ROOT.parent == Path("/opt") and
          DEST_ROOT.parent.is_dir() and
@@ -63,6 +63,8 @@ def safe_root():
          not DEST_ROOT.parent.stat().st_mode & 0o022,
          "Invalid protected /opt source parent")
     if not DEST_ROOT.exists():
+        if not create:
+            return DEST_ROOT
         DEST_ROOT.mkdir(mode=0o755)
         tx.fsync_dir(DEST_ROOT.parent)
     st = DEST_ROOT.stat()
@@ -161,7 +163,7 @@ def plan(host, transaction, revision):
     need(record["phase"] == "active" and
          not any(row.get("kind") == "cape_source" for row in record["entries"]),
          "Source has already been attempted in this transaction")
-    root = safe_root()
+    root = safe_root(create=False)
     dest = root / transaction
     need(not dest.exists() and not dest.is_symlink(),
          "Source checkout destination already exists")
@@ -194,6 +196,7 @@ def install(host, transaction, revision):
         ledger["entries"].append(entry)
         tx.atomic_receipt(receipt, ledger)
         # All source writes happen strictly after durable prepare receipt.
+        safe_root(create=True)
         stage = Path(tempfile.mkdtemp(prefix=".cape-source-", dir=DEST_ROOT))
         try:
             execute_git(stage, "init", "-q")
