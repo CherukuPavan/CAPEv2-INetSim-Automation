@@ -164,6 +164,32 @@ cases, not physical host CAPE installation. This is source staging only:
 no CAPE installer, Python environment, databases, services, QEMU/libvirt,
 Windows master, TPM restore, networking or full undo has been delivered.
 
+**2026-10-16 isolated network owned subset:** the reviewed
+`command2_portable_network_install.py` now records a root-private
+`command2-isolated-network-deployment.json` intent in the exact
+Command2 identity journal **before** invoking nft. It advances
+monotonically through nft creation, libvirt net-define, net-start and
+verification. The final receipt seals hashes of the live libvirt XML and
+the nft **stateless** JSON table readback. These are provenance and
+current-integrity checks, not physical packet-path test results.
+`scripts/command2_portable_network_rollback.py`, accessible through
+the guarded Command2 `network-rollback` phase, verifies that the
+network and table were absent before deployment and their installed
+readbacks remain unchanged, refuses if ANY VM references the named
+network or any guest/CAPE service is active, and after root consent
+removes **only the named CAPE libvirt network first**, then **only its
+named nft inet table**. Every change is journaled; partial errors halt
+without retry. It never flushes the global nft ruleset, touches the
+libvirt default NAT network, deletes VM disks or modifies SSL55/SSL46.
+Offline mocked unit tests and CI validate ordering and refusal behavior.
+
+This is a SEPARATE *resource-scoped* undo mechanism; the comprehensive
+`command123_scoped_recovery.py` still does NOT orchestrate it, because
+VM ownership and removal have not been finished and network rollback
+must follow independent guest removal. It is NOT a deployment-wide
+rollback. Physical L2, IPv4, IPv6 and reboot isolation still require
+real-host packet-path and persistence acceptance.
+
 **These are NOT final release features.** The new ledger does NOT yet
 automatically start inside a fully implemented fresh-host Command 1
 bootstrap; it cannot safely undo other CAPE dependencies/packages,
