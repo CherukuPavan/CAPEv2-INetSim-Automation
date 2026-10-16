@@ -39,7 +39,7 @@ class TrackedAPTTests(unittest.TestCase):
              mock.patch.object(a, "installed", return_value=baseline), \
              mock.patch.object(a.hypervisor, "plan", return_value=fake) as candidates, \
              mock.patch.object(a, "simulate",
-                 side_effect=lambda names: list(names)) as simulate:
+                 side_effect=lambda names, **kwargs: list(names)) as simulate:
             result=a.plan()
         self.assertTrue(result["resolute_virt26_binaries_in_scope"])
         self.assertTrue(result["qemu_libvirt_candidate_versions_admitted"])
