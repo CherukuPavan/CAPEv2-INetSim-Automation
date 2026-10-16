@@ -11,6 +11,9 @@ This is an incremental, fail-closed foundation, NOT universal deployment undo.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import fcntl
+from functools import wraps
 import hashlib
 import json
 import os
@@ -91,6 +94,38 @@ def fsync_dir(folder):
         os.fsync(fd)
     finally:
         os.close(fd)
+
+
+@contextmanager
+def exclusive_transaction_lock(transaction):
+    """Prevent overlapping root-owned writers from racing on one ledger."""
+    path = receipt_path(transaction)
+    lock = path.parent / ".transaction.lock"
+    fd = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW |
+                 os.O_CLOEXEC, 0o600)
+    try:
+        st = os.fstat(fd)
+        need(stat.S_ISREG(st.st_mode) and st.st_uid == 0 and
+             st.st_nlink == 1 and stat.S_IMODE(st.st_mode) == 0o600,
+             "Untrusted transaction lock file")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise TransactionBlocked("Transaction already has a live writer") from error
+        try:
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+
+
+def serialized_transaction(func):
+    @wraps(func)
+    def locked(transaction, *args, **kwargs):
+        with exclusive_transaction_lock(transaction):
+            return func(transaction, *args, **kwargs)
+    return locked
 
 
 def atomic_receipt(path, value, new=False):
@@ -220,6 +255,7 @@ def private_copy(folder, filename, raw):
     fsync_dir(folder)
 
 
+@serialized_transaction
 def prepare_file(transaction, host, stage, path):
     need(stage in STAGES, "Unknown deployment stage")
     file_path = allowed_file(path)
@@ -243,6 +279,7 @@ def prepare_file(transaction, host, stage, path):
             "before_existed": before is not None, "writer_authorized": True}
 
 
+@serialized_transaction
 def seal_file(transaction, host, step_id):
     need(isinstance(step_id, str) and re.fullmatch(r"[0-9a-f]{32}", step_id),
          "Invalid step ID")
@@ -262,6 +299,7 @@ def seal_file(transaction, host, step_id):
             "step_id": step_id, "after_existed": after is not None}
 
 
+@serialized_transaction
 def record_unsupported(transaction, host, stage, kind, identity):
     """Durably refuse unimplemented mutating resource changes.
 
@@ -369,6 +407,7 @@ def restore_original(path, raw, state):
             os.unlink(name)
 
 
+@serialized_transaction
 def rollback(transaction, host, approved=False):
     need(approved is True and sys.stdin.isatty() and os.geteuid() == 0,
          "Rollback requires interactive root approval")
