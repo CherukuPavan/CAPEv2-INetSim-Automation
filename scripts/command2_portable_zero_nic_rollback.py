@@ -27,6 +27,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 
 import command2_portable_zero_nic_stager as stager
+import command2_clone_rollback_storage_audit as disk_audit
 
 VM = re.compile(r"win11_([1-9]|1[0-6])\Z")
 RECORD_PREFIX = "command2-zero-nic-rollback-"
@@ -174,6 +175,15 @@ def plan(host,folder,vm):
          "Clone undo already attempted; no blind replay")
     xml=live_admission(row)
     disk,nvram=standalone_paths(row)
+    # Plain filesystem hashes cannot reveal an external QCOW2 backing chain
+    # into the protected Windows master (or hidden internal snapshots).
+    # Refuse any unexpected disk graph BEFORE undefining this guest.
+    try:
+        disk_metadata=disk_audit.inspect_qcow2(disk)
+    except disk_audit.DiskAdmissionBlocked as exc:
+        raise CloneRollbackBlocked(
+            "Clone QCOW2 independence or snapshot absence unproven"
+        ) from exc
     uid=row["libvirt_uuid_candidate"]
     # The original guest must be present and shut off. No imported master
     # or foreign guest is ever targeted for undefinition by this route.
@@ -192,6 +202,10 @@ def plan(host,folder,vm):
         "nvram_quarantine":str(quarantine_nvram),
         "inactive_domain_xml_sha256":hashlib.sha256(xml.encode()).hexdigest(),
         "disk_sha256":sha256_file(disk),
+        "independent_flat_qcow2_without_snapshots":(
+            disk_metadata["no_external_backing"] and
+            disk_metadata["no_internal_snapshots"] and
+            disk_metadata["no_external_data_file"]),
         "nvram_sha256":sha256_file(nvram),
         "clone_was_absent_before_staging":True,
         "clone_zero_nics":True,
