@@ -43,8 +43,8 @@ class QMP:
     def read(self):
         end=time.monotonic()+25
         while time.monotonic()<end:
-            if b"\\r\\n" in self.buffer:
-                first,self.buffer=self.buffer.split(b"\\r\\n",1)
+            if b"\r\n" in self.buffer:
+                first,self.buffer=self.buffer.split(b"\r\n",1)
                 if first:
                     return json.loads(first)
             fragment=self.sock.recv(65536)
@@ -59,7 +59,7 @@ class QMP:
         request={"execute":cmd}
         if argument is not None:
             request["arguments"]=argument
-        self.sock.sendall(json.dumps(request).encode()+b"\\r\\n")
+        self.sock.sendall(json.dumps(request).encode()+b"\r\n")
         for _ in range(20):
             reply=self.read()
             if "event" in reply:
