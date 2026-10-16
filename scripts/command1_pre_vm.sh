@@ -38,6 +38,7 @@ Modes:
   master-private-handoff   INTERNAL guarded reader -> encrypted download -> shutoff exact master import.
   integrated-cold-host-master INTERNAL guarded tracked APT/CAPE source -> private golden cold master.
   verify-pinned-python-wheels Internal read-only exact manifest/170-wheel SHA verification before offline CAPE runtime install.
+  install-rootless-python-wheels INTERNAL approved, journaled offline CAPE Python3.12 venv under non-root account.
   repair-doctor           READ-ONLY new-host CAPE+VM+service+snapshot diagnostic (no repair writes).
   recovery                Tracked six-CAPE-config baseline/seal/plan-repair/repair/plan-rollback/rollback ONLY.
   coverage                Show human-reviewed automation coverage/status documentation.
@@ -179,6 +180,10 @@ case "$MODE" in
     ;;
   verify-pinned-python-wheels)
     exec python3 -B "$HERE/command1_cape_runtime_offline_admission.py" "$@"
+    ;;
+  install-rootless-python-wheels)
+    [[ $EUID -eq 0 ]] || { echo 'Journaled runtime orchestration needs root.' >&2; exit 2; }
+    exec python3 -B "$HERE/command1_cape_runtime_rootless_stage.py" "$@"
     ;;
   repair-doctor)
     exec python3 -B "$HERE/command123_repair_doctor.py" "$@"
