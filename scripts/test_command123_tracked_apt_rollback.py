@@ -54,6 +54,54 @@ class TrackedRollbackTests(unittest.TestCase):
             return_value=["python3-pip", "python3-wheel"]))
         return folder
 
+    def test_resolute_hypervisor_rollback_requires_no_defined_libvirt_assets(self):
+        hypervisor = ["qemu-system-x86", "libvirt-daemon-system"]
+        for blocked in ("win11_1\\n", "cape-analysis-isolated\\n",
+                        "default\\n"):
+            with self.subTest(asset=blocked):
+                call_count = [0]
+                def runner(*args, **kw):
+                    call_count[0] += 1
+                    return SimpleNamespace(
+                        returncode=0, stdout=blocked if call_count[0] == 1
+                        else "")
+                with mock.patch.object(rollback.subprocess, "run",
+                                       side_effect=runner):
+                    with self.assertRaisesRegex(
+                            ledger.TransactionBlocked,
+                            "not owned for APT rollback"):
+                        rollback.no_unowned_libvirt_assets_before_virtualization_removal(
+                            hypervisor)
+
+    def test_resolute_hypervisor_rollback_blocks_failed_libvirt_inventory(self):
+        with mock.patch.object(rollback.subprocess, "run",
+                               return_value=SimpleNamespace(
+                                   returncode=1, stdout="")):
+            with self.assertRaises(ledger.TransactionBlocked):
+                rollback.no_unowned_libvirt_assets_before_virtualization_removal(
+                    ["qemu-system-x86"])
+
+    def test_noble_base_only_rollback_never_needs_hypervisor_inventory(self):
+        with mock.patch.object(rollback.subprocess, "run") as runner:
+            self.assertIsNone(
+                rollback.no_unowned_libvirt_assets_before_virtualization_removal(
+                    ["python3-pip", "python3-wheel"]))
+        runner.assert_not_called()
+
+    def test_resolute_hypervisor_rollback_accepts_empty_defined_resources(self):
+        def runner(*args, **kw):
+            if args[0][-1] == "secret-list":
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=" UUID   Usage\\n-----------------\\n")
+            return SimpleNamespace(returncode=0,stdout="")
+        with mock.patch.object(rollback.subprocess, "run",
+                               side_effect=runner) as command:
+            self.assertIsNone(
+                rollback.no_unowned_libvirt_assets_before_virtualization_removal(
+                    ["qemu-system-x86", "libvirt-daemon-system"]))
+        self.assertEqual(command.call_count,4)
+
     def test_apt_removal_only_attested_set(self):
         with mock.patch.object(rollback.apt, "read_command", return_value=(
                 "Remv python3-pip [24]\n"
