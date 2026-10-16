@@ -18,7 +18,7 @@ class TrackedAPTTests(unittest.TestCase):
                  mock.patch.object(a.platform, "machine", return_value="x86_64"), \
                  mock.patch.object(Path, "read_text", return_value=(
                      'NAME="Ubuntu"\nID=ubuntu\nVERSION_ID="'+release+'"\n')):
-                self.assertIsNone(a.verify_host())
+                self.assertEqual(a.verify_host(), release)
         for release in ("22.04", "25.10", "26.10", "99.99"):
             with self.subTest(release=release), \
                  mock.patch.object(a.platform, "machine", return_value="x86_64"), \
@@ -31,6 +31,50 @@ class TrackedAPTTests(unittest.TestCase):
                                return_value='ID=ubuntu\nVERSION_ID=26.04\n'):
             with self.assertRaises(tx.TransactionBlocked):
                 a.verify_host()
+
+    def test_resolute_plan_includes_official_version_gated_virt_packages(self):
+        baseline = {"dpkg": "1", "git": "2"}
+        fake = {"running_snapshot_stack_versions_admitted": True}
+        with mock.patch.object(a, "verify_host", return_value="26.04"), \
+             mock.patch.object(a, "installed", return_value=baseline), \
+             mock.patch.object(a.hypervisor, "plan", return_value=fake) as candidates, \
+             mock.patch.object(a, "simulate",
+                 side_effect=lambda names: list(names)) as simulate:
+            result=a.plan()
+        self.assertTrue(result["resolute_virt26_binaries_in_scope"])
+        self.assertTrue(result["qemu_libvirt_candidate_versions_admitted"])
+        self.assertTrue(set(a.VIRT26) <= set(result["requested_missing"]))
+        self.assertFalse(result["snapshot_stack_authorized"])
+        self.assertIn("qemu-system-x86", result["requested_missing"])
+        candidates.assert_called_once()
+        simulate.assert_called_once()
+
+    def test_resolute_plan_refuses_old_or_unavailable_hypervisor(self):
+        for witness in ({"running_snapshot_stack_versions_admitted": False},
+                        a.hypervisor.ReleaseBlocked("no signed policy")):
+            with self.subTest(witness=repr(witness)), \
+                 mock.patch.object(a, "verify_host", return_value="26.04"), \
+                 mock.patch.object(a, "installed") as inventory:
+                with mock.patch.object(
+                    a.hypervisor, "plan",
+                    side_effect=witness if isinstance(witness, Exception)
+                    else None, return_value=witness if isinstance(witness, dict)
+                    else None):
+                    with self.assertRaises(tx.TransactionBlocked):
+                        a.plan()
+                inventory.assert_not_called()
+
+    def test_noble_plan_remains_exact_old_seven_base_packages(self):
+        with mock.patch.object(a,"verify_host",return_value="24.04"), \
+             mock.patch.object(a,"installed",return_value={"dpkg":"1"}), \
+             mock.patch.object(a,"simulate",
+                 side_effect=lambda names:list(names)), \
+             mock.patch.object(a.hypervisor,"plan") as newer:
+            result=a.plan()
+        self.assertFalse(result["resolute_virt26_binaries_in_scope"])
+        self.assertEqual(set(result["requested_missing"]), set(a.BASE))
+        self.assertFalse(result["qemu_libvirt_candidate_versions_admitted"])
+        newer.assert_not_called()
 
     def test_delta_attributes_all_transitive_new_packages(self):
         changed = a.delta(
