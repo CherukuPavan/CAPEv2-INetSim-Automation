@@ -68,6 +68,8 @@ class RollbackTests(unittest.TestCase):
             raise AssertionError("Unexpected libvirt call "+str(args))
         stack.enter_context(mock.patch.object(m, "virsh", side_effect=libvirt))
         stack.enter_context(mock.patch.object(m, "nft", return_value=nft))
+        stack.enter_context(mock.patch.object(
+            m, "command", return_value="[]"))
 
     def test_exact_owned_isolated_network_plan_readonly(self):
         with ExitStack() as stack:
@@ -123,6 +125,30 @@ class RollbackTests(unittest.TestCase):
             self.stubs(stack, guest=True, guest_xml=domain)
             result = m.inspect(HOST, self.journal)
         self.assertTrue(result["no_domain_references_network"])
+
+    def test_refuse_kernel_tap_or_veth_port_before_network_delete(self):
+        for links in ('[{"ifname":"veth4"}]',
+                      '[{"ifname":"tap98"}]'):
+            with self.subTest(links=links), ExitStack() as stack:
+                self.stubs(stack)
+                stack.enter_context(mock.patch.object(
+                    m, "command", return_value=links))
+                with self.assertRaisesRegex(
+                        m.NetworkRollbackBlocked, "still attached"):
+                    m.inspect(HOST, self.journal)
+
+    def test_refuse_unparseable_kernel_bridge_inventory(self):
+        for content in ("not json", "{}", '[{"link":12}]'):
+            with self.subTest(content=content), mock.patch.object(
+                    m, "command", return_value=content):
+                with self.assertRaises(m.NetworkRollbackBlocked):
+                    m.require_empty_kernel_bridge()
+
+    def test_kernel_bridge_inspection_uses_exact_master(self):
+        with mock.patch.object(m,"command",return_value="[]") as runner:
+            self.assertIsNone(m.require_empty_kernel_bridge())
+        runner.assert_called_once_with(
+            "ip", "-j", "link", "show", "master", m.network.BRIDGE)
 
     def test_refuse_if_live_network_xml_drifted(self):
         with ExitStack() as stack:
