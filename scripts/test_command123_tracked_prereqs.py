@@ -32,10 +32,27 @@ class TrackedAPTTests(unittest.TestCase):
             with self.assertRaises(tx.TransactionBlocked):
                 a.verify_host()
 
+    def test_shadowed_custom_hypervisor_prevents_apt_plan(self):
+        for name in ("qemu-img", "qemu-system-x86_64", "virsh", "swtpm"):
+            with self.subTest(name=name):
+                def pretend(binary):
+                    return "/usr/local/bin/" + binary if binary == name else None
+                with mock.patch.object(a.shutil, "which", side_effect=pretend):
+                    with self.assertRaisesRegex(
+                            tx.TransactionBlocked, "External or shadowed"):
+                        a.no_shadowed_virtualization_executables()
+
+    def test_missing_hypervisor_binaries_can_be_staged_from_signed_apt(self):
+        with mock.patch.object(a.shutil, "which", return_value=None):
+            observed = a.no_shadowed_virtualization_executables()
+        self.assertTrue(observed)
+        self.assertTrue(all(value is None for value in observed.values()))
+
     def test_resolute_plan_includes_official_version_gated_virt_packages(self):
         baseline = {"dpkg": "1", "git": "2"}
         fake = {"running_snapshot_stack_versions_admitted": True}
         with mock.patch.object(a, "verify_host", return_value="26.04"), \
+             mock.patch.object(a, "no_shadowed_virtualization_executables"), \
              mock.patch.object(a, "installed", return_value=baseline), \
              mock.patch.object(a.hypervisor, "plan", return_value=fake) as candidates, \
              mock.patch.object(a, "simulate",
@@ -54,6 +71,7 @@ class TrackedAPTTests(unittest.TestCase):
                         a.hypervisor.ReleaseBlocked("no signed policy")):
             with self.subTest(witness=repr(witness)), \
                  mock.patch.object(a, "verify_host", return_value="26.04"), \
+                 mock.patch.object(a, "no_shadowed_virtualization_executables"), \
                  mock.patch.object(a, "installed") as inventory:
                 with mock.patch.object(
                     a.hypervisor, "plan",
