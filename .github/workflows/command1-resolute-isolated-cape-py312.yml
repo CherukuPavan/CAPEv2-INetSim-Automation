@@ -1,0 +1,66 @@
+name: CAPE isolated Python 3.12 native dependency feasibility on Ubuntu26
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/command1-resolute-isolated-cape-py312.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cp312-cape-abi:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Provision disposable private CPython 3.12 without replacing Ubuntu Python 3.14
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          UV_PYTHON_INSTALL_DIR: /tmp/cape-python-versions
+          UV_PYTHON_INSTALL_BIN: "0"
+          UV_NO_CACHE: "1"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu && test "$VERSION_ID" = 26.04
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get install -y --no-install-recommends python3 python3-venv python3-pip ca-certificates
+          before="$(python3 --version)"
+          test "$before" = "Python 3.14.4"
+          python3 -m venv /tmp/cape-uv-tool
+          /tmp/cape-uv-tool/bin/python -m pip install --only-binary=:all: "uv==0.9.15"
+          /tmp/cape-uv-tool/bin/uv --version
+          /tmp/cape-uv-tool/bin/uv python install "3.12" --no-bin
+          /tmp/cape-uv-tool/bin/uv venv --python "3.12" --managed-python /tmp/cape-py312
+          /tmp/cape-py312/bin/python - <<'PY'
+          import sys
+          assert sys.version_info[:2] == (3,12), sys.version
+          assert '/tmp/cape-' in sys.executable
+          print("ISOLATED_PYTHON:",sys.version,sys.executable)
+          PY
+          test "$(python3 --version)" = "$before"
+          # Test actual upstream pinned wheel availability without building
+          # unknown source or installing into distro Python3.14.
+          /tmp/cape-uv-tool/bin/uv pip install --python /tmp/cape-py312/bin/python \
+             --only-binary=:all: "greenlet==3.0.3" "gevent==24.2.1"
+          /tmp/cape-py312/bin/python - <<'PY'
+          import sys
+          import greenlet
+          import gevent
+          assert sys.version_info[:2] == (3,12)
+          assert greenlet.__version__ == '3.0.3', greenlet.__version__
+          assert gevent.__version__ == '24.2.1', gevent.__version__
+          print("CAPE_NATIVE_PINS_IMPORTED_IN_PRIVATE_PY312")
+          PY
+          test "$(python3 --version)" = "$before"
+          echo "EXTERNAL_MANAGED_PYTHON_TRUST_PROVENANCE_REVIEW_REQUIRED"
+          echo "FULL_CAPE_APPLICATION_RUNTIME_AND_WINDOWS_TPM_UNTESTED"
