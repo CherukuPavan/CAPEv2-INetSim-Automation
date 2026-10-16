@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Verified private GitHub checkout without Git, public access or a fourth command.
+"""Verified public OR private pinned GitHub checkout without Git or extra commands.
 
 Library component: the eventual Command 1 may call acquire() internally.
 A successful checkout is NOT a CAPEv2 installation or snapshot release.
-Credentials are read from a TTY and are never written to disk or argv.
+Private credentials are read from TTY and never written to disk/argv.
+Public mode never asks for or sends any credentials, and still verifies Git blobs.
 """
 from __future__ import annotations
 
@@ -49,16 +50,26 @@ def git_hash(content: bytes) -> str:
     ).hexdigest()
 
 
-def api_json(path: str, token: str) -> dict:
-    require(path.startswith("/git/") and "?" not in path or
-            path.startswith("/git/trees/") and path.endswith("?recursive=1"),
-            "Disallowed GitHub API endpoint")
-    req = Request(API + path, headers={
-        "Authorization": "Bearer " + token,
+def request_headers(token: str | None) -> dict:
+    headers = {
         "Accept": "application/vnd.github+json",
         "User-Agent": "cape-verified-checkout",
         "X-GitHub-Api-Version": "2022-11-28",
-    })
+    }
+    # Never add a bogus "Bearer None" header to public HTTPS requests.
+    if token is not None:
+        require(type(token) is str and 8 <= len(token) <= 500 and
+                "\\n" not in token and "\\r" not in token,
+                "Invalid optional read-only GitHub token")
+        headers["Authorization"] = "Bearer " + token
+    return headers
+
+
+def api_json(path: str, token: str | None) -> dict:
+    require(re.fullmatch(r"/git/commits/[0-9a-f]{40}", path) is not None or
+            re.fullmatch(r"/git/trees/[0-9a-f]{40}\\?recursive=1", path) is not None,
+            "Disallowed GitHub API endpoint")
+    req = Request(API + path, headers=request_headers(token))
     with urlopen(req, timeout=30) as response:
         data = response.read(MAX_JSON + 1)
     require(len(data) <= MAX_JSON, "GitHub API response too large")
@@ -67,7 +78,7 @@ def api_json(path: str, token: str) -> dict:
     return doc
 
 
-def tree_entries(commit_sha: str, token: str) -> dict:
+def tree_entries(commit_sha: str, token: str | None) -> dict:
     require(SHA40.fullmatch(commit_sha), "A pinned 40-hex commit is required")
     commit = api_json("/git/commits/" + commit_sha, token)
     require(commit.get("sha") == commit_sha and
@@ -116,12 +127,11 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def archive_to_temp(commit_sha: str, token: str, directory: Path) -> Path:
-    req = Request(API + "/tarball/" + commit_sha, headers={
-        "Authorization": "Bearer " + token,
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "cape-verified-checkout",
-    })
+def archive_to_temp(commit_sha: str, token: str | None, directory: Path) -> Path:
+    require(SHA40.fullmatch(commit_sha) is not None,
+            "Unpinned Git revision")
+    req = Request(API + "/tarball/" + commit_sha,
+                  headers=request_headers(token))
     opener = build_opener(NoRedirect)
     try:
         with opener.open(req, timeout=30):
@@ -228,11 +238,9 @@ def verified_parent(home: Path) -> Path:
     return root
 
 
-def acquire(commit_sha: str, token: str, home: Path) -> Path:
+def acquire(commit_sha: str, token: str | None, home: Path) -> Path:
     require(SHA40.fullmatch(commit_sha), "Unpinned Git revision")
-    require(type(token) is str and 8 <= len(token) <= 500 and
-            "\n" not in token and "\r" not in token,
-            "Missing or invalid private GitHub access credential")
+    request_headers(token)  # Validate credential BEFORE network or file I/O.
     entries = tree_entries(commit_sha, token)
     parent = verified_parent(home)
     target = parent / commit_sha
@@ -258,6 +266,8 @@ def acquire(commit_sha: str, token: str, home: Path) -> Path:
 def main(*, bootstrap_token=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--revision", required=True)
+    parser.add_argument("--public", action="store_true",
+                        help="Unauthenticated, integrity-checked PUBLIC repository checkout")
     args = parser.parse_args()
     try:
         require(os.geteuid() != 0 and sys.stdin.isatty(),
@@ -266,10 +276,14 @@ def main(*, bootstrap_token=None):
                 "Checkout only supported on x86_64")
         # The one-command private bootstrap may pass the token in memory;
         # never place it in argv, an environment variable or a temp file.
-        token = (bootstrap_token if bootstrap_token is not None else
+        require(not (args.public and bootstrap_token is not None),
+                "Public source mode must never receive a private token")
+        token = (None if args.public else
+                 bootstrap_token if bootstrap_token is not None else
                  getpass.getpass("GitHub fine-grained read-only token: "))
         result = acquire(args.revision, token, Path.home())
-        print(json.dumps({"result": "VERIFIED_PRIVATE_SOURCE_ONLY",
+        print(json.dumps({"result": "VERIFIED_PINNED_SOURCE_ONLY",
+                          "source_access": "public" if args.public else "private",
                           "path": str(result),
                           "sha": args.revision,
                           "CAPE_installed": False,
@@ -277,7 +291,7 @@ def main(*, bootstrap_token=None):
         return 0
     except (CheckoutBlocked, HTTPError, URLError, OSError, ValueError,
             tarfile.TarError, json.JSONDecodeError) as error:
-        print(json.dumps({"result": "PRIVATE_CHECKOUT_BLOCKED",
+        print(json.dumps({"result": "PINNED_CHECKOUT_BLOCKED",
                           "error_type": type(error).__name__,
                           "credentials_printed": False,
                           "no_installation_attempted": True}),
