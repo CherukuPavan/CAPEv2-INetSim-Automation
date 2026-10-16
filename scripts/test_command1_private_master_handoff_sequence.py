@@ -65,6 +65,33 @@ class PrivateHandoffTests(unittest.TestCase):
         with self.assertRaises(h.HandoffBlocked):
             h.child_argv(self.args, "unreviewed-shell-command")
 
+    def test_remote_and_local_bundle_identifiers_must_match(self):
+        self.args.bundle_destination = (self.root / "downloads" /
+                                        self.args.bundle_id)
+        self.args.os_disk = self.root / "images" / "win11.qcow2"
+        self.args.uefi_vars = self.root / "firmware" / "win11_VARS.fd"
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(h.os, "geteuid",
+                                                  return_value=0))
+            stack.enter_context(mock.patch.object(h, "admitted_host"))
+            stack.enter_context(mock.patch.object(h, "trusted_path"))
+            stack.enter_context(mock.patch(
+                "shutil.which", return_value="/usr/bin/tool"))
+            stack.enter_context(mock.patch.object(
+                h.reader, "verify_inputs",
+                return_value={
+                    "service_account_email_to_share_with_as_viewer":
+                    "restricted-lab@project.iam.gserviceaccount.com"
+                }))
+            result = h.inputs(self.args)
+            self.assertEqual(result["bundle_id"], self.args.bundle_id)
+            self.assertFalse(result["CAPE_ready"])
+            self.args.bundle_destination = (
+                self.root / "downloads" / "cape-master-OTHER")
+            with self.assertRaisesRegex(h.HandoffBlocked,
+                                        "must match exact"):
+                h.inputs(self.args)
+
     def test_preflight_fails_if_crypt_config_would_overwrite(self):
         self.args.config.write_text("unrelated user settings")
         with mock.patch.object(h.os, "geteuid", return_value=0), \
