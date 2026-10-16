@@ -7,6 +7,7 @@ or certifies actual guest isolation / reboot containment.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -34,6 +35,9 @@ class RealNetworkSchemaTests(unittest.TestCase):
 
     def test_real_libvirt_network_schema_without_defining_network(self):
         self.require_tool("virt-xml-validate")
+        # The libvirt wrapper invokes xmllint; installations of
+        # libvirt-clients alone do not guarantee its availability.
+        self.require_tool("xmllint")
         xml = network.plan(
             "cape-analysis-isolated", "cape-lab0", "192.168.240.0/24",
             ["192.168.240.125", "192.168.240.126"]
@@ -47,6 +51,15 @@ class RealNetworkSchemaTests(unittest.TestCase):
 
     def test_real_nft_candidate_syntax_without_installing_rules(self):
         self.require_tool("nft")
+        # 'nft --check' is non-mutating but still needs CAP_NET_ADMIN
+        # to inspect current netlink state. Offline unittest CI runs as
+        # non-root; the dedicated real-tool workflow runs this under sudo.
+        if os.geteuid() != 0:
+            probe = subprocess.run(
+                ["nft", "-j", "list", "tables"], capture_output=True,
+                text=True, check=False, timeout=15)
+            if probe.returncode != 0:
+                self.skipTest("Unprivileged CI has no nft netlink access")
         for subnet in ("192.168.240.0/24", "172.28.240.0/24",
                        "10.99.240.0/24"):
             with self.subTest(subnet=subnet):
