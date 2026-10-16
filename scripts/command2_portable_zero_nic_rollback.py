@@ -221,6 +221,35 @@ def record(path,payload,first=False):
     _fsync(path.parent)
 
 
+def quarantine_noreplace(source,target,expected_sha):
+    """Same-dir, no-overwrite owned clone preservation.
+
+    Hardlink the exact stopped guest image into its unique quarantine name
+    using link(O_EXCL) semantics, then unlink the original name. A crash
+    may leave TWO names pointing to the same inode; never auto-retry.
+    """
+    source=Path(source)
+    target=Path(target)
+    need(source.parent==target.parent and
+         not source.is_symlink() and source.is_file() and
+         not target.exists() and not target.is_symlink(),
+         "Untrusted or colliding guest quarantine destination")
+    need(source.stat().st_nlink==1 and
+         sha256_file(source)==expected_sha,
+         "Original guest image differs from approved source")
+    os.link(source,target,follow_symlinks=False)
+    _fsync(source.parent)
+    need(source.stat().st_ino==target.stat().st_ino and
+         sha256_file(target)==expected_sha,
+         "Quarantine hardlink contents mismatch")
+    os.unlink(source)
+    _fsync(source.parent)
+    need(not source.exists() and not source.is_symlink() and
+         target.stat().st_nlink==1,
+         "Original guest image remains linked after quarantine")
+    return True
+
+
 def revert(host,folder,vm):
     need(os.geteuid()==0 and sys.stdin.isatty(),
          "Root interactive approval required")
@@ -263,14 +292,14 @@ def revert(host,folder,vm):
             disk,nvram=standalone_paths(row)
             need(sha256_file(disk)==initial["disk_sha256"],
                  "Disk changed during VM undefinition")
-            os.rename(disk,initial["disk_quarantine"])
-            _fsync(disk.parent)
+            quarantine_noreplace(disk,initial["disk_quarantine"],
+                                 initial["disk_sha256"])
             data["status"]="disk_quarantined"
             record(record_path,data)
             need(sha256_file(nvram)==initial["nvram_sha256"],
                  "UEFI changed during VM undefinition")
-            os.rename(nvram,initial["nvram_quarantine"])
-            _fsync(nvram.parent)
+            quarantine_noreplace(nvram,initial["nvram_quarantine"],
+                                 initial["nvram_sha256"])
             data["status"]="nvram_quarantined"
             record(record_path,data)
             need(not disk.exists() and not nvram.exists() and
