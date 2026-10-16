@@ -249,6 +249,55 @@ class TransactionTests(unittest.TestCase):
         with self.assertRaises(t.TransactionBlocked):
             t.rollback(self.transaction, "rakshati", False)
 
+class ServiceRecoveryGuards(unittest.TestCase):
+    def test_missing_systemd_service_is_inactive(self):
+        self.assertTrue(t.service_inactive_from_systemd(
+            "LoadState=not-found\nActiveState=inactive\n"))
+
+    def test_installed_stopped_service_is_inactive(self):
+        self.assertTrue(t.service_inactive_from_systemd(
+            "LoadState=loaded\nActiveState=inactive\n"))
+
+    def test_active_failed_and_masked_services_are_rejected(self):
+        for raw in (
+            "LoadState=loaded\nActiveState=active\n",
+            "LoadState=loaded\nActiveState=failed\n",
+            "LoadState=masked\nActiveState=inactive\n",
+        ):
+            self.assertFalse(t.service_inactive_from_systemd(raw))
+
+    def test_ambiguous_service_response_is_rejected(self):
+        for raw in (
+            "", "ActiveState=inactive\n",
+            "LoadState=loaded\nActiveState=inactive\nActiveState=active\n",
+            "LoadState=loaded\nActiveState=inactive\nGarbage=x\n",
+        ):
+            with self.assertRaises(t.TransactionBlocked):
+                t.service_inactive_from_systemd(raw)
+
+    def test_no_live_work_admits_absent_units_and_no_running_guests(self):
+        def run(cmd, **kwargs):
+            if cmd[0] == "systemctl":
+                return SimpleNamespace(returncode=0, stdout=(
+                    "LoadState=not-found\nActiveState=inactive\n"))
+            if cmd[0] == "virsh":
+                return SimpleNamespace(returncode=0, stdout="")
+            raise AssertionError("unexpected host command")
+        with mock.patch.object(t.subprocess, "run", side_effect=run) as proc:
+            t.no_live_work()
+        self.assertEqual(proc.call_count, len(t.SERVICE_STOPS) + 1)
+
+    def test_no_live_work_refuses_active_cape_unit(self):
+        def run(cmd, **kwargs):
+            if cmd[0] == "systemctl":
+                return SimpleNamespace(returncode=0, stdout=(
+                    "LoadState=loaded\nActiveState=active\n"))
+            raise AssertionError("virsh must not run after active service")
+        with mock.patch.object(t.subprocess, "run", side_effect=run):
+            with self.assertRaises(t.TransactionBlocked):
+                t.no_live_work()
+
+
 class StandaloneGuards(unittest.TestCase):
     def test_reject_protected_hosts(self):
         with mock.patch.object(t.socket, "gethostname",
