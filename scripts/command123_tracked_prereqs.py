@@ -197,12 +197,21 @@ def apply(transaction, host):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--mode", choices=("plan", "apply"), default="plan")
-    p.add_argument("--transaction")
+    source = p.add_mutually_exclusive_group()
+    source.add_argument("--transaction")
+    source.add_argument("--use-active-transaction", action="store_true")
     p.add_argument("--approved-host")
     a = p.parse_args()
     try:
-        value = plan() if a.mode == "plan" else apply(a.transaction,
-                                                      a.approved_host)
+        if a.mode == "plan":
+            value = plan()
+        else:
+            need(a.approved_host and
+                 (a.transaction or a.use_active_transaction),
+                 "Existing deployment transaction and approved host required")
+            ident = (ledger.active_transaction(a.approved_host)
+                     if a.use_active_transaction else a.transaction)
+            value = apply(ident, a.approved_host)
         print(json.dumps(value, sort_keys=True, indent=2))
         return 0
     except (ledger.TransactionBlocked, OSError, ValueError,
