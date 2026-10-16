@@ -14,6 +14,8 @@ CONFIGURE: approved OTHER host, root + direct TTY, all five plans must pass
           each existing guarded apply in operator order. Each helper still
           asks its own exact typed approval and makes its own atomic backup.
           Does not silently alter router/firewall, restart services or VMs.
+RUN     : combined five-config then five-service execution under one outer
+          private receipt; both inner stages preserve consent and journals.
 RESTART : a separately approved OTHER-host stage that refuses incomplete
           five-config targets, checks actual tmpfs and routing reference,
           and restarts only the operator's five systemd units with receipts.
@@ -61,7 +63,8 @@ def need(ok, why):
 def approved_host(host):
     actual = socket.gethostname().split(".", 1)[0].lower()
     requested = host.split(".", 1)[0].lower()
-    need(actual not in ("ssl-55", "cse-ssl-55") and
+    need(actual not in ("ssl-55", "cse-ssl-55",
+                            "ssl-46", "cse-ssl-46") and
          actual == requested and len(actual) >= 2,
          "No automatic Command3 changes on SSL-55 or a different host")
     return actual
@@ -392,10 +395,84 @@ def restart_existing_config(args):
             "CAPE_SAMPLE_ANALYSIS_READY":False}
 
 
+def run_joined(args):
+    """One Command3 invocation, with durable config→service stage receipts.
+
+    The two existing reviewed stages still require their own approvals;
+    their distinct change journals and preflight controls are retained.
+    This coordinator does not auto-enable unsafe routing, boot guests,
+    or turn a running-snapshot candidate into a TPM proof.
+    """
+    need(os.geteuid() == 0 and sys.stdin.isatty(),
+         "Joined Command3 needs a root interactive terminal")
+    approved_host(args.approved_host)
+    first=review(args)
+    need(first["verified_target_tmpfs_mounted"] is True,
+         "Command3 target tmpfs not admitted before joined operation")
+    folder=private_witness_dir(args.witness_dir)
+    receipt=folder/("command3-joined."+uuid.uuid4().hex+".json")
+    record={
+        "result":"COMMAND3_JOINED_STARTED",
+        "host":args.approved_host,
+        "steps":("five_configuration_files","five_service_restarts"),
+        "completed":[],
+        "pending":None,
+        "config_witness":None,
+        "restart_witness":None,
+        "full_deployment_accepted":False,
+        "VM_or_TPM_touched":False,
+        "routing_auto_modified":False,
+    }
+    write_witness(receipt,record,first=True)
+    try:
+        record["pending"]="five_configuration_files"
+        write_witness(receipt,record)
+        configured=configure(args)
+        need(configured.get("result") ==
+             "COMMAND3_FIVE_CONFIG_FILES_APPLIED_NO_RESTART" and
+             configured.get("witness"),
+             "Joined config stage did not produce complete receipt")
+        record["config_witness"]=configured["witness"]
+        record["completed"].append("five_configuration_files")
+        record["pending"]=None
+        write_witness(receipt,record)
+        record["pending"]="five_service_restarts"
+        write_witness(receipt,record)
+        restarted=restart_existing_config(args)
+        need(restarted.get("result") ==
+             "COMMAND3_EXISTING_CONFIG_FIVE_SERVICE_RESTART_COMPLETE",
+             "Joined service restart not verified")
+        # Separate service-witness details remain authoritative.
+        record["restart_witness"]=restarted.get(
+            "receipt",restarted.get("witness"))
+        record["completed"].append("five_service_restarts")
+        record["pending"]=None
+        record["result"]="COMMAND3_CONFIG_AND_FIVE_SERVICES_VERIFIED_ONLY"
+        write_witness(receipt,record)
+        return {
+            "result":record["result"],
+            "receipt":str(receipt),
+            "config_receipt":record["config_witness"],
+            "service_receipt":record["restart_witness"],
+            "full_three_command_acceptance":False,
+            "Windows_running_snapshot_TPM_accepted":False,
+            "malware_analysis_ready":False,
+            "no_auto_routing_change":True,
+        }
+    except Exception as error:
+        record["result"]="COMMAND3_JOINED_PARTIAL_OR_UNKNOWN"
+        record["failure_type"]=type(error).__name__
+        write_witness(receipt,record)
+        raise Command3PipelineBlocked(
+            "Joined Command3 stopped at uncertain stage: review both "
+            "root-private receipts; never retry or blindly stop services"
+        ) from None
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--mode",
-                   choices=("plan", "configure", "restart", "verify"),
+                   choices=("plan", "configure", "restart", "verify", "run"),
                    default="plan")
     p.add_argument("--approved-host", required=True)
     p.add_argument("--journal", required=True, type=Path)
@@ -419,6 +496,7 @@ def main():
         result = (review(args) if args.mode == "plan" else
                   review(args, True) if args.mode == "verify" else
                   restart_existing_config(args) if args.mode == "restart" else
+                  run_joined(args) if args.mode == "run" else
                   configure(args))
         print(json.dumps(result, indent=2, sort_keys=True), flush=True)
         return 0
@@ -428,8 +506,9 @@ def main():
         print(json.dumps({
             "result": "COMMAND3_BATCH_BLOCKED_OR_PARTIAL",
             "error_type": type(exc).__name__,
-            "no_services_restarted": True,
-            "no_routing_or_VM_modification": True,
+            "service_restarts_may_be_partial_if_mode_is_run_or_restart":True,
+            "routing_auto_modified":False,
+            "VMs_modified_by_this_script":False,
             "review_private_witness_if_configure": True,
         }, sort_keys=True), file=sys.stderr)
         return 2
