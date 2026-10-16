@@ -13,6 +13,15 @@ Usage: bash scripts/bootstrap_pre_vm_prereqs.sh [--plan|--apply] [--report FILE]
 --apply      Explicit opt-in to apt-get install missing cpu-checker, msr-tools,
              git, acpica-tools, python3, python3-venv and python3-pip.
 --report     Store private TXT output at this new absolute path (never overwrite).
+--deployment-transaction ID
+             Existing root-private transaction created before Command1.
+--approved-host HOST
+             Actual approved target hostname. REQUIRED with transaction.
+
+With both transaction fields and --apply, the installer delegates to the
+root-only fully inventoried APT wrapper. It records ALL transitive package
+changes, refuses simulated upgrades/removals and preserves partial receipts.
+Package rollback is still UNSUPPORTED; these flags do not authorize removal.
 
 This does NOT install CAPEv2, libvirt/QEMU builds, guest VMs or INetSim.
 Host package repositories and system power/network policy are not edited.
@@ -21,10 +30,18 @@ HELP
 
 MODE=plan
 REPORT=''
+DEPLOYMENT_TRANSACTION=''
+APPROVED_HOST=''
 while (($#)); do
   case "$1" in
     --plan) MODE=plan; shift ;;
     --apply) MODE=apply; shift ;;
+    --deployment-transaction)
+      (($# >= 2)) || { echo 'Missing transaction ID' >&2; exit 2; }
+      DEPLOYMENT_TRANSACTION=$2; shift 2 ;;
+    --approved-host)
+      (($# >= 2)) || { echo 'Missing host' >&2; exit 2; }
+      APPROVED_HOST=$2; shift 2 ;;
     --report)
       (($# >= 2)) || { echo 'Missing report path' >&2; exit 2; }
       REPORT=$2; shift 2 ;;
@@ -32,6 +49,19 @@ while (($#)); do
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+if [[ -n $DEPLOYMENT_TRANSACTION || -n $APPROVED_HOST ]]; then
+  [[ $MODE == apply && -n $DEPLOYMENT_TRANSACTION && -n $APPROVED_HOST ]] || {
+    echo 'Transaction tracking requires --apply and BOTH transaction/host flags' >&2
+    exit 2
+  }
+  [[ $DEPLOYMENT_TRANSACTION =~ ^[0-9a-f]{32}$ ]] || {
+    echo 'Invalid transaction ID' >&2; exit 2
+  }
+  [[ $APPROVED_HOST =~ ^[a-z0-9][a-z0-9-]{1,62}$ ]] || {
+    echo 'Invalid approved host' >&2; exit 2
+  }
+fi
 
 [[ $EUID -ne 0 ]] || { echo 'Run under intended non-root user; sudo is scoped to apt.' >&2; exit 2; }
 [[ -r /etc/os-release ]] || { echo 'Cannot read OS release' >&2; exit 2; }
@@ -89,6 +119,15 @@ fi
 
 command -v sudo >/dev/null || { echo 'sudo unavailable; cannot apply.' >&2; exit 3; }
 sudo -v || { echo 'sudo permission unavailable; no packages changed.' >&2; exit 3; }
+if [[ -n $DEPLOYMENT_TRANSACTION ]]; then
+  HERE=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+  command -v python3 >/dev/null 2>&1 || {
+    echo 'Tracked APT installation requires preinstalled Python3' >&2; exit 3
+  }
+  echo '[APPLY] Using root-only complete-dpkg provenance in deployment transaction.'
+  exec sudo python3 -B "$HERE/command123_tracked_prereqs.py" --mode apply \
+    --transaction "$DEPLOYMENT_TRANSACTION" --approved-host "$APPROVED_HOST"
+fi
 echo '[APPLY] apt-get install ONLY listed missing packages, no upgrade/autoremove.'
 # Fail visibly on broken/duplicate/mixed APT sources or locks; do not edit them.
 sudo env DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends "${missing[@]}"
