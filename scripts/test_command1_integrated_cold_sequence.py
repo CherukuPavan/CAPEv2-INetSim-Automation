@@ -55,10 +55,14 @@ class IntegratedColdTests(unittest.TestCase):
         self.assertEqual(
             seq.phases_for(self.args),
             (seq.PHASES[0],seq.RUNTIME_PHASE,seq.PHASES[1]))
-        with mock.patch.object(seq.base,"apply") as mutate:
+        # A complete profile is routed into the existing three-phase
+        # executor. Before approval or host admission it cannot mutate.
+        with mock.patch.object(seq.sys.stdin,"isatty",return_value=True), \
+             mock.patch.object(seq,"preflight",return_value=self.plan), \
+             mock.patch("builtins.input",return_value="DECLINED"), \
+             mock.patch.object(seq.base,"apply") as mutate:
             with self.assertRaisesRegex(
-                    seq.IntegratedBlocked,
-                    "not wired into the executor"):
+                    seq.IntegratedBlocked,"Operator declined"):
                 seq.execute(self.args)
         mutate.assert_not_called()
 
@@ -129,6 +133,90 @@ class IntegratedColdTests(unittest.TestCase):
         child_args=run.call_args.args[0]
         self.assertEqual(child_args.receipt_dir,self.handoff)
         self.assertEqual(self.args.receipt_dir,self.receipts)
+
+    def test_optional_rootless_runtime_executes_in_middle_with_receipt(self):
+        for key in seq.RUNTIME_FIELDS:
+            setattr(self.args,key,("a"*64 if "sha256" in key
+                                   else self.path/key))
+        ordered=[]
+        records=[]
+        source_tx="e"*32
+        def log(path,doc,**kwargs):
+            records.append({
+                "current":doc["current"],"phase":doc["phase"],
+                "finished":list(doc["finished"]),
+                "transaction_id":doc.get("transaction_id"),
+                "packages":doc.get("rootless_python_runtime_packages"),
+            })
+        with ExitStack() as st:
+            st.enter_context(mock.patch.object(seq.sys.stdin,"isatty",
+                                                 return_value=True))
+            st.enter_context(mock.patch.object(seq,"preflight",
+                                                 return_value=self.plan))
+            st.enter_context(mock.patch("builtins.input",
+                                                 return_value=seq.APPROVAL))
+            st.enter_context(mock.patch.object(
+                seq.master,"private_receipt_dir",return_value=self.receipts))
+            st.enter_context(mock.patch.object(
+                seq.master,"durable_receipt",side_effect=log))
+            st.enter_context(mock.patch.object(
+                seq.master,"inputs",return_value={"host_modified":False}))
+            st.enter_context(mock.patch.object(seq.base,"apply",
+                side_effect=lambda *args:(
+                    ordered.append("base") or {
+                        "exact_public_source_staged":True,
+                        "transaction_id":source_tx})))
+            rootless=st.enter_context(mock.patch.object(seq.runtime,"apply",
+                side_effect=lambda *args:(
+                    ordered.append("runtime") or {
+                        "result":"CAPE_ROOTLESS_OFFLINE_PY312_RUNTIME_INSTALLED",
+                        "transaction":source_tx,
+                        "packages":170,
+                        "runtime":"/opt/cape-deployment-runtime/venv"})))
+            master_exec=st.enter_context(mock.patch.object(
+                seq.master,"execute",side_effect=lambda *args:(
+                    ordered.append("master") or {
+                        "master_imported_shut_off":True,
+                        "guest_started":False})))
+            result=seq.execute(self.args)
+        self.assertEqual(ordered,["base","runtime","master"])
+        self.assertTrue(result["rootless_cape_python_runtime_installed"])
+        self.assertEqual(result["rootless_python_packages_installed"],170)
+        self.assertEqual(records[-1]["finished"],list(seq.phases_for(self.args)))
+        self.assertEqual(records[-1]["packages"],170)
+        self.assertEqual(rootless.call_args.args[0],self.args.approved_host)
+        self.assertEqual(rootless.call_args.args[1],source_tx)
+        master_exec.assert_called_once()
+
+    def test_runtime_failure_halts_before_private_master_import(self):
+        for key in seq.RUNTIME_FIELDS:
+            setattr(self.args,key,("b"*64 if "sha256" in key
+                                   else self.path/key))
+        records=[]
+        with ExitStack() as st:
+            st.enter_context(mock.patch.object(seq.sys.stdin,"isatty",
+                                                 return_value=True))
+            st.enter_context(mock.patch.object(seq,"preflight",
+                                                 return_value=self.plan))
+            st.enter_context(mock.patch("builtins.input",
+                                                 return_value=seq.APPROVAL))
+            st.enter_context(mock.patch.object(
+                seq.master,"private_receipt_dir",return_value=self.receipts))
+            st.enter_context(mock.patch.object(seq.master,"durable_receipt",
+                side_effect=lambda path,doc,**kw:records.append(dict(doc))))
+            st.enter_context(mock.patch.object(seq.base,"apply",
+                return_value={"exact_public_source_staged":True,
+                              "transaction_id":"e"*32}))
+            st.enter_context(mock.patch.object(seq.runtime,"apply",
+                side_effect=RuntimeError("synthetic rootless installer failure")))
+            handoff=st.enter_context(mock.patch.object(seq.master,"execute"))
+            with self.assertRaisesRegex(seq.IntegratedBlocked,"BEFORE retry"):
+                seq.execute(self.args)
+        handoff.assert_not_called()
+        self.assertEqual(records[-1]["phase"],"PARTIAL_OR_UNKNOWN_STOP")
+        self.assertEqual(records[-1]["current"],seq.RUNTIME_PHASE)
+        self.assertEqual(records[-1]["finished"],[seq.PHASES[0]])
+        self.assertEqual(records[-1]["transaction_id"],"e"*32)
 
     def test_partial_master_import_keeps_external_transaction_and_receipt(self):
         records=[]
