@@ -37,7 +37,7 @@ class CloneRecoveryTests(unittest.TestCase):
         self.original_fstat=os.fstat
 
     def test_unmodified_guest_bytes_can_be_quarantined_without_deletion(self):
-        target=self.folder/"."+VM+".quarantine-"+UID
+        target=self.folder/("."+VM+".quarantine-"+UID)
         digest=u.sha256_file(self.disk)
         self.assertTrue(u.quarantine_noreplace(self.disk,target,digest))
         self.assertFalse(self.disk.exists())
@@ -46,7 +46,7 @@ class CloneRecoveryTests(unittest.TestCase):
         self.assertEqual(target.stat().st_nlink,1)
 
     def test_existing_quarantine_never_overwritten(self):
-        target=self.folder/"."+VM+".quarantine-"+UID
+        target=self.folder/("."+VM+".quarantine-"+UID)
         target.write_bytes(b"foreign valuable data")
         with self.assertRaises(u.CloneRollbackBlocked):
             u.quarantine_noreplace(self.disk,target,u.sha256_file(self.disk))
@@ -56,7 +56,7 @@ class CloneRecoveryTests(unittest.TestCase):
     def test_source_disk_drift_prevents_any_quarantine_mutation(self):
         expected=u.sha256_file(self.disk)
         self.disk.write_bytes(b"modified after approved plan")
-        target=self.folder/"."+VM+".quarantine-"+UID
+        target=self.folder/("."+VM+".quarantine-"+UID)
         with self.assertRaises(u.CloneRollbackBlocked):
             u.quarantine_noreplace(self.disk,target,expected)
         self.assertFalse(target.exists())
