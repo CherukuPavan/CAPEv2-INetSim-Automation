@@ -155,6 +155,78 @@ class ScopedRecoveryTests(unittest.TestCase):
                          ["files", "source", "apt", "verify", "complete"])
         self.assertFalse(final["full_three_command_rollback_verified"])
 
+    def test_owned_cape_runtime_receipt_allowed_only_when_sealed(self):
+        record=doc()
+        record["entries"].append({
+            "kind":"cape_runtime","id":"c"*32,
+            "status":"sealed"})
+        with ExitStack() as stack:
+            self.patch_stage(stack,record)
+            witness=stack.enter_context(mock.patch.object(
+                m.cape_runtime,"inspect",
+                return_value={"action":"quarantine_owned_runtime"}))
+            plan=m.owned_stage_plan("rakshati",TX)
+        self.assertTrue(plan["runtime_rollback_needed"])
+        witness.assert_called_once_with("rakshati",TX)
+        record["entries"][-1]["status"]="prepared"
+        with ExitStack() as stack:
+            self.patch_stage(stack,record)
+            with self.assertRaisesRegex(
+                    m.ScopedRecoveryBlocked,
+                    "Unsealed or partially reverted CAPE runtime"):
+                m.owned_stage_plan("rakshati",TX)
+
+    def test_python_runtime_undo_happens_before_source_and_apt(self):
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(
+                m.os,"geteuid",return_value=0))
+            stack.enter_context(mock.patch.object(
+                m.sys.stdin,"isatty",return_value=True))
+            stack.enter_context(mock.patch.object(
+                m.transaction,"host_guard"))
+            stage={
+                "transaction":TX,
+                "file_rollback_steps_needed":1,
+                "runtime_rollback_needed":True,
+                "source_rollback_needed":True,
+                "apt_rollback_needed":True,
+            }
+            stack.enter_context(mock.patch.object(
+                m,"owned_stage_plan",return_value=stage))
+            stack.enter_context(mock.patch(
+                "builtins.input",
+                return_value="ROLLBACK-TRACKED-CAPE-FILES-AND-BASE-APT-"+TX))
+            order=[]
+            stack.enter_context(mock.patch.object(
+                m.transaction,"rollback_files_first",
+                side_effect=lambda *a:order.append("files") or
+                {"transaction_still_active":True}))
+            stage_undo=stack.enter_context(mock.patch.object(
+                m.cape_runtime,"undo",
+                side_effect=lambda *a:order.append("runtime") or
+                {"result":"COMMAND1_OWNED_PYTHON_RUNTIME_UNDEPLOYED_QUARANTINED"}))
+            stack.enter_context(mock.patch.object(
+                m.cape_source,"undo",
+                side_effect=lambda *a:order.append("source") or
+                {"result":"COMMAND1_OWNED_SOURCE_UNDEPLOYED_QUARANTINED"}))
+            stack.enter_context(mock.patch.object(
+                m.packages,"rollback",
+                side_effect=lambda *a:order.append("apt") or
+                {"preexisting_package_inventory_restored":True}))
+            stack.enter_context(mock.patch.object(
+                m.transaction,"rollback_plan",
+                side_effect=lambda *a:order.append("verify") or
+                {"can_rollback":True,"actions":[{"action":"keep"}]}))
+            stack.enter_context(mock.patch.object(
+                m.transaction,"rollback",
+                side_effect=lambda *a:order.append("finish") or
+                {"result":"CAPE_TRACKED_FILE_CHANGES_ROLLED_BACK"}))
+            result=m.run("rakshati",TX)
+        self.assertEqual(order,["files","runtime","source","apt",
+                                "verify","finish"])
+        self.assertFalse(result["full_three_command_rollback_verified"])
+        stage_undo.assert_called_once_with("rakshati",TX)
+
     def test_rejects_unknown_vm_domain_entry(self):
         with ExitStack() as stack:
             self.patch_stage(stack, doc(unknown=True))
