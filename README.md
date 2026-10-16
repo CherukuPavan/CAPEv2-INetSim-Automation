@@ -29,6 +29,19 @@
 > and deployment-wide VM/network/service-state undo remain UNIMPLEMENTED.
 > **No final three-command installer is approved for use.**
 >
+> **2026-10-16 independently rebuilt, hash-locked CAPE Python wheelhouse:**
+> Disposable Ubuntu 26.04 CI independently built **170 CAPEv2 dependency
+> wheels twice**, normalized only `python-tlsh==4.5.0` non-runtime
+> DWARF/build-ID volatility, and verified identical hashes for **all 170**.
+> A fresh Python 3.12 venv installed them entirely offline, imported CAPE
+> dependencies, and launched CAPE CLI help unprivileged; another fresh
+> venv installed with offline `uv` and no target pip. The admission helper
+> also rejected a deliberately writable wheel before execution.
+> [Full CI evidence, hashes and distribution limitations](
+> docs/CAPE_PY312_OFFLINE_ARTIFACT_ATTESTATION_20261016.md).
+> This validates **dependencies**, not the live CAPE database, services,
+> Windows TPM continuity, real guest network isolation or host rollback.
+>
 > **2026-10-16 exercised CAPE Python + real libvirt snapshot experiments:**
 > On disposable Ubuntu 26.04, a separately managed Python 3.12.12
 > successfully resolved and installed **170 upstream CAPEv2 dependencies**
