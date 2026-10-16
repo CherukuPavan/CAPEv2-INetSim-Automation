@@ -13,23 +13,22 @@ import command123_deployment_transaction as tx
 
 class TrackedAPTTests(unittest.TestCase):
     def test_exact_supported_lts_host_versions_for_base_apt_only(self):
-        real_read = Path.read_text
         for release in ("24.04", "26.04"):
             with self.subTest(release=release), \
                  mock.patch.object(a.platform, "machine", return_value="x86_64"), \
                  mock.patch.object(Path, "read_text", return_value=(
-                     'NAME="Ubuntu"\\nID=ubuntu\\nVERSION_ID="'+release+'"\\n')):
+                     'NAME="Ubuntu"\nID=ubuntu\nVERSION_ID="'+release+'"\n')):
                 self.assertIsNone(a.verify_host())
         for release in ("22.04", "25.10", "26.10", "99.99"):
             with self.subTest(release=release), \
                  mock.patch.object(a.platform, "machine", return_value="x86_64"), \
                  mock.patch.object(Path, "read_text", return_value=(
-                     'ID=ubuntu\\nVERSION_ID="'+release+'"\\n')):
+                     'ID=ubuntu\nVERSION_ID="'+release+'"\n')):
                 with self.assertRaises(tx.TransactionBlocked):
                     a.verify_host()
         with mock.patch.object(a.platform, "machine", return_value="aarch64"), \
              mock.patch.object(Path, "read_text",
-                               return_value='ID=ubuntu\\nVERSION_ID=26.04\\n'):
+                               return_value='ID=ubuntu\nVERSION_ID=26.04\n'):
             with self.assertRaises(tx.TransactionBlocked):
                 a.verify_host()
 
