@@ -21,6 +21,8 @@ import time
 import uuid
 
 import command2_disposable_snapshot_revert_probe as once
+import command2_disposable_guest_marker as marker
+import ipaddress
 
 LOCK = Path("/run/lock/cape-command2-two-cycle-revert.lock")
 DEFAULT_RECEIPTS = Path("/var/lib/cape-command2-two-cycle-receipts")
@@ -116,13 +118,50 @@ def plan(host, journal, vm, bundle, sha):
     identity = {name: checked[name] for name in fields}
     digest = hashlib.sha256(json.dumps(
         identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    gateway = str(ipaddress.IPv4Network(checked["subnet"]).network_address + 1)
     return {"result": "COMMAND2_TWO_BENIGN_REVERT_PLAN_ONLY",
             "host": host, "vm": vm, "snapshot": checked["snapshot"],
+            "guest_ip": checked["guest_ip"], "bridge_ip": gateway,
             "identity_sha256": digest, "cold_manifest_sha256": sha,
             "cycles_planned": 2, "host_modified": False,
             "running_snapshot_revert_tested": False,
             "TPM_UEFI_full_state_revert_proven": False,
             "safe_for_malware": False}
+
+
+def wait_agent_after_boot(ip, timeout=300):
+    need(60 <= timeout <= 600, "Invalid bounded Agent boot timeout")
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            state = once.agent.probe_agent(ip)
+            need(state.get("result") ==
+                 "COMMAND2_CAPE_AGENT_READONLY_VERIFIED",
+                 "Guest CAPE Agent response not accepted")
+            return True
+        except once.agent.AgentBlocked as error:
+            need(time.monotonic() < deadline,
+                 "Windows Agent not ready after benign isolated boot")
+            time.sleep(5)
+
+
+def seed_marker_from_stopped_guest(vm, ip, bridge_ip):
+    need(once.virsh("domstate", vm).lower() == "shut off",
+         "Disposable guest not shut off before initial disk mutation")
+    # Only the previously admitted isolated guest may start. No other
+    # guests are running; caller has just checked the full isolation plan.
+    once.virsh("start", vm)
+    need(once.virsh("domstate", vm).lower() == "running",
+         "Guest did not start for benign marker challenge")
+    wait_agent_after_boot(ip)
+    need(marker.read_marker(ip, bridge_ip) is False,
+         "Preexisting benign disk marker; refuse to overwrite")
+    need(marker.create_marker(ip, bridge_ip) is True and
+         marker.read_marker(ip, bridge_ip) is True,
+         "Windows benign disk mutation not verified")
+    need(shut_down_without_force(vm),
+         "Initial Windows benign marker boot did not stop gracefully")
+    return True
 
 
 def lock():
@@ -143,7 +182,8 @@ def lock():
         raise
 
 
-def run(host, journal, vm, bundle, sha, receipts):
+def run(host, journal, vm, bundle, sha, receipts, *,
+        prove_disk_marker=False):
     need(os.geteuid() == 0 and sys.stdin.isatty(),
          "Interactive approved other-host root operator required")
     initial = plan(host, journal, vm, bundle, sha)
@@ -157,6 +197,7 @@ def run(host, journal, vm, bundle, sha, receipts):
     target = folder / ("two-reverts." + vm + "." + uuid.uuid4().hex + ".json")
     receipt = {
         "result": "TWO_CYCLE_BENIGN_STARTED", "host": host, "vm": vm,
+        "disk_marker_challenge_requested": prove_disk_marker,
         "snapshot": initial["snapshot"], "identity_sha256": initial["identity_sha256"],
         "cycles": [], "in_progress": None,
         "TPM_UEFI_full_state_revert_proven": False, "safe_for_malware": False,
@@ -165,6 +206,17 @@ def run(host, journal, vm, bundle, sha, receipts):
     write_receipt(target, receipt, initial=True)
     fd = lock()
     try:
+        if prove_disk_marker:
+            receipt["in_progress"] = "prepare_benign_disk_challenge"
+            write_receipt(target, receipt)
+            need(seed_marker_from_stopped_guest(
+                vm, initial["guest_ip"], initial["bridge_ip"]),
+                "Failed to prove pre-snapshot disk mutation")
+            need(plan(host, journal, vm, bundle, sha) == initial,
+                 "Guest/source/isolated network drifted after marker seeding")
+            receipt["initial_disk_marker_created"] = True
+            receipt["in_progress"] = None
+            write_receipt(target, receipt)
         for cycle in (1, 2):
             fresh = plan(host, journal, vm, bundle, sha)
             need(fresh["identity_sha256"] == initial["identity_sha256"],
@@ -179,6 +231,18 @@ def run(host, journal, vm, bundle, sha, receipts):
                  result.get("guest_running_after_revert") is True and
                  result.get("post_revert_agent_http_verified") is True,
                  "One revert failed to restore Windows Agent in running VM")
+            if prove_disk_marker:
+                need(marker.read_marker(initial["guest_ip"],
+                                        initial["bridge_ip"]) is False,
+                     "Windows marker persisted after snapshot-revert")
+                if cycle == 1:
+                    # Seed a different after-snapshot mutation before the
+                    # second revert; verify that it also gets reverted.
+                    need(marker.create_marker(initial["guest_ip"],
+                                              initial["bridge_ip"]) is True and
+                         marker.read_marker(initial["guest_ip"],
+                                            initial["bridge_ip"]) is True,
+                         "Cycle-2 marker not created and verified")
             receipt["in_progress"] = "graceful_shutdown_" + str(cycle)
             write_receipt(target, receipt)
             need(shut_down_without_force(vm),
@@ -189,6 +253,7 @@ def run(host, journal, vm, bundle, sha, receipts):
             receipt["cycles"].append({
                 "cycle": cycle, "revert_verified_running": True,
                 "Agent_http_verified": True, "clean_shutdown_verified": True,
+                "Windows_disk_mutation_reverted": bool(prove_disk_marker),
             })
             receipt["in_progress"] = None
             write_receipt(target, receipt)
@@ -200,7 +265,7 @@ def run(host, journal, vm, bundle, sha, receipts):
                 "Windows_agent_worked_both_times": True,
                 "guest_off_final": True,
                 "TPM_UEFI_full_state_revert_proven": False,
-                "disk_mutation_rollback_proven": False,
+                "disk_mutation_rollback_proven": bool(prove_disk_marker),
                 "physical_egress_containment_proven": False,
                 "production_ready": False}
     except Exception as error:
@@ -222,6 +287,8 @@ def main():
     p.add_argument("--recovery-bundle", required=True, type=Path)
     p.add_argument("--manifest-sha256", required=True)
     p.add_argument("--receipt-dir", type=Path, default=DEFAULT_RECEIPTS)
+    p.add_argument("--prove-disk-marker", action="store_true",
+                   help="Boot disposable guest once and verify actual harmless Windows disk mutation reverses twice")
     args = p.parse_args()
     try:
         report = (plan(args.approved_host, args.journal, args.vm,
@@ -229,7 +296,8 @@ def main():
                   if args.mode == "plan" else
                   run(args.approved_host, args.journal, args.vm,
                       args.recovery_bundle, args.manifest_sha256,
-                      args.receipt_dir))
+                      args.receipt_dir,
+                      prove_disk_marker=args.prove_disk_marker))
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
     except (TwoCycleBlocked, once.RevertBlocked, OSError, ValueError,
