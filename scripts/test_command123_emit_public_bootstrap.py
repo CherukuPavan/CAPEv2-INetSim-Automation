@@ -53,7 +53,8 @@ class PublicBootstrapTests(unittest.TestCase):
         try:
             sys.argv=["verified-public-source","--revision",REV,"--public"]
             with mock.patch.object(checkout.os,"geteuid",return_value=1000), \
-                 mock.patch.object(checkout.sys.stdin,"isatty",return_value=True), \
+                 mock.patch.object(checkout.sys.stdin,"isatty",return_value=False), \
+                 mock.patch.object(checkout,"has_controlling_tty",return_value=True), \
                  mock.patch.object(checkout.os,"uname",return_value=SimpleNamespace(
                      machine="x86_64")), \
                  mock.patch.object(checkout.getpass,"getpass",
