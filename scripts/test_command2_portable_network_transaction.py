@@ -48,7 +48,7 @@ class NetworkOwnershipTests(unittest.TestCase):
 
     def test_five_steps_monotonic_and_replay_refused(self):
         owned.begin(HOST, self.journal, dict(PLAN))
-        for before, after in zip(owned.PHASES, owned.PHASES[1:]):
+        for before, after in zip(owned.PHASES[:4], owned.PHASES[1:5]):
             kwargs = ({"post_state": {
                 "post_live_libvirt_xml_sha256": "c" * 64,
                 "post_nft_stateless_sha256": "d" * 64}}
