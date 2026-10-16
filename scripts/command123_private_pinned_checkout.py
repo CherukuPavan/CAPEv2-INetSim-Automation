@@ -255,7 +255,7 @@ def acquire(commit_sha: str, token: str, home: Path) -> Path:
         raise
 
 
-def main():
+def main(*, bootstrap_token=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--revision", required=True)
     args = parser.parse_args()
@@ -264,7 +264,10 @@ def main():
                 "Run on a local non-root interactive terminal")
         require(os.uname().machine == "x86_64",
                 "Checkout only supported on x86_64")
-        token = getpass.getpass("GitHub fine-grained read-only token: ")
+        # The one-command private bootstrap may pass the token in memory;
+        # never place it in argv, an environment variable or a temp file.
+        token = (bootstrap_token if bootstrap_token is not None else
+                 getpass.getpass("GitHub fine-grained read-only token: "))
         result = acquire(args.revision, token, Path.home())
         print(json.dumps({"result": "VERIFIED_PRIVATE_SOURCE_ONLY",
                           "path": str(result),
