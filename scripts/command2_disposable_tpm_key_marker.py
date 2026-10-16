@@ -77,7 +77,10 @@ def script_for(vm, mode):
 
 def execute(ip, bridge, vm, mode):
     need(mode in ("read", "create"), "Invalid CNG TPM marker action")
-    dst, src = disk.checked_ips(ip, bridge)
+    try:
+        dst, src = disk.checked_ips(ip, bridge)
+    except disk.MarkerBlocked as error:
+        raise TPMKeyBlocked("Isolated Windows TPM probe destination rejected") from error
     code = script_for(vm, mode)
     # Windows PowerShell's -EncodedCommand uses UTF-16-LE, and *only* our
     # fixed, reviewable command is encoded. Avoid ExecutionPolicy bypass.
