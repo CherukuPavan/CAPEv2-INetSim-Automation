@@ -74,7 +74,7 @@ class TwoCycleTests(unittest.TestCase):
     def test_graceful_shutdown_timeout_fails_closed(self):
         with mock.patch.object(m.once, "virsh", return_value="running"), \
              mock.patch.object(m.time, "monotonic",
-                               side_effect=[10.0, 61.0]), \
+                               side_effect=[10.0, 71.0]), \
              mock.patch.object(m.time, "sleep"):
             with self.assertRaisesRegex(m.TwoCycleBlocked,
                                         "did not shut down"):
