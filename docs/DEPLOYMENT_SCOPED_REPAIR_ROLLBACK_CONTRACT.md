@@ -182,6 +182,21 @@ named nft inet table**. Every change is journaled; partial errors halt
 without retry. It never flushes the global nft ruleset, touches the
 libvirt default NAT network, deletes VM disks or modifies SSL55/SSL46.
 Offline mocked unit tests and CI validate ordering and refusal behavior.
+The 2026-10-16 additional bridge dependency gates reject any foreign libvirt
+guest using the network by name or directly attaching the Linux bridge,
+including macvtap and explicit device/target references. The rollback also
+requires that `ip -j link show master cape-lab0` report **no** host TAP,
+veth or other enslaved interfaces, refusing malformed or unavailable
+kernel inventory; other guests and services must remain stopped.
+
+The 2026-10-16 staged-clone rollback also now verifies the clone's
+independent 64-GiB QCOW2 metadata before undefining it. Its read-only
+foreign-disk audit uses QEMU's full `qemu-img info --backing-chain` to
+reject **indirect** references to the clone's disk or UEFI state through
+another libvirt guest's storage chain, including symlink aliases. Opaque,
+missing, remote or uninspectable foreign storage prevents automatic removal
+instead of assuming independence. This is a pre-undefine refusal guard,
+NOT first-boot, saved-RAM or swtpm-state rollback; those remain blocked.
 
 This is a SEPARATE *resource-scoped* undo mechanism; the comprehensive
 `command123_scoped_recovery.py` still does NOT orchestrate it, because
