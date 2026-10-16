@@ -6,7 +6,7 @@ Ubuntu 24.04 stages ONLY the prior seven base prerequisites. Official Ubuntu
 after positive version admission. The operator must separately approve before
 mutation; full dpkg inventory is journaled. No guest/TPM state is touched and
 no complete CAPE or running-snapshot deployment is claimed.
-""
+"""
 from __future__ import annotations
 
 import argparse
