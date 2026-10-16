@@ -91,8 +91,17 @@ def no_guest_using_network():
                 need(target.get("dev") != network.BRIDGE,
                      "A VM still references isolated network/bridge; "
                      "remove owned VM first")
-    need(not virsh("list", "--name").strip(),
-         "Running VM detected; no network deletion authorized")
+    # --name without --all checks only running guests: a PAUSED or
+    # PM-suspended guest still owns domain/device state and must block
+    # isolated-bridge removal, even if it uses another libvirt network.
+    for vm in rows:
+        need(virsh("domstate", vm).strip().lower() == "shut off",
+             "Non-shutoff (paused/suspended/running) VM detected; "
+             "no network deletion authorized")
+    again = [v.strip() for v in
+             virsh("list", "--all", "--name").splitlines() if v.strip()]
+    need(tuple(sorted(again)) == tuple(sorted(rows)),
+         "Libvirt guest inventory changed during network rollback admission")
 
 
 def require_empty_kernel_bridge():
