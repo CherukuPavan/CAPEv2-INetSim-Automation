@@ -202,7 +202,8 @@ class CheckoutTests(unittest.TestCase):
         try:
             sys.argv=["pinned-checkout", "--revision", REV, "--public"]
             with mock.patch.object(c.os, "geteuid", return_value=1000), \
-                 mock.patch.object(c.sys.stdin, "isatty", return_value=True), \
+                 mock.patch.object(c.sys.stdin, "isatty", return_value=False), \
+                 mock.patch.object(c, "has_controlling_tty", return_value=True), \
                  mock.patch.object(c.os, "uname", return_value=SimpleNamespace(
                      machine="x86_64")), \
                  mock.patch.object(c.getpass, "getpass",
