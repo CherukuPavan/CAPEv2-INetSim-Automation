@@ -2,6 +2,8 @@
 import hashlib
 import io
 import json
+import sys
+from types import SimpleNamespace
 from pathlib import Path
 import tarfile
 import tempfile
@@ -147,6 +149,71 @@ class CheckoutTests(unittest.TestCase):
                 self.assertEqual((root / "README.md").read_bytes(), SOURCE["README.md"])
                 with self.assertRaises(c.CheckoutBlocked):
                     c.acquire(REV, "dummy-secret-token", home)
+
+    def test_public_request_headers_never_include_credentials(self):
+        h = c.request_headers(None)
+        self.assertNotIn("Authorization", h)
+        self.assertEqual(h["Accept"], "application/vnd.github+json")
+        self.assertEqual(c.request_headers("test-secrettoken")["Authorization"],
+                         "Bearer test-secrettoken")
+        for bad in ("", "short", "a" * 501, "fake\\nsecret", "fake\\rsecret"):
+            with self.subTest(bad=repr(bad)), self.assertRaises(
+                    c.CheckoutBlocked):
+                c.request_headers(bad)
+
+    def test_public_api_calls_use_exact_pinned_commit_without_token(self):
+        def response(request, timeout):
+            headers = {key.lower(): val for key, val in request.header_items()}
+            self.assertNotIn("authorization", headers)
+            self.assertTrue(request.full_url.startswith(c.API + "/git/"))
+            return io.BytesIO(b'{"sha":"verified"}')
+        with mock.patch.object(c, "urlopen", side_effect=response) as opened:
+            result = c.api_json("/git/commits/" + REV, None)
+        self.assertEqual(result["sha"], "verified")
+        self.assertEqual(opened.call_count, 1)
+        for bad in ("/git/commits/" + REV + "?ref=main",
+                    "/contents/README.md", "/git/trees/" + TREE + "?other=1"):
+            with self.subTest(path=bad), self.assertRaises(c.CheckoutBlocked):
+                c.api_json(bad, None)
+
+    def test_public_checkout_is_verified_without_token(self):
+        with tempfile.TemporaryDirectory() as temp:
+            def save_archive(sha, token, folder):
+                self.assertIsNone(token)
+                destination = folder / "public.tar.gz"
+                destination.write_bytes(build_tar())
+                return destination
+            def load_tree(sha, token):
+                self.assertIsNone(token)
+                return entries()
+            with mock.patch.object(c, "tree_entries",
+                                   side_effect=load_tree), \\
+                 mock.patch.object(c, "archive_to_temp",
+                                   side_effect=save_archive):
+                root=c.acquire(REV, None, Path(temp))
+                self.assertEqual(root.name, REV)
+                self.assertEqual((root / "scripts/deploy.sh").read_bytes(),
+                                 SOURCE["scripts/deploy.sh"])
+                with self.assertRaises(c.CheckoutBlocked):
+                    c.acquire(REV,None,Path(temp))
+
+    def test_public_cli_never_prompts_or_receives_private_token(self):
+        original_argv = sys.argv
+        try:
+            sys.argv=["pinned-checkout", "--revision", REV, "--public"]
+            with mock.patch.object(c.os, "geteuid", return_value=1000), \\
+                 mock.patch.object(c.sys.stdin, "isatty", return_value=True), \\
+                 mock.patch.object(c.os, "uname", return_value=SimpleNamespace(
+                     machine="x86_64")), \\
+                 mock.patch.object(c.getpass, "getpass",
+                     side_effect=AssertionError("Public checkout must not ask for GitHub token")), \\
+                 mock.patch.object(c, "acquire",
+                     return_value=Path("/tmp/public/"+REV)) as acquire:
+                self.assertEqual(c.main(), 0)
+                acquire.assert_called_once_with(REV, None, Path.home())
+                self.assertEqual(c.main(bootstrap_token="secret-test-token"), 2)
+        finally:
+            sys.argv=original_argv
 
     def test_redirect_fails_closed_on_unapproved_origin(self):
         headers = {"Location": "https://other.example/" + REV}
