@@ -190,6 +190,32 @@ must follow independent guest removal. It is NOT a deployment-wide
 rollback. Physical L2, IPv4, IPv6 and reboot isolation still require
 real-host packet-path and persistence acceptance.
 
+**2026-10-16 VM-scoped reverse staging:** a new guarded
+`scripts/command2_portable_zero_nic_rollback.py` permits undo of **only**
+an untouched, NEVER-started, SHUT-OFF `win11_1..16` clone that still has
+exactly the original independent QCOW2 OS disk, OVMF NVRAM and zero NICs
+with no snapshots, managed RAM save or initialized swtpm state. This is
+verified against the canonical root-private before/complete staging
+receipts, libvirt UUID/Generation-ID, domain XML, master shut-off, full
+domain inventory and other domains' disk/firmware references. If any
+guest, NIC, TPM state, snapshot, identity or filesystem attribution is
+uncertain, undo is refused. The operator must type approval directly as
+root. Before undefining **only** the owned domain with `--keep-nvram`,
+the script fsyncs a root-private pre-undo receipt. It preserves QCOW2 and
+UEFI bytes by same-directory, no-overwrite hardlink/quarantine (never
+`rm -rf`), compares full SHA256 digests and journals each monotonic
+step. Failures retain partial-state evidence; they are NOT automatically
+retried. This phase is exposed as `zero-nic-rollback` by the guarded
+Command2 workflow. CI includes synthetic actual filesystem-quarantine
+and mocked libvirt undefine/partial failure/refusal tests.
+
+**Limitations:** this deliberately CANNOT undo a VM after first Windows
+boot, network attachment, swtpm initialization, running snapshots or
+malware analysis; their true guest-specific TPM/UEFI/storage/network
+provenance and reversible shutdown are still required for deployment-wide
+rollback. This is a safe incremental subset, not completed Command2
+rollback. Protected SSL55 source and SSL46 backup hosts are blocked.
+
 **These are NOT final release features.** The new ledger does NOT yet
 automatically start inside a fully implemented fresh-host Command 1
 bootstrap; it cannot safely undo other CAPE dependencies/packages,
