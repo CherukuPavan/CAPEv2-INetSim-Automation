@@ -107,14 +107,36 @@ new files, with service/guest stop checks and durable partial-state receipts.
 five config changes to an already-begun transaction via the OPTIONAL
 `--deployment-transaction` flag; it never fabricates a Command 1 baseline.
 
+**2026-10-16 additional incremental changes:** the transaction manager
+now securely stores a single root-private `active.json` pointer after
+writing its initial ledger. Later stages can resolve the same host-bound
+transaction without requiring the operator to copy an ID. Repeated first
+command initialization while that pointer exists is refused. A
+`--use-active-transaction` option is wired into the guarded Command 1
+base-prerequisite stage and Command 3 five-config workflow.
+
+`scripts/command123_tracked_prereqs.py` now simulates APT and rejects
+planned upgrades/removals before installing seven reviewed Ubuntu 24.04
+base packages. It inventories the ENTIRE installed dpkg database before
+and after, journal-stores exact private snapshots and transitive additions,
+and marks partial/unexpected operations unowned and non-retryable. The
+newly observed package ownership is evidence **only**: safe unattended APT
+removal, external repository/source provenance, dependency reversal and
+associated systemd state restoration are **NOT IMPLEMENTED**.
+
+File recovery now permits positively verified *missing* CAPE units (as
+distinct from active/failed/ambiguous units); a running libvirt guest still
+blocks the operation. The current source code includes isolated unit and
+integrated regression tests, but there is NO physical guest qualification.
+
 **These are NOT final release features.** The new ledger does NOT yet
-automatically start inside the future Command 1 bootstrap; it cannot
-attribute package installations, account changes, VM disks/TPM, networks,
-firewall policy or systemd service enable/running state, and intentionally
-marks all those categories unsupported rather than attempting removal.
-There is no three-command deployment-wide undo, complete host repair, or
-genuine hardware qualification. Offline regression success only verifies
-software behavior under controlled test fixtures.
+automatically start inside a fully implemented fresh-host Command 1
+bootstrap; it cannot safely roll back packages, user/account changes,
+VM disks/TPM, networks, firewall policy or systemd enable/running state,
+and intentionally marks those resource categories unsupported rather
+than attempting removal. There is no three-command deployment-wide undo,
+complete host repair, or genuine hardware qualification. Offline
+regression success only verifies software behavior under test fixtures.
 
 The earlier `scripts/command123_repair_rollback.py` remains a separately
 guarded reversible **six CAPE-configuration-files-only** tool. It can capture a root-private
