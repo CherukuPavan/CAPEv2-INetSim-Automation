@@ -38,7 +38,11 @@ jobs:
           done
           virsh -c qemu:///system version
           test -z "$(virsh -c qemu:///system list --all --name)"
-          test -z "$(virsh -c qemu:///system net-list --all --name)"
+          # Distro libvirt-daemon-config-network creates a default NAT
+          # definition on first installation. No guest NIC is attached in
+          # this disposable lab; report that package side effect instead
+          # of pretending the host network inventory is empty.
+          virsh -c qemu:///system net-list --all
       - name: Test actual libvirt full-system RUNNING snapshot and two reverts without guest NIC
         env:
           PYTHONPATH: scripts
