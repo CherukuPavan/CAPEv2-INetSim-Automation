@@ -58,6 +58,64 @@ class BaseCommand1Tests(unittest.TestCase):
             self.assertFalse(done["full_CAPEv2_installed"])
             self.assertFalse(done["full_deployment_rollback_ready"])
 
+    def test_combined_command1_stages_pinned_source_after_base_apt(self):
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            self.common(stack)
+            stack.enter_context(mock.patch.object(
+                c.source, "safe_root"))
+            stack.enter_context(mock.patch("builtins.input",
+                return_value="BEGIN-CAPE-DEPLOYMENT-ON-RAKSHATI"))
+            steps = []
+            stack.enter_context(mock.patch.object(
+                c.tx, "begin", side_effect=lambda *a:
+                    steps.append("begin") or
+                    {"transaction_id": "c" * 32}))
+            stack.enter_context(mock.patch.object(
+                c.packages, "apply", side_effect=lambda *a:
+                    steps.append("apt") or
+                    {"result": "CAPE_BASE_APT_INSTALLED_AND_PROVEN"}))
+            stage = stack.enter_context(mock.patch.object(
+                c.source, "install", side_effect=lambda *a:
+                    steps.append("cape_source") or
+                    {"result": "COMMAND1_CAPE_PINNED_SOURCE_STAGED_ONLY"}))
+            result = c.apply("rakshati", "d" * 40)
+        self.assertEqual(steps, ["begin", "apt", "cape_source"])
+        stage.assert_called_once_with("rakshati", "c" * 32, "d" * 40)
+        self.assertTrue(result["exact_public_source_staged"])
+        self.assertFalse(result["full_CAPEv2_installed"])
+        self.assertFalse(result["VM_snapshots_ready"])
+
+    def test_unpinned_combined_source_refused_before_any_mutation(self):
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            self.common(stack)
+            start = stack.enter_context(mock.patch.object(c.tx, "begin"))
+            with self.assertRaises(tx.TransactionBlocked):
+                c.apply("rakshati", "development")
+            start.assert_not_called()
+
+    def test_source_failure_retains_apt_receipt_without_retry(self):
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            self.common(stack)
+            stack.enter_context(mock.patch.object(
+                c.source, "safe_root"))
+            stack.enter_context(mock.patch("builtins.input",
+                return_value="BEGIN-CAPE-DEPLOYMENT-ON-RAKSHATI"))
+            begin = stack.enter_context(mock.patch.object(
+                c.tx, "begin", return_value={"transaction_id": "e" * 32}))
+            apt = stack.enter_context(mock.patch.object(
+                c.packages, "apply", return_value={
+                    "result": "CAPE_BASE_APT_INSTALLED_AND_PROVEN"}))
+            stack.enter_context(mock.patch.object(
+                c.source, "install",
+                side_effect=c.source.SourceBlocked("incomplete checkout")))
+            with self.assertRaisesRegex(tx.TransactionBlocked, "source stage"):
+                c.apply("rakshati", "f" * 40)
+            begin.assert_called_once()
+            apt.assert_called_once()
+
     def test_operator_decline_does_not_create_transaction(self):
         from contextlib import ExitStack
         with ExitStack() as stack:
