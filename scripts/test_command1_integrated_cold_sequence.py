@@ -37,6 +37,31 @@ class IntegratedColdTests(unittest.TestCase):
         self.plan={"result":"COMMAND1_INTEGRATED_COLD_SEQUENCE_PLAN_ONLY",
                    "host":self.args.approved_host,"host_modified":False}
 
+    def test_partial_offline_python_profile_is_rejected_before_change(self):
+        self.args.runtime_manifest=self.path/"manifest.json"
+        with self.assertRaisesRegex(seq.IntegratedBlocked,
+                                    "Partial CAPE runtime input"):
+            seq.phases_for(self.args)
+        with mock.patch.object(seq.base,"apply") as mutate:
+            with self.assertRaisesRegex(seq.IntegratedBlocked,
+                                        "Partial CAPE runtime input"):
+                seq.execute(self.args)
+        mutate.assert_not_called()
+
+    def test_full_runtime_profile_appears_in_readonly_phase_order(self):
+        for key in seq.RUNTIME_FIELDS:
+            setattr(self.args,key,
+                    ("a"*64 if "sha256" in key else self.path/key))
+        self.assertEqual(
+            seq.phases_for(self.args),
+            (seq.PHASES[0],seq.RUNTIME_PHASE,seq.PHASES[1]))
+        with mock.patch.object(seq.base,"apply") as mutate:
+            with self.assertRaisesRegex(
+                    seq.IntegratedBlocked,
+                    "not wired into the executor"):
+                seq.execute(self.args)
+        mutate.assert_not_called()
+
     def test_admission_checks_credentials_before_base_transaction(self):
         with ExitStack() as st:
             st.enter_context(mock.patch.object(seq.os,"geteuid",return_value=0))
