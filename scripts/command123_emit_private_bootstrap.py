@@ -59,7 +59,12 @@ try:
     doc = json.loads(doc_bytes)
     if doc.get("encoding") != "base64" or doc.get("sha") != EXPECTED_HELPER_BLOB:
         raise ValueError("Pinned helper metadata mismatch")
-    data = base64.b64decode(doc["content"], validate=True)
+    encoded = doc.get("content")
+    if not isinstance(encoded, str) or len(encoded) > 100000:
+        raise ValueError("Invalid GitHub base64 source payload")
+    # GitHub Contents API folds Base64 with CR/LF. Validate every remaining
+    # character rather than accepting arbitrary whitespace or extra bytes.
+    data = base64.b64decode("".join(encoded.splitlines()), validate=True)
     if len(data) > 65536:
         raise ValueError("Pinned helper code too large")
     got = hashlib.sha1(
