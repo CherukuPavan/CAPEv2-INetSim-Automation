@@ -63,6 +63,7 @@ class TrackedAPTTests(unittest.TestCase):
         self.assertTrue(set(a.VIRT26) <= set(result["requested_missing"]))
         self.assertFalse(result["snapshot_stack_authorized"])
         self.assertIn("qemu-system-x86", result["requested_missing"])
+        self.assertIn("rclone", result["requested_missing"])
         candidates.assert_called_once()
         simulate.assert_called_once()
 
