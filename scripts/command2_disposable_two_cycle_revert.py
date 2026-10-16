@@ -22,6 +22,7 @@ import uuid
 
 import command2_disposable_snapshot_revert_probe as once
 import command2_disposable_guest_marker as marker
+import command2_disposable_tpm_key_marker as tpm_key
 import ipaddress
 
 LOCK = Path("/run/lock/cape-command2-two-cycle-revert.lock")
@@ -145,7 +146,10 @@ def wait_agent_after_boot(ip, timeout=300):
             time.sleep(5)
 
 
-def seed_marker_from_stopped_guest(vm, ip, bridge_ip):
+def seed_marker_from_stopped_guest(vm, ip, bridge_ip, *,
+                                   disk_probe=True, tpm_probe=False):
+    need(type(disk_probe) is bool and type(tpm_probe) is bool and
+         (disk_probe or tpm_probe), "No reviewed guest challenge selected")
     need(once.virsh("domstate", vm).lower() == "shut off",
          "Disposable guest not shut off before initial disk mutation")
     # Only the previously admitted isolated guest may start. No other
@@ -154,11 +158,18 @@ def seed_marker_from_stopped_guest(vm, ip, bridge_ip):
     need(once.virsh("domstate", vm).lower() == "running",
          "Guest did not start for benign marker challenge")
     wait_agent_after_boot(ip)
-    need(marker.read_marker(ip, bridge_ip) is False,
-         "Preexisting benign disk marker; refuse to overwrite")
-    need(marker.create_marker(ip, bridge_ip) is True and
-         marker.read_marker(ip, bridge_ip) is True,
-         "Windows benign disk mutation not verified")
+    if disk_probe:
+        need(marker.read_marker(ip, bridge_ip) is False,
+             "Preexisting benign disk marker; refuse to overwrite")
+        need(marker.create_marker(ip, bridge_ip) is True and
+             marker.read_marker(ip, bridge_ip) is True,
+             "Windows benign disk mutation not verified")
+    if tpm_probe:
+        need(tpm_key.key_exists(ip, bridge_ip, vm) is False,
+             "Preexisting TPM CNG key; refuse to overwrite")
+        need(tpm_key.create_key(ip, bridge_ip, vm) is True and
+             tpm_key.key_exists(ip, bridge_ip, vm) is True,
+             "Windows TPM-backed benign key mutation not verified")
     need(shut_down_without_force(vm),
          "Initial Windows benign marker boot did not stop gracefully")
     return True
@@ -183,7 +194,7 @@ def lock():
 
 
 def run(host, journal, vm, bundle, sha, receipts, *,
-        prove_disk_marker=False):
+        prove_disk_marker=False, prove_tpm_key=False):
     need(os.geteuid() == 0 and sys.stdin.isatty(),
          "Interactive approved other-host root operator required")
     initial = plan(host, journal, vm, bundle, sha)
@@ -198,6 +209,7 @@ def run(host, journal, vm, bundle, sha, receipts, *,
     receipt = {
         "result": "TWO_CYCLE_BENIGN_STARTED", "host": host, "vm": vm,
         "disk_marker_challenge_requested": prove_disk_marker,
+        "tpm_cng_key_challenge_requested": prove_tpm_key,
         "snapshot": initial["snapshot"], "identity_sha256": initial["identity_sha256"],
         "cycles": [], "in_progress": None,
         "TPM_UEFI_full_state_revert_proven": False, "safe_for_malware": False,
@@ -206,15 +218,18 @@ def run(host, journal, vm, bundle, sha, receipts, *,
     write_receipt(target, receipt, initial=True)
     fd = lock()
     try:
-        if prove_disk_marker:
-            receipt["in_progress"] = "prepare_benign_disk_challenge"
+        if prove_disk_marker or prove_tpm_key:
+            receipt["in_progress"] = "prepare_benign_guest_challenges"
             write_receipt(target, receipt)
             need(seed_marker_from_stopped_guest(
-                vm, initial["guest_ip"], initial["bridge_ip"]),
+                vm, initial["guest_ip"], initial["bridge_ip"],
+                disk_probe=bool(prove_disk_marker),
+                tpm_probe=bool(prove_tpm_key)),
                 "Failed to prove pre-snapshot disk mutation")
             need(plan(host, journal, vm, bundle, sha) == initial,
                  "Guest/source/isolated network drifted after marker seeding")
-            receipt["initial_disk_marker_created"] = True
+            receipt["initial_disk_marker_created"] = bool(prove_disk_marker)
+            receipt["initial_tpm_cng_key_created"] = bool(prove_tpm_key)
             receipt["in_progress"] = None
             write_receipt(target, receipt)
         for cycle in (1, 2):
@@ -243,6 +258,16 @@ def run(host, journal, vm, bundle, sha, receipts, *,
                          marker.read_marker(initial["guest_ip"],
                                             initial["bridge_ip"]) is True,
                          "Cycle-2 marker not created and verified")
+            if prove_tpm_key:
+                need(tpm_key.key_exists(initial["guest_ip"],
+                                        initial["bridge_ip"], vm) is False,
+                     "Windows TPM-backed marker key persisted after revert")
+                if cycle == 1:
+                    need(tpm_key.create_key(initial["guest_ip"],
+                                            initial["bridge_ip"], vm) is True and
+                         tpm_key.key_exists(initial["guest_ip"],
+                                            initial["bridge_ip"], vm) is True,
+                         "Cycle-2 TPM marker key not created and verified")
             receipt["in_progress"] = "graceful_shutdown_" + str(cycle)
             write_receipt(target, receipt)
             need(shut_down_without_force(vm),
@@ -254,6 +279,8 @@ def run(host, journal, vm, bundle, sha, receipts, *,
                 "cycle": cycle, "revert_verified_running": True,
                 "Agent_http_verified": True, "clean_shutdown_verified": True,
                 "Windows_disk_mutation_reverted": bool(prove_disk_marker),
+                "Windows_platform_crypto_key_absent_after_revert":
+                    bool(prove_tpm_key),
             })
             receipt["in_progress"] = None
             write_receipt(target, receipt)
@@ -266,6 +293,8 @@ def run(host, journal, vm, bundle, sha, receipts, *,
                 "guest_off_final": True,
                 "TPM_UEFI_full_state_revert_proven": False,
                 "disk_mutation_rollback_proven": bool(prove_disk_marker),
+                "windows_tpm_backed_cng_key_rollback_tested":
+                    bool(prove_tpm_key),
                 "physical_egress_containment_proven": False,
                 "production_ready": False}
     except Exception as error:
@@ -288,7 +317,9 @@ def main():
     p.add_argument("--manifest-sha256", required=True)
     p.add_argument("--receipt-dir", type=Path, default=DEFAULT_RECEIPTS)
     p.add_argument("--prove-disk-marker", action="store_true",
-                   help="Boot disposable guest once and verify actual harmless Windows disk mutation reverses twice")
+                   help="Boot disposable guest and verify harmless Windows disk mutation reverses twice")
+    p.add_argument("--prove-tpm-key", action="store_true",
+                   help="Check a disposable Windows TPM Platform Crypto Provider key disappears on both restores; NOT full swtpm state proof")
     args = p.parse_args()
     try:
         report = (plan(args.approved_host, args.journal, args.vm,
@@ -297,7 +328,8 @@ def main():
                   run(args.approved_host, args.journal, args.vm,
                       args.recovery_bundle, args.manifest_sha256,
                       args.receipt_dir,
-                      prove_disk_marker=args.prove_disk_marker))
+                      prove_disk_marker=args.prove_disk_marker,
+                      prove_tpm_key=args.prove_tpm_key))
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
     except (TwoCycleBlocked, once.RevertBlocked, OSError, ValueError,
