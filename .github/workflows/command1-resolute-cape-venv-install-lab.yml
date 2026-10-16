@@ -47,9 +47,16 @@ jobs:
           test "$(git -C /tmp/cape-upstream rev-parse HEAD)" = "$UPSTREAM_REV"
           # Run SDist builders only in this disposable no-secrets runner:
           # install into /tmp/cape-py312, NEVER default Python3.14 or /opt/CAPE.
+          # CAPE's pyproject declares package-mode=false in Poetry.
+          # Editable CAPE install is deliberately invalid; install just the
+          # exact pinned dependency graph from PEP-621 metadata instead.
+          /tmp/cape-uv-tool/bin/uv pip compile \
+              --python /tmp/cape-py312/bin/python \
+              --output-file /tmp/cape-cp312-resolved.txt \
+              /tmp/cape-upstream/pyproject.toml
           /tmp/cape-uv-tool/bin/uv pip install \
               --python /tmp/cape-py312/bin/python \
-              --editable /tmp/cape-upstream
+              --requirement /tmp/cape-cp312-resolved.txt
           /tmp/cape-py312/bin/python - <<'PY'
           import sys
           import gevent, greenlet, django, sqlalchemy, yara
