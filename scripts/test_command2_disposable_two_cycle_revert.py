@@ -89,7 +89,9 @@ class TwoCycleTests(unittest.TestCase):
         report = {"result": "COMMAND2_TWO_BENIGN_REVERT_PLAN_ONLY",
                   "identity_sha256": "b" * 64,
                   "host": HOST, "vm": VM,
-                  "snapshot": "cape_ready_win11_1"}
+                  "snapshot": "cape_ready_win11_1",
+                  "guest_ip": "192.168.241.101",
+                  "bridge_ip": "192.168.241.1"}
         stack.enter_context(mock.patch.object(m.os, "geteuid",
                                                return_value=0))
         stack.enter_context(mock.patch.object(m.sys.stdin, "isatty",
