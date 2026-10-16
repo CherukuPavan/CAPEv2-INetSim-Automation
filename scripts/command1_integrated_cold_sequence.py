@@ -157,9 +157,6 @@ def preflight(args):
     }
 
 def execute(args):
-    need(runtime_arguments(args) is None,
-         "Optional offline runtime phase is not wired into the executor; "
-         "refusing a partial integrated deployment")
     need(sys.stdin.isatty(),"Use interactive root terminal")
     initial=preflight(args)
     print(json.dumps(initial,indent=2,sort_keys=True),flush=True)
@@ -189,6 +186,27 @@ def execute(args):
                 need(result.get("exact_public_source_staged") is True,
                      "Pinned CAPE source was not staged")
                 doc["transaction_id"]=result["transaction_id"]
+            elif phase == RUNTIME_PHASE:
+                fields=runtime_arguments(args)
+                need(fields is not None and doc.get("transaction_id"),
+                     "Runtime requires a tracked, sealed source transaction")
+                result=runtime.apply(
+                    args.approved_host,doc["transaction_id"],
+                    fields["runtime_manifest"],fields["runtime_lock"],
+                    fields["runtime_wheelhouse"],
+                    fields["runtime_approved_manifest_sha256"],
+                    fields["runtime_uv"],fields["runtime_approved_uv_sha256"],
+                    fields["runtime_python"],
+                    fields["runtime_approved_python_sha256"],
+                    getattr(args,"runtime_user","cape"))
+                need(result.get("result") ==
+                     "CAPE_ROOTLESS_OFFLINE_PY312_RUNTIME_INSTALLED" and
+                     result.get("transaction") == doc["transaction_id"] and
+                     result.get("packages") is not None and
+                     result["packages"] >= 160,
+                     "Offline pinned CAPE runtime receipt is incomplete")
+                doc["rootless_python_runtime_packages"]=result["packages"]
+                doc["rootless_python_runtime_venv"]=result["runtime"]
             else:
                 # Now QEMU/libvirt/rclone should be installed; the child
                 # performs its own full root/VM/TPM admission.
@@ -246,9 +264,10 @@ def main():
     p.add_argument("--receipt-dir",type=Path,default=RECEIPTS)
     p.add_argument("--handoff-receipt-dir",type=Path,
                    default=master.RECEIPTS)
-    # Read-only assessment of the signed/hard-pinned offline CAPE runtime
-    # is available. Execution of this optional phase is intentionally
-    # refused until its integrated rollback is physically qualified.
+    # Optional exact approved offline Python runtime assets must already
+    # be staged in root-protected storage and the service account must exist.
+    # Runtime.apply seals an owned transaction entry before master import.
+    # This remains an engineering cold substage, not a full CAPE installer.
     p.add_argument("--runtime-manifest",type=Path)
     p.add_argument("--runtime-lock",type=Path)
     p.add_argument("--runtime-wheelhouse",type=Path)
