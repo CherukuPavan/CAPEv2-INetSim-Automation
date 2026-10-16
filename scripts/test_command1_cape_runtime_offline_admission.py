@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import stat
 from pathlib import Path
 import tempfile
 import unittest
@@ -131,6 +132,36 @@ class WheelAdmissionTests(unittest.TestCase):
         self.rebuild()
         with self.assertRaisesRegex(subject.AdmissionBlocked,
                                     "Untrusted wheel ZIP member"):
+            self.check()
+
+    def test_reject_symlink_zip_member_even_with_approved_archive_hash(self):
+        target=self.wheels/self.packages["greenlet"][1]
+        target.unlink()
+        with zipfile.ZipFile(target,"w") as wheel:
+            regular=zipfile.ZipInfo("greenlet/__init__.py")
+            regular.create_system=3
+            regular.external_attr=(stat.S_IFREG | 0o644)<<16
+            wheel.writestr(regular,"ok = True")
+            link=zipfile.ZipInfo("greenlet/unsafe_link")
+            link.create_system=3
+            link.external_attr=(stat.S_IFLNK | 0o777)<<16
+            wheel.writestr(link,"../../outside")
+        self.rebuild()
+        with self.assertRaisesRegex(subject.AdmissionBlocked,
+                                    "Unsupported ZIP member type"):
+            self.check()
+
+    def test_reject_fifo_zip_member_even_with_approved_archive_hash(self):
+        target=self.wheels/self.packages["gevent"][1]
+        target.unlink()
+        with zipfile.ZipFile(target,"w") as wheel:
+            special=zipfile.ZipInfo("gevent/pipe")
+            special.create_system=3
+            special.external_attr=(stat.S_IFIFO | 0o644)<<16
+            wheel.writestr(special,b"")
+        self.rebuild()
+        with self.assertRaisesRegex(subject.AdmissionBlocked,
+                                    "Unsupported ZIP member type"):
             self.check()
 
     def test_cannot_review_unsafe_absolute_and_relative_file_paths(self):
