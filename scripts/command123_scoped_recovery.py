@@ -124,7 +124,7 @@ def run(host, txid):
         result = transaction.rollback_files_first(txid, host, True)
         need(result["transaction_still_active"] is True,
              "File rollback not verified")
-    if initial["source_rollback_needed"]:
+    if initial.get("source_rollback_needed", False):
         result = cape_source.undo(host, txid)
         need(result["result"] == "COMMAND1_OWNED_SOURCE_UNDEPLOYED_QUARANTINED",
              "Owned CAPE source checkout was not quarantined")
