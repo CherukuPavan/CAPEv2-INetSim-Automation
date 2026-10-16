@@ -241,6 +241,72 @@ def install(host, transaction, revision):
             ) from err
 
 
+def portable_quarantine_digest(directory):
+    """Digest ALL source and .git bytes without invoking Git or executable code.
+
+    This must work after package rollback has uninstalled a newly-added git
+    binary. Reject symlinks, specials, non-owned hardlinked files, excessive
+    paths or excessive size; never follow links outside the quarantine.
+    """
+    need(directory.is_absolute() and directory.is_dir() and
+         not directory.is_symlink(), "Invalid source quarantine root")
+    digest = hashlib.sha256()
+    stack = [(directory, "", 0)]
+    total_bytes = 0
+    entries_seen = 0
+    while stack:
+        current, prefix, depth = stack.pop()
+        need(depth <= 32, "Unexpectedly nested source quarantine")
+        discovered = []
+        with os.scandir(current) as stream:
+            for item in stream:
+                discovered.append(item)
+        for item in sorted(discovered, key=lambda entry: entry.name):
+            name = item.name
+            need(name not in (".", "..") and
+                 len(name.encode("utf-8")) < 1024,
+                 "Unsafe quarantine entry name")
+            relative = prefix + name
+            entries_seen += 1
+            need(entries_seen <= 40000, "Unreasonably large quarantine tree")
+            st = item.stat(follow_symlinks=False)
+            need(not stat.S_ISLNK(st.st_mode),
+                 "Quarantine contains symbolic links")
+            if stat.S_ISDIR(st.st_mode):
+                digest.update(b"D" + relative.encode("utf-8") + b"\0")
+                stack.append((Path(item.path), relative + "/", depth + 1))
+            else:
+                need(stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and
+                     st.st_size <= 512 * 1024 * 1024,
+                     "Quarantine contains unsafe file type or size")
+                total_bytes += st.st_size
+                need(total_bytes <= MAX_BYTES,
+                     "Quarantine exceeds source size guard")
+                content = hashlib.sha256()
+                fd = os.open(item.path, os.O_RDONLY | os.O_NOFOLLOW |
+                             os.O_CLOEXEC)
+                try:
+                    actual = os.fstat(fd)
+                    need(stat.S_ISREG(actual.st_mode) and
+                         actual.st_size == st.st_size and
+                         actual.st_ino == st.st_ino and
+                         actual.st_dev == st.st_dev,
+                         "Quarantine entry changed while opening")
+                    remaining = st.st_size
+                    while remaining:
+                        block = os.read(fd, min(1024 * 1024, remaining))
+                        need(bool(block), "Short read of quarantine entry")
+                        content.update(block)
+                        remaining -= len(block)
+                finally:
+                    os.close(fd)
+                digest.update(b"F" + relative.encode("utf-8") + b"\0")
+                digest.update(str(st.st_mode & 0o777).encode() + b"\0")
+                digest.update(content.digest())
+    need(entries_seen >= 2, "Empty source quarantine cannot be verified")
+    return digest.hexdigest()
+
+
 def source_entry(doc):
     matching = [row for row in doc["entries"]
                 if row.get("kind") == "cape_source"]
@@ -269,7 +335,11 @@ def undo_plan(host, transaction):
         need(not expected.exists() and not expected.is_symlink() and
              entry.get("quarantine") == str(quarantine) and
              quarantine.is_dir() and not quarantine.is_symlink() and
-             pristine(quarantine, entry["revision"]) == entry["after"],
+             type(entry.get("quarantine_content_sha256")) is str and
+             re.fullmatch(r"[0-9a-f]{64}",
+                          entry["quarantine_content_sha256"]) and
+             portable_quarantine_digest(quarantine) ==
+             entry["quarantine_content_sha256"],
              "Completed source undo quarantine no longer verified")
         action = "already_quarantined"
     else:
@@ -319,6 +389,11 @@ def undo(host, transaction):
             need(pristine(quarantine, entry["revision"]) == entry["after"] and
                  not target.exists() and not target.is_symlink(),
                  "Relocated source did not verify")
+            # Record a pure-Python digest while Git is still installed.
+            # Later APT removal of newly-installed Git does not prevent
+            # final transaction-level source verification.
+            entry["quarantine_content_sha256"] = portable_quarantine_digest(
+                quarantine)
             entry["status"] = "rollback_verified"
             entry["quarantine"] = str(quarantine)
             tx.atomic_receipt(receipt, doc)
