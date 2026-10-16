@@ -112,11 +112,19 @@
 > Do not modify source SSL55 Windows, source snapshots or GitHub `main`.
 
 
-> **2026-10-13 current development status — READ BEFORE NEW-HOST TEST**
-> This repository is **PRIVATE**; unauthenticated raw GitHub `curl`
-> will not fetch the scripts. Authenticate and pin the exact `development`
-> SHA using the [private code and encrypted master deployment handoff](
-> docs/PRIVATE_DEPLOYMENT_SOURCE_AND_GDRIVE_HANDOFF.md).
+> **2026-10-16 source-access correction — READ BEFORE NEW-HOST TEST**
+> GitHub currently reports this automation **repository as public**.
+> Source code can therefore be fetched without a GitHub login, but every
+> deployment must pin and verify an exact reviewed `development` commit,
+> not execute mutable branch-tip scripts blindly. Earlier instructions
+> saying the code repository was private are outdated. **This does NOT
+> grant access to the separately encrypted, access-controlled Windows
+> golden-master backup in Google Drive**: the target still needs an
+> approved unattended key-delivery and verification mechanism. Never
+> commit crypt passwords, rclone keys, OAuth tokens, service-account JSON
+> or Windows images. The [private master-access handoff](
+> docs/PRIVATE_DEPLOYMENT_SOURCE_AND_GDRIVE_HANDOFF.md) describes the
+> additional credential and master-image restrictions.
 > [SSL55 report review](docs/SSL55_REFERENCE_EVIDENCE_20261013.md) documents
 > the now-confirmed 48.41 GiB free space, active CAPE services,
 > unknown custom QEMU/libvirt package provenance, no proven INetSim
