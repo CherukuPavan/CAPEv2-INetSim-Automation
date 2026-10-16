@@ -44,6 +44,24 @@ jobs:
               assert downloaded == checked_out, path
           print("PUBLIC_EXACT_COMMIT_GIT_BLOBS_VERIFIED_NO_TOKEN")
           PY
+      - name: Execute exact paste-style public bootstrap under a controlling PTY
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          COMMIT_SHA="${GITHUB_SHA}"
+          HELPER_BLOB="$(git rev-parse "${COMMIT_SHA}:scripts/command123_private_pinned_checkout.py")"
+          python3 -B scripts/command123_emit_public_bootstrap.py \
+            --pinned-commit "$COMMIT_SHA" --helper-blob "$HELPER_BLOB" \
+            > "$RUNNER_TEMP/cape-paste-source.sh"
+          mkdir -m 0700 "$RUNNER_TEMP/paste-home"
+          env HOME="$RUNNER_TEMP/paste-home" \
+            script -q -e -c "bash '$RUNNER_TEMP/cape-paste-source.sh'" \
+              "$RUNNER_TEMP/cape-paste-tty.log"
+          cmp scripts/command123_private_pinned_checkout.py \
+            "$RUNNER_TEMP/paste-home/.local/share/cape-three-command/$COMMIT_SHA/scripts/command123_private_pinned_checkout.py"
+          echo "ONE_PASTE_HEREDOC_PUBLIC_BOOTSTRAP_PASS"
+
       - name: Do not bundle credentials, Windows master or TPM
         run: |
           python3 -B - <<'PY'
