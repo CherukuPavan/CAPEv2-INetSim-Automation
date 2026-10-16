@@ -87,6 +87,21 @@ class AutomaticSubnetSelection(unittest.TestCase):
 
 
 class PurePreflight(unittest.TestCase):
+    def test_signed_ubuntu26_candidate_is_admitted_readonly(self):
+        result = evaluate(os={"id":"ubuntu","version":"26.04"})
+        self.assertTrue(result["preflight_pass"])
+        self.assertFalse(result["deploy_authorized"])
+        self.assertFalse(result["template_windows_and_tpm_semantics_verified"])
+        self.assertFalse(result["guest_isolation_egress_tested"])
+
+    def test_protected_ssl46_is_detected_like_ssl55(self):
+        for name in ("ssl-46","CSE-SSL-46","ssl-55","CSE-SSL-55"):
+            with self.subTest(name=name), \
+                 patch.object(p.platform, "node", return_value=name):
+                self.assertTrue(p.local_ref_host())
+        with patch.object(p.platform,"node",return_value="other-26-04-host"):
+            self.assertFalse(p.local_ref_host())
+
     def test_good_target_host_is_still_not_authorized(self):
         result = evaluate()
         self.assertTrue(result["preflight_pass"])
