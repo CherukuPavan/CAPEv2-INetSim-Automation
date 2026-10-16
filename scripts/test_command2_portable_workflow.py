@@ -218,6 +218,19 @@ class Workflow(unittest.TestCase):
             self.assertNotIn("10.255.255.0/24",argv)
             self.assertTrue(result["not_production_release"])
 
+    def test_only_unstarted_zero_nic_clone_rollback_is_wired(self):
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td)
+            script,argv,meta=self.choose_fixture(j,rows,
+                        "zero-nic-rollback","apply")
+            self.assertEqual(script.name,
+                             "command2_portable_zero_nic_rollback.py")
+            self.assertEqual(argv[argv.index("--mode")+1],"revert")
+            self.assertEqual(argv[argv.index("--journal-dir")+1],
+                             str(j.parent))
+            self.assertEqual(argv[argv.index("--vm")+1],"win11_1")
+            self.assertFalse(meta["master_vm_mutations_authorized"])
+
     def test_network_rollback_is_independent_scoped_resource_phase(self):
         with TemporaryDirectory() as td:
             j,rows=self.makefixture(td)
