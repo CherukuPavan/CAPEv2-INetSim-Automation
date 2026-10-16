@@ -133,6 +133,64 @@ class JoinedCommand3Tests(unittest.TestCase):
                 m.configure(args)
             self.assertFalse(args.witness_dir.exists())
 
+    def test_optional_deployment_transaction_attests_each_change(self):
+        from contextlib import ExitStack
+        with tempfile.TemporaryDirectory() as td, ExitStack() as stack:
+            args = self.context(td)
+            args.deployment_transaction = "a" * 32
+            for p in self.patch_plans(self):
+                stack.enter_context(p)
+            stack.enter_context(patch.object(m.os, "geteuid", return_value=0))
+            stack.enter_context(patch.object(m.sys.stdin, "isatty",
+                                             return_value=True))
+            stack.enter_context(patch.object(m.socket, "gethostname",
+                                             return_value="other-host"))
+            stack.enter_context(patch("builtins.input",
+                                      return_value=m.APPROVAL))
+            stack.enter_context(patch.object(
+                m, "private_witness_dir",
+                return_value=args.witness_dir))
+            stack.enter_context(patch.object(m, "write_witness"))
+            stack.enter_context(patch.object(
+                m.deployment_transaction, "load",
+                return_value=(Path(td) / "ledger.json", {"phase":"active"})))
+            sequence = []
+            prepare_count = [0]
+            def prepare(tx, host, stage, path):
+                i = prepare_count[0]
+                prepare_count[0] += 1
+                sequence.append("prepare:" + path.name)
+                self.assertEqual((tx, host, stage),
+                                 (args.deployment_transaction,
+                                  "other-host", "command3"))
+                return {"step_id": str(i)}
+            def seal(tx, host, step):
+                sequence.append("seal:" + step)
+                self.assertEqual(tx, args.deployment_transaction)
+            stack.enter_context(patch.object(
+                m.deployment_transaction, "prepare_file",
+                side_effect=prepare))
+            stack.enter_context(patch.object(
+                m.deployment_transaction, "seal_file", side_effect=seal))
+            def applied(name):
+                sequence.append("apply:" + name)
+                return {"result": "OK", "applied": True}
+            for module, name in ((m.api, "api"), (m.aux, "auxiliary"),
+                                 (m.cuckoo, "cuckoo"), (m.kvm, "kvm"),
+                                 (m.mitm, "mitmdump")):
+                stack.enter_context(patch.object(
+                    module, "apply", side_effect=lambda *a, n=name:
+                        applied(n)))
+            outcome = m.configure(args)
+            self.assertEqual(outcome["result"],
+                             "COMMAND3_FIVE_CONFIG_FILES_APPLIED_NO_RESTART")
+            self.assertEqual(prepare_count[0], 5)
+            expected = []
+            for i, name in enumerate(ORDER):
+                expected += ["prepare:" + name + ".conf",
+                             "apply:" + name, "seal:" + str(i)]
+            self.assertEqual(sequence, expected)
+
     def test_all_five_applied_and_every_milestone_recorded(self):
         from contextlib import ExitStack
         with tempfile.TemporaryDirectory() as td, ExitStack() as stack:
