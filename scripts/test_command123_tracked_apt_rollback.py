@@ -99,6 +99,36 @@ class TrackedRollbackTests(unittest.TestCase):
             with self.assertRaises(ledger.TransactionBlocked):
                 rollback.inspect(TX, "rakshati")
 
+    def test_reverified_apt_receipt_checks_live_package_baseline(self):
+        doc = receipt()
+        doc["entries"][0]["status"] = "rollback_verified"
+        doc["entries"][0]["rollback_after_sha256"] = "f" * 64
+        with ExitStack() as stack:
+            self.fake_inspect(stack, doc)
+            stack.enter_context(mock.patch.object(
+                rollback.apt, "installed", return_value=dict(ORIGINAL)))
+            stack.enter_context(mock.patch.object(
+                rollback, "trusted_inventory_file",
+                side_effect=lambda folder, name, sha:
+                    dict(ORIGINAL)))
+            report = rollback.verify_reversed(TX, "rakshati")
+        self.assertTrue(report["preexisting_package_inventory_matches"])
+
+    def test_reverified_apt_receipt_rejects_later_package_drift(self):
+        doc = receipt()
+        doc["entries"][0]["status"] = "rollback_verified"
+        doc["entries"][0]["rollback_after_sha256"] = "f" * 64
+        with ExitStack() as stack:
+            self.fake_inspect(stack, doc)
+            stack.enter_context(mock.patch.object(
+                rollback, "trusted_inventory_file",
+                side_effect=lambda folder, name, sha:
+                    dict(ORIGINAL)))
+            stack.enter_context(mock.patch.object(
+                rollback.apt, "installed", return_value=dict(AFTER)))
+            with self.assertRaises(ledger.TransactionBlocked):
+                rollback.verify_reversed(TX, "rakshati")
+
     def test_verified_execution_journals_before_removal(self):
         doc = receipt()
         snapshots = []
