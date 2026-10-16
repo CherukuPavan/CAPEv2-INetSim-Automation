@@ -15,7 +15,8 @@ Modes:
   plan-prereqs            Read-only missing-package plan.
   apply-prereqs           Explicitly install only known-safe missing base packages.
   begin-tracked-prereqs   INTERNAL: create root-private Command1 ledger BEFORE guarded APT.
-  bootstrap-source        Fresh-host Git clone, or verify existing owned checkout.
+  bootstrap-source        Legacy draft Git clone (not transaction-safe).
+  stage-tracked-cape-source INTERNAL: import exact pinned CAPEv2 commit into owned transaction.
   plan-virt               Read-only distro virtualization package preflight (Steps 6-9).
   plan-release-hypervisor Read-only QEMU/libvirt version admission for REAL running-snapshot contract.
   apply-virt              Controlled distro QEMU/libvirt install (not custom build).
@@ -90,6 +91,12 @@ case "$MODE" in
     ;;
   bootstrap-source)
     exec bash "$HERE/bootstrap_cape_source.sh" "$@"
+    ;;
+  stage-tracked-cape-source)
+    [[ $EUID -eq 0 ]] || {
+      echo 'Root needed for source-provenance transaction stage' >&2; exit 2
+    }
+    exec python3 -B "$HERE/command1_tracked_cape_source.py" --mode install "$@"
     ;;
   plan-virt)
     exec bash "$HERE/bootstrap_virtualization_stack.sh" --plan "$@"
