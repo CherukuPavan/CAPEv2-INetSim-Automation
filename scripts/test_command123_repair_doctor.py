@@ -39,7 +39,7 @@ class DoctorTests(TestCase):
         def response(*argv, **_):
             calls.append(tuple(argv))
             if "--all" in argv:
-                return "win11\\nforeign-lab"
+                return "win11\nforeign-lab"
             if "domstate" in argv:
                 return "running" if argv[-1] == "foreign-lab" else "shut off"
             return ""
@@ -53,7 +53,7 @@ class DoctorTests(TestCase):
                              for c in calls))
 
     def test_libvirt_inventory_race_and_unknown_states_fail_closed(self):
-        for other in ("win11\\nnew-foreign", None):
+        for other in ("win11\nnew-foreign", None):
             scans = iter(("win11", other))
             def response(*argv, **_):
                 if "--all" in argv:
@@ -67,7 +67,7 @@ class DoctorTests(TestCase):
             self.assertFalse(report["all_domains_shut_off"])
 
     def test_native_snapshot_versions_do_not_prove_tpm_restore(self):
-        good = ("Running against daemon: 12.0.0\\n"
+        good = ("Running against daemon: 12.0.0\n"
                 "Running hypervisor: QEMU 10.2.1")
         with mock.patch.object(m, "read_command", return_value=good):
             result = m.snapshot_stack_status()
@@ -75,7 +75,7 @@ class DoctorTests(TestCase):
         self.assertTrue(result["versions_meet_conservative_snapshot_lab_floor"])
         self.assertFalse(result["running_windows_tpm_restore_proven"])
         with mock.patch.object(m, "read_command",
-                               return_value="Running against daemon: 10.0.0\\n"
+                               return_value="Running against daemon: 10.0.0\n"
                                             "Running hypervisor: QEMU 8.2.0"):
             result = m.snapshot_stack_status()
         self.assertFalse(result["versions_meet_conservative_snapshot_lab_floor"])
