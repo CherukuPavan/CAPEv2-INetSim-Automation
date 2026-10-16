@@ -1,0 +1,67 @@
+name: Pinned CAPEv2 Python3.12 full dependency wheel resolution on Ubuntu26
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/command1-resolute-cape-full-py312-dependency-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actual-upstream-cape-metadata:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Resolve reviewed CAPE upstream pinned package graph with isolated Python3.12
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          UV_PYTHON_INSTALL_DIR: /tmp/cape-python-versions
+          UV_PYTHON_INSTALL_BIN: "0"
+          UV_NO_CACHE: "1"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+          UPSTREAM_REV: 004d73c51dcd12dacb97b3657262bdea8376d710
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu && test "$VERSION_ID" = 26.04
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get install -y --no-install-recommends git python3 python3-venv python3-pip ca-certificates
+          python3 -m venv /tmp/cape-uv-tool
+          /tmp/cape-uv-tool/bin/python -m pip install --only-binary=:all: "uv==0.9.15"
+          /tmp/cape-uv-tool/bin/uv python install "3.12.12" --no-bin
+          /tmp/cape-uv-tool/bin/uv venv --managed-python --python "3.12.12" /tmp/cape-py312
+          git clone -q --filter=blob:none --no-checkout https://github.com/kevoreilly/CAPEv2.git /tmp/cape-upstream
+          git -C /tmp/cape-upstream checkout -q --detach "$UPSTREAM_REV"
+          test "$(git -C /tmp/cape-upstream rev-parse HEAD)" = "$UPSTREAM_REV"
+          test -f /tmp/cape-upstream/pyproject.toml
+          /tmp/cape-py312/bin/python - <<'PY'
+          import sys, tomllib
+          from pathlib import Path
+          meta=tomllib.loads(Path('/tmp/cape-upstream/pyproject.toml').read_text())
+          deps=meta['project']['dependencies']
+          assert sys.version_info[:2] == (3,12)
+          assert 'greenlet==3.0.3' in deps
+          assert 'gevent==24.2.1' in deps
+          print('CAPE_REVISION_PINNED_AND_METADATA_PARSED', len(deps))
+          PY
+          # Intentionally metadata-only (no sudo CAPE installer, VM, or pip
+          # into system Python). Binary-only resolution shows unsatisfied C
+          # extension dependencies, without trying arbitrary build scripts.
+          /tmp/cape-uv-tool/bin/uv pip compile \
+             --python /tmp/cape-py312/bin/python \
+             --only-binary=:all: \
+             --output-file /tmp/cape-fully-resolved-cp312.txt \
+             /tmp/cape-upstream/pyproject.toml
+          test -s /tmp/cape-fully-resolved-cp312.txt
+          test "$(python3 --version)" = "Python 3.14.4"
+          echo "PINNED_CAPE_UPSTREAM_CP312_FULL_DEPENDENCY_METADATA_RESOLVED"
+          echo "DEPENDENCIES_NOT_INSTALLED_OR_EXECUTED"
