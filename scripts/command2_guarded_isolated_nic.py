@@ -58,9 +58,10 @@ def virsh(*args):
 
 def guard_host(approved_host):
     actual = socket.gethostname().split(".",1)[0].lower()
-    need(actual not in ("ssl-55","cse-ssl-55") and
+    need(actual not in ("ssl-55","cse-ssl-55",
+                        "ssl-46","cse-ssl-46") and
          not SENTINEL.exists() and not SENTINEL.is_symlink(),
-         "SSL55_REFERENCE_ONLY: NIC attachment blocked")
+         "SSL55_REFERENCE_ONLY: NIC attachment blocked (also SSL46 protected)")
     need(re.fullmatch(r"[a-z0-9][a-z0-9_.-]{0,62}",approved_host or "")
          and actual == approved_host, "Wrong approved separate host")
 
