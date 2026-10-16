@@ -178,6 +178,46 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(s.undo_plan("rakshati", self.txid)["action"],
                          "already_quarantined")
 
+    def test_quarantine_is_verifiable_after_newly_installed_git_removed(self):
+        self.stage()
+        s.install("rakshati", self.txid, self.revision)
+        with mock.patch.object(s.tx, "no_live_work"), \
+             mock.patch("builtins.input",
+                return_value="QUARANTINE-OWNED-CAPE-SOURCE-" + self.txid):
+            s.undo("rakshati", self.txid)
+        # The final APT undo may remove git completely. The current
+        # source should remain verifiable with pure Python only.
+        with mock.patch.object(s, "execute_git",
+                               side_effect=AssertionError(
+                                   "Git unavailable after APT undo")):
+            result = s.undo_plan("rakshati", self.txid)
+        self.assertEqual(result["action"], "already_quarantined")
+
+    def test_quarantined_source_tampering_fails_without_git(self):
+        self.stage()
+        s.install("rakshati", self.txid, self.revision)
+        with mock.patch.object(s.tx, "no_live_work"), \
+             mock.patch("builtins.input",
+                return_value="QUARANTINE-OWNED-CAPE-SOURCE-" + self.txid):
+            s.undo("rakshati", self.txid)
+        private = self.target_root / self.txid / (
+            ".quarantine-" + self.doc["entries"][0]["id"])
+        (private / "README.md").write_text("Added content after undo")
+        with mock.patch.object(s, "execute_git",
+                               side_effect=AssertionError("No Git expected")):
+            with self.assertRaises(s.SourceBlocked):
+                s.undo_plan("rakshati", self.txid)
+
+    def test_quarantine_digest_rejects_symlink_in_git_metadata(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / ".git").mkdir()
+            (root / "readme").write_text("safe")
+            self.assertEqual(len(s.portable_quarantine_digest(root)), 64)
+            (root / ".git" / "escape").symlink_to("/etc/passwd")
+            with self.assertRaises(s.SourceBlocked):
+                s.portable_quarantine_digest(root)
+
     def test_source_undo_preserves_foreign_code_modifications(self):
         self.stage()
         s.install("rakshati", self.txid, self.revision)
