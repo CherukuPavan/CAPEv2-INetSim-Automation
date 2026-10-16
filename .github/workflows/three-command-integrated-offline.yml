@@ -53,7 +53,16 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
-          python -B -m unittest discover -s scripts -p 'test_*.py' -q
+          set -o pipefail
+          python -B -m unittest discover -s scripts -p 'test_*.py' -q 2>&1 | tee "$RUNNER_TEMP/cape-offline-failure.log"
+      - name: Save sanitized synthetic regression failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-failure-py${{ matrix.python-version }}
+          path: ${{ runner.temp }}/cape-offline-failure.log
+          if-no-files-found: ignore
+          retention-days: 2
       - name: Guarantee protected reference and latest master stay out of artifact
         run: |
           python -B - <<'PY'
