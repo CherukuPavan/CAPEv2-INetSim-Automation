@@ -137,6 +137,7 @@ def admitted(args):
 def preflight(args):
     identity=admitted(args)
     current=base.preflight(args.approved_host,args.cape_revision)
+    python_profile=runtime_preflight(args)
     return {
         "result":"COMMAND1_INTEGRATED_COLD_SEQUENCE_PLAN_ONLY",
         "host":args.approved_host,
@@ -145,7 +146,8 @@ def preflight(args):
         "private_service_account_identity":
             identity["service_account_email_to_share_with_as_viewer"],
         "base_apt_and_pinned_cape_source":current,
-        "ordered_phases":list(PHASES),
+        "ordered_phases":list(phases_for(args)),
+        "offline_python_runtime_profile":python_profile,
         "authorized_private_master_key_already_provisioned":True,
         "cold_master_staged":False,
         "guest_booted":False,
@@ -168,14 +170,14 @@ def execute(args):
         "schema":1,"host":args.approved_host,
         "master_bundle_id":args.bundle_id,
         "upstream_source_sha":args.cape_revision,
-        "phases":list(PHASES),
+        "phases":list(phases_for(args)),
         "finished":[],"current":None,"phase":"started",
         "host_vm_started":False,
         "complete_command1":False,
         "guest_tpm_revert_tested":False,
     }
     master.durable_receipt(receipt,doc,first=True)
-    for phase in PHASES:
+    for phase in phases_for(args):
         doc["current"]=phase
         master.durable_receipt(receipt,doc)
         try:
@@ -211,7 +213,11 @@ def execute(args):
         "result":"COMMAND1_TRACKED_HOST_SOURCE_AND_EXACT_COLD_MASTER_ONLY",
         "receipt":str(receipt),
         "tracked_transaction":doc["transaction_id"],
-        "all_phases_completed":list(PHASES),
+        "all_phases_completed":list(phases_for(args)),
+        "rootless_cape_python_runtime_installed": (
+            RUNTIME_PHASE in phases_for(args)),
+        "rootless_python_packages_installed":
+            doc.get("rootless_python_runtime_packages",0),
         "master_vm_state":"shut off",
         "full_cape_installed":False,
         "TPM_coherent_running_snapshot_proven":False,
