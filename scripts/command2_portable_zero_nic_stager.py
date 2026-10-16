@@ -69,7 +69,7 @@ def host_guard(approved_host, *, for_stage):
     real = socket.gethostname().split(".", 1)[0].lower()
     need(real not in ("cse-ssl-55", "ssl-55",
                       "cse-ssl-46", "ssl-46"),
-         "SSL55_SSL46_PROTECTED: staging prohibited")
+         "SSL55_REFERENCE_ONLY: staging prohibited; SSL46 backup also protected")
     # Defense-in-depth if SSL-55 was renamed; never mutate any host that
     # still carries its canonical protected Windows preservation backup.
     need(not SSL55_PRESERVATION_SENTINEL.exists() and
