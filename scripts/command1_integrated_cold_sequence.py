@@ -157,6 +157,9 @@ def preflight(args):
     }
 
 def execute(args):
+    need(runtime_arguments(args) is None,
+         "Optional offline runtime phase is not wired into the executor; "
+         "refusing a partial integrated deployment")
     need(sys.stdin.isatty(),"Use interactive root terminal")
     initial=preflight(args)
     print(json.dumps(initial,indent=2,sort_keys=True),flush=True)
