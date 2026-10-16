@@ -127,6 +127,29 @@ class SourceTests(unittest.TestCase):
                          self.revision)
         self.assertEqual(self.doc["entries"][0]["target"], str(target))
 
+    def test_source_checkout_is_service_readable_with_exact_provenance(self):
+        self.stage()
+        result = s.install("rakshati", self.txid, self.revision)
+        out = self.target_root / self.txid / "CAPEv2"
+        self.assertEqual(out.stat().st_mode & 0o777, 0o755)
+        self.assertEqual(out.parent.stat().st_mode & 0o777, 0o755)
+        self.assertEqual(result["source_tree"]["revision"], self.revision)
+        self.assertEqual(self.doc["entries"][0]["staging"],
+                         str(self.target_root / (".cape-stage-" + self.txid)))
+        self.assertFalse((self.target_root /
+                         (".cape-stage-" + self.txid)).exists())
+
+    def test_abandoned_owned_source_stage_never_silently_reused(self):
+        self.stage()
+        self.target_root.mkdir()
+        stage = self.target_root / (".cape-stage-" + self.txid)
+        stage.mkdir()
+        (stage / "README.txt").write_text("foreign incomplete work")
+        with self.assertRaises(s.SourceBlocked):
+            s.plan("rakshati", self.txid, self.revision)
+        self.assertEqual((stage / "README.txt").read_text(),
+                         "foreign incomplete work")
+
     def test_duplicate_or_modified_source_refused(self):
         self.stage()
         s.install("rakshati", self.txid, self.revision)
