@@ -110,6 +110,32 @@ registering the resulting guest with CAPE.
 Neither the presence of `/dev/kvm` on `rakshati` nor 1,500+ offline
 regression tests can close that physical and integration gap.
 
+## 2026-10-16 Windows TPM Platform Crypto Provider challenge
+
+The disposable two-cycle sequencer now optionally accepts
+`--prove-tpm-key`. It uses
+`scripts/command2_disposable_tpm_key_marker.py` to create only a fixed,
+nonexportable named CNG key using Windows' **Microsoft Platform Crypto
+Provider** on the approved isolated disposable clone after snapshot
+capture. After each real running-snapshot revert it queries the same
+provider and refuses if the named key is still present. For a second
+cycle it creates the fixed key again and verifies disappearance again.
+The challenge NEVER clears a TPM, deletes an existing key, changes
+BitLocker/Defender or exports any TPM secret. Pre-existing keys block
+creation. CI tests cover unsafe guest IPs, exact fixed commands, response
+validation, two cycles and failure to restore.
+
+Important limitation: Windows may store Platform Crypto Provider key
+metadata in its OS disk; restoring the disk alone can make a named CNG
+key appear absent without proving swtpm's permanent or volatile state was
+restored. Thus this is extra **guest-visible evidence**, not sufficient
+proof of atomically restored swtpm TPM2 permanent+volatile blobs and
+QCOW2 OVMF variables, or physical network containment. The
+`TPM_UEFI_full_state_revert_proven`, `safe_for_malware` and
+`production_ready` fields remain **false**, including on successful
+synthetic CI. Real TPM-blob paired capture/replay acceptance is still
+mandatory before final command release.
+
 ## 2026-10-16 disposable snapshot two-cycle implementation — NOT production acceptance
 
 The development branch now includes
