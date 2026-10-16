@@ -230,9 +230,103 @@ def install(host, transaction, revision):
             ) from err
 
 
+def source_entry(doc):
+    matching = [row for row in doc["entries"]
+                if row.get("kind") == "cape_source"]
+    need(len(matching) == 1 and
+         matching[0].get("stage") == "command1" and
+         matching[0].get("git_source") == SOURCE,
+         "Exactly one owned CAPE source record required")
+    entry = matching[0]
+    need(type(entry.get("id")) is str and
+         re.fullmatch(r"[0-9a-f]{32}", entry["id"]),
+         "Untrusted source receipt ID")
+    need(SHA40.fullmatch(entry.get("revision", "")),
+         "Source revision not pinned")
+    return entry
+
+
+def undo_plan(host, transaction):
+    receipt, doc = tx.load(transaction, host)
+    need(doc["phase"] == "active", "Source recovery needs active transaction")
+    entry = source_entry(doc)
+    expected = DEST_ROOT / transaction / "CAPEv2"
+    quarantine = DEST_ROOT / transaction / (".quarantine-" + entry["id"])
+    need(entry["target"] == str(expected),
+         "Recorded source differs from owned transaction path")
+    if entry["status"] == "rollback_verified":
+        need(not expected.exists() and not expected.is_symlink() and
+             entry.get("quarantine") == str(quarantine) and
+             quarantine.is_dir() and not quarantine.is_symlink() and
+             pristine(quarantine, entry["revision"]) == entry["after"],
+             "Completed source undo quarantine no longer verified")
+        action = "already_quarantined"
+    else:
+        need(entry["status"] == "sealed" and type(entry.get("after")) is dict,
+             "Source step was not successfully sealed")
+        need(expected.is_dir() and not expected.is_symlink() and
+             not quarantine.exists() and not quarantine.is_symlink(),
+             "Source path was modified or quarantine already exists")
+        need(pristine(expected, entry["revision"]) == entry["after"],
+             "Deployment source has foreign modifications; preserve it")
+        action = "quarantine_owned_checkout"
+    return {
+        "result": "COMMAND1_OWNED_CAPE_SOURCE_UNDO_PLAN",
+        "transaction": transaction, "step_id": entry["id"],
+        "action": action, "source_path": str(expected),
+        "quarantine_path": str(quarantine),
+        "target_was_absent_before_deployment": True,
+        "no_host_changes": True,
+        "manual_disposal_of_quarantined_source_needed": True,
+        "whole_deployment_rollback_complete": False,
+    }
+
+
+def undo(host, transaction):
+    need(os.geteuid() == 0 and sys.stdin.isatty(),
+         "Only direct root operator can undo owned source")
+    with tx.exclusive_transaction_lock(transaction):
+        before = undo_plan(host, transaction)
+        need(before["action"] == "quarantine_owned_checkout",
+             "Source is already reversed or uncertain")
+        tx.no_live_work()
+        print(json.dumps(before, indent=2, sort_keys=True), flush=True)
+        phrase = "QUARANTINE-OWNED-CAPE-SOURCE-" + transaction
+        need(input("Type " + phrase + ": ").strip() == phrase,
+             "Owned CAPE source quarantine declined")
+        need(undo_plan(host, transaction) == before,
+             "Source changed after operator approval")
+        receipt, doc = tx.load(transaction, host)
+        entry = source_entry(doc)
+        target = Path(before["source_path"])
+        quarantine = Path(before["quarantine_path"])
+        entry["status"] = "source_rollback_partial"
+        tx.atomic_receipt(receipt, doc)
+        try:
+            os.rename(target, quarantine)
+            tx.fsync_dir(target.parent)
+            need(pristine(quarantine, entry["revision"]) == entry["after"] and
+                 not target.exists() and not target.is_symlink(),
+                 "Relocated source did not verify")
+            entry["status"] = "rollback_verified"
+            entry["quarantine"] = str(quarantine)
+            tx.atomic_receipt(receipt, doc)
+        except Exception as error:
+            raise SourceBlocked(
+                "Source undo interrupted; do not retry without reconciliation"
+            ) from error
+        return {"result": "COMMAND1_OWNED_SOURCE_UNDEPLOYED_QUARANTINED",
+                "transaction": transaction,
+                "source_was_active": False,
+                "quarantined_source_preserved": str(quarantine),
+                "whole_deployment_rollback_complete": False}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--mode", choices=("plan", "install"), default="plan")
+    p.add_argument("--mode",
+                   choices=("plan", "install", "plan-undo", "undo"),
+                   default="plan")
     p.add_argument("--approved-host", required=True)
     group = p.add_mutually_exclusive_group(required=True)
     group.add_argument("--transaction")
@@ -242,9 +336,14 @@ def main():
     try:
         target = (tx.active_transaction(args.approved_host)
                   if args.use_active_transaction else args.transaction)
-        out = (plan(args.approved_host, target, args.revision)
-               if args.mode == "plan" else
-               install(args.approved_host, target, args.revision))
+        if args.mode == "plan":
+            out = plan(args.approved_host, target, args.revision)
+        elif args.mode == "install":
+            out = install(args.approved_host, target, args.revision)
+        elif args.mode == "plan-undo":
+            out = undo_plan(args.approved_host, target)
+        else:
+            out = undo(args.approved_host, target)
         print(json.dumps(out, indent=2, sort_keys=True))
         return 0
     except (tx.TransactionBlocked, SourceBlocked, OSError, ValueError,
