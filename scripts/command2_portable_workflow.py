@@ -39,6 +39,7 @@ PHASES={
     "stage":("command2_portable_zero_nic_entrypoint.py","stage","plan"),
     "network-install":("command2_portable_network_install.py","install","plan"),
     "network-rollback":("command2_portable_network_rollback.py","rollback","plan"),
+    "zero-nic-rollback":("command2_portable_zero_nic_rollback.py","revert","plan"),
     "guard-persistence":("command2_portable_guard_persistence.py","install","plan"),
     "identity-build":("command2_portable_guest_identity_iso.py","build","plan"),
     "identity-attach":("command2_portable_guest_identity_attach.py","attach","plan"),
@@ -171,7 +172,14 @@ def choose(args):
     vm=row["libvirt_name"];uuid=row["libvirt_uuid_candidate"]
     mac=row["mac_candidate"];ip=row["guest_static_ipv4_target"]
     argv=["--mode",mode,"--approved-host",host,"--vm",vm]
-    if phase=="identity-build":
+    if phase=="zero-nic-rollback":
+        need(args.mode in ("apply","plan"),
+             "Invalid untouched-clone rollback mode")
+        need(args.journal is not None and
+             args.journal.name=="command2-identity-reservation.json",
+             "Existing canonical clone reservation required")
+        argv+=["--journal-dir",str(args.journal.parent)]
+    elif phase=="identity-build":
         argv+=["--journal",str(args.journal),"--config",str(config),
                "--dest",str(args.journal.parent/(vm+".command2_identity.iso"))]
     elif phase in ("identity-attach","network-approve"):
