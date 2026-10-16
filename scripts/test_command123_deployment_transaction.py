@@ -435,12 +435,12 @@ class ServiceRecoveryGuards(unittest.TestCase):
         def run(cmd, **kwargs):
             if cmd[0] == "systemctl":
                 return SimpleNamespace(returncode=0,stdout=(
-                    "LoadState=not-found\\nActiveState=inactive\\n"))
+                    "LoadState=not-found\nActiveState=inactive\n"))
             if cmd[0] == "virsh":
                 libvirt_calls.append(cmd)
                 if "list" in cmd:
-                    return SimpleNamespace(returncode=0,stdout="win11_1\\n")
-                return SimpleNamespace(returncode=0,stdout="paused\\n")
+                    return SimpleNamespace(returncode=0,stdout="win11_1\n")
+                return SimpleNamespace(returncode=0,stdout="paused\n")
             raise AssertionError("Unexpected command")
         with mock.patch.object(t.subprocess,"run",side_effect=run):
             with self.assertRaisesRegex(
