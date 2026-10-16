@@ -1,0 +1,43 @@
+name: Real QEMU backing-chain rollback safety on benign QCOW2 images
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command2_clone_rollback_storage_audit.py"
+      - "scripts/command2_portable_zero_nic_rollback.py"
+      - "scripts/test_command2_clone_rollback_real_qemu.py"
+      - ".github/workflows/command2-real-qcow2-chain.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qemu-backing-chain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install supported distro QEMU utilities in disposable GitHub runner
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-utils
+          qemu-img --version
+      - name: Validate real read-only QCOW2 dependency detection
+        env:
+          PYTHONPATH: scripts
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python3 -B -m unittest -v test_command2_clone_rollback_real_qemu
+      - name: Assert no VM, golden disk, TPM, or credentials bundled
+        run: |
+          python3 -B - <<'PY'
+          from pathlib import Path
+          forbidden = {".qcow2", ".pfx", ".key", ".tpm", ".nvram", ".p12"}
+          assert not [str(p) for p in Path("scripts").rglob("*")
+                      if p.is_file() and p.suffix.lower() in forbidden]
+          print("PASS: ephemeral benign QEMU fixtures only")
+          PY
