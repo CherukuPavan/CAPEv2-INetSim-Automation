@@ -414,6 +414,22 @@ def rollback_plan(transaction, host, *, files_only=False):
             actions.append({"id": step_id, "action": "keep",
                             "already_reversed_by": "tracked_apt_rollback"})
             continue
+        if kind == "cape_source" and entry["status"] == "rollback_verified":
+            # Recheck actual pristine quarantine, not just journal status.
+            try:
+                from command1_tracked_cape_source import undo_plan as source_undo_plan
+                witness = source_undo_plan(host, transaction)
+                need(witness["action"] == "already_quarantined" and
+                     witness["step_id"] == step_id,
+                     "Owned CAPE checkout undo not independently verified")
+            except (OSError, ValueError, RuntimeError) as error:
+                raise TransactionBlocked("Owned CAPE source undo unverifiable") from error
+            actions.append({"id": step_id, "action": "keep",
+                            "already_reversed_by": "tracked_cape_source"})
+            continue
+        if kind == "cape_source" and entry["status"] == "sealed" and files_only:
+            actions.append({"id": step_id, "action": "defer_source"})
+            continue
         if kind == "package" and entry["status"] == "sealed" and files_only:
             # Release files in reverse deployment order before uninstalling
             # packages. Keep package receipt active for later exact APT undo.
@@ -487,6 +503,10 @@ def rollback_files_first(transaction, host, approved=False):
             if entry["kind"] == "package":
                 need(action["action"] in ("defer_package", "keep"),
                      "Package state changed during file undo")
+                continue
+            if entry["kind"] == "cape_source":
+                need(action["action"] in ("defer_source", "keep"),
+                     "Source state changed during file undo")
                 continue
             doc["current_step"] = step
             atomic_receipt(receipt, doc)
