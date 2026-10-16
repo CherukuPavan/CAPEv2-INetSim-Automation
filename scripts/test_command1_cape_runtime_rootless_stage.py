@@ -74,9 +74,85 @@ class RootlessRuntimeTests(unittest.TestCase):
             return_value={"source_sha":self.revision,
                           "packages_verified":2}))
         stack.enter_context(mock.patch.object(
+            stage,"verify_root_immutable_inputs",
+            return_value={
+                "immutable_input_paths_verified":7,
+                "immutable_root_owned_wheels_verified":2}))
+        stack.enter_context(mock.patch.object(
             stage,"user_account",return_value=self.account))
         stack.enter_context(mock.patch.object(
             stage,"stage_parent",return_value=self.target_root))
+
+    def test_runtime_inputs_reject_world_writable_staging_ancestors(self):
+        # The /tmp parent is intentionally world writable. Production
+        # runtime artifacts must live in a root-owned protected tree.
+        for _ in range(160):
+            (self.wheels / ("pkg%03d-1.0-py3-none-any.whl" % _)).write_bytes(
+                b"reviewed fixture")
+        with self.assertRaisesRegex(stage.RuntimeBlocked,
+                                    "writable/untrusted"):
+            stage.verify_root_immutable_inputs(
+                manifest=self.manifest,lock=self.lock,
+                wheelhouse=self.wheels,uv=self.uv,
+                python=self.python,cape_source=self.checkout)
+
+    def test_root_owned_protected_170_wheels_accepted_under_mocked_stat(self):
+        import os
+        import stat
+        real = Path.lstat
+        for n in range(170):
+            (self.wheels / ("package%03d-1.0-py3-none-any.whl" % n)).write_bytes(
+                b"benign bytes")
+        self.uv.write_bytes(b"mock-uv")
+        self.python.write_bytes(b"mock-python")
+        from types import SimpleNamespace
+        def protected(node):
+            current=real(node)
+            # Filesystem ownership is simulated; the test never chowns or
+            # mutates actual host directories or privileged /opt locations.
+            return SimpleNamespace(
+                st_uid=0,st_mode=current.st_mode & ~0o022,
+                st_nlink=current.st_nlink,st_size=current.st_size)
+        with mock.patch.object(Path,"lstat",side_effect=protected):
+            witness=stage.verify_root_immutable_inputs(
+                manifest=self.manifest,lock=self.lock,
+                wheelhouse=self.wheels,uv=self.uv,
+                python=self.python,cape_source=self.checkout)
+        self.assertEqual(witness["immutable_root_owned_wheels_verified"],170)
+        self.assertGreater(witness["immutable_input_paths_verified"],7)
+
+    def test_nonroot_wheel_or_group_writable_root_wheel_is_refused(self):
+        from types import SimpleNamespace
+        import stat
+        real=Path.lstat
+        victim=self.wheels/"bad-1.0-py3-none-any.whl"
+        for n in range(159):
+            (self.wheels / ("good%03d-1.0-py3-none-any.whl" % n)).write_bytes(
+                b"test")
+        victim.write_bytes(b"test")
+        self.uv.write_bytes(b"mock-uv")
+        self.python.write_bytes(b"mock-python")
+        for fault in ("foreign-owner","group-writable"):
+            def read(node):
+                current=real(node)
+                st_mode=current.st_mode & ~0o022
+                st_uid=0
+                if node == victim:
+                    if fault == "foreign-owner":
+                        st_uid=999
+                    else:
+                        st_mode |= 0o020
+                return SimpleNamespace(
+                    st_uid=st_uid,st_mode=st_mode,
+                    st_nlink=current.st_nlink,st_size=current.st_size)
+            with self.subTest(fault=fault), \
+                 mock.patch.object(Path,"lstat",side_effect=read):
+                with self.assertRaisesRegex(
+                        stage.RuntimeBlocked,"not root-owned"):
+                    stage.verify_root_immutable_inputs(
+                        manifest=self.manifest,lock=self.lock,
+                        wheelhouse=self.wheels,uv=self.uv,
+                        python=self.python,cape_source=self.checkout)
 
     def test_plan_binds_source_and_wheel_manifest_to_transaction(self):
         with ExitStack() as stack:
