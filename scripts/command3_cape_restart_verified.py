@@ -45,10 +45,10 @@ def need(value,why):
 
 def target_host(requested):
     here=socket.gethostname().split(".",1)[0].lower()
-    need(here not in ("cse-ssl-55","ssl-55") and
+    need(here not in ("cse-ssl-55","ssl-55","cse-ssl-46","ssl-46") and
          type(requested) is str and
          requested.lower().split(".",1)[0]==here,
-         "Service restart forbidden on protected SSL-55 or different host")
+         "Service restart forbidden on protected SSL-55/SSL-46 or different host")
     return here
 
 def inspect(routing_conf,cuckoo_conf):
@@ -75,6 +75,12 @@ def inspect(routing_conf,cuckoo_conf):
         "all_five_units_loaded":all(x["loaded"] and
                                     x["installed_fragment"] for x in states),
         "routing_reference_matches_operator_values":config_is_exact,
+        # The original operator reference route=internet,nat=yes does NOT
+        # prove malware traffic containment. Read-only inspection cannot
+        # manufacture packet-path and full-running-snapshot proof.
+        "external_ipv4_ipv6_egress_negative_test_verified":False,
+        "guest_l2_containment_independently_verified":False,
+        "swtpm_coherent_two_cycle_restore_verified":False,
         "routing_file_sha256":routing.guard.sha(route_raw),
         "tmpfs_ready":bool(t.get("cape_tmpfs_prerequisite_ready",False)),
         "tmpfs_readiness":t,
@@ -91,6 +97,11 @@ def admitted_status(report):
          "CAPE tmpfs mount/owner/free-space preflight failed")
     need(report["routing_reference_matches_operator_values"],
          "CAPE routing config differs from operator target: review before restart")
+    need(report.get("external_ipv4_ipv6_egress_negative_test_verified") is True and
+         report.get("guest_l2_containment_independently_verified") is True and
+         report.get("swtpm_coherent_two_cycle_restore_verified") is True,
+         "Guest containment and TPM-coherent running restores lack independent proof; "
+         "refusing CAPE/Suricata service restarts")
 
 def witness_dir(path):
     folder=Path(path)
