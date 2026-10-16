@@ -28,6 +28,7 @@ import command2_portable_workflow as workflow
 import command2_target_host_preflight as hostinfo
 import command2_isolated_network_xml_plan as libvirtnet
 import command2_cape_egress_guard_plan as nftplan
+import command2_portable_network_transaction as owned_network
 
 LOCK=Path("/run/lock/cape-command2-network-install.lock")
 NETWORK="cape-analysis-isolated"
@@ -144,14 +145,19 @@ def install(host,journal):
         except BlockingIOError as e:raise NetworkBlocked("Concurrent network install") from e
         need(canonical_inputs(host,journal)==initial,
              "Host subnet, domain list or network/firewall state changed after approval")
+        # Mutation ownership receipt is fsynced BEFORE nft can create a
+        # table. Stale or partially applied installation is never repeated.
+        owned_network.begin(host,journal,initial)
         # nft batch contains only a new precisely named table/chain creation.
         # If later libvirt action fails, keep table and refuse blind retry.
         command("nft","-f","-",input_text=initial["nft_rules"])
+        owned_network.advance(journal,"prepared","nft_applied")
         with tempfile.TemporaryDirectory(prefix="cape-net-def-",dir="/run") as td:
             file=Path(td)/"isolated.xml"
             file.write_text(initial["network_xml"],encoding="utf-8")
             file.chmod(0o600)
             virsh("net-define",str(file),"--validate")
+        owned_network.advance(journal,"nft_applied","network_defined")
         netxml=ET.fromstring(virsh("net-dumpxml",NETWORK))
         need(netxml.findtext("name")==NETWORK and
              netxml.find("forward") is None and
@@ -159,6 +165,7 @@ def install(host,journal):
              netxml.find("port").get("isolated")=="yes",
              "Defined CAPE network differs from approved isolated XML")
         virsh("net-start",NETWORK)
+        owned_network.advance(journal,"network_defined","network_started")
         info=virsh("net-info",NETWORK)
         need(re.search(r"(?mi)^Active:\s+yes\s*$",info) is not None and
              re.search(r"(?mi)^Autostart:\s+no\s*$",info) is not None,
@@ -168,6 +175,7 @@ def install(host,journal):
              BRIDGE in nft,"CAPEv2 dedicated nft guard runtime differs")
         need(not virsh("list","--name").strip(),
              "Unexpected guest started during safe network staging")
+        owned_network.advance(journal,"network_started","verified")
         return {
            "result":"COMMAND2_PORTABLE_CAPE_LAB_DEFINED_ACTIVE_NOT_REBOOT_VERIFIED",
            "approved_host":host,"subnet":initial["analysis_subnet"],
@@ -179,7 +187,9 @@ def install(host,journal):
            "positive_cape_inetsim_guest_paths_tested":False,
            "guest_nics_attached":False,
            "production_network_authorized":False,
-           "operator_must_not_blindly_retry":True
+           "operator_must_not_blindly_retry":True,
+           "root_private_network_intent_recorded_before_mutation":True,
+           "network_ownership_receipt":str(owned_network.record_path(journal))
         }
     finally:os.close(fd)
 
