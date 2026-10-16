@@ -117,6 +117,51 @@ class CloneRecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(u.CloneRollbackBlocked,"Snapshot"):
                 u.live_admission(self.row)
 
+    def test_plan_verifies_independent_qcow2_before_vm_undefine(self):
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(u,"expected",
+                                                   return_value=self.row))
+            stack.enter_context(mock.patch.object(u,"live_admission",
+                                                   return_value="<domain/>"))
+            stack.enter_context(mock.patch.object(u,"standalone_paths",
+                                        return_value=(self.disk,self.nvram)))
+            stack.enter_context(mock.patch.object(
+                stager,"virsh",return_value="shut off"))
+            checked=stack.enter_context(mock.patch.object(
+                u.disk_audit,"inspect_qcow2",return_value={
+                    "no_external_backing":True,
+                    "no_internal_snapshots":True,
+                    "no_external_data_file":True,
+                }))
+            reviewed=u.plan(HOST,self.folder,VM)
+        checked.assert_called_once_with(self.disk)
+        self.assertTrue(
+            reviewed["independent_flat_qcow2_without_snapshots"])
+        self.assertEqual(reviewed["disk_sha256"],u.sha256_file(self.disk))
+
+    def test_plan_refuses_qcow2_backing_or_internal_snapshots(self):
+        for case in ("external backing chain","unexpected internal snapshot"):
+            with self.subTest(case=case), ExitStack() as stack:
+                stack.enter_context(mock.patch.object(
+                    u,"expected",return_value=self.row))
+                stack.enter_context(mock.patch.object(
+                    u,"live_admission",return_value="<domain/>"))
+                stack.enter_context(mock.patch.object(
+                    u,"standalone_paths",
+                    return_value=(self.disk,self.nvram)))
+                undo=stack.enter_context(mock.patch.object(
+                    stager,"virsh",side_effect=AssertionError(
+                        "Do not act on the clone or protected master")))
+                stack.enter_context(mock.patch.object(
+                    u.disk_audit,"inspect_qcow2",
+                    side_effect=u.disk_audit.DiskAdmissionBlocked(case)))
+                with self.assertRaisesRegex(
+                        u.CloneRollbackBlocked,"independence"):
+                    u.plan(HOST,self.folder,VM)
+                undo.assert_not_called()
+        self.assertTrue(self.disk.exists())
+        self.assertTrue(self.nvram.exists())
+
     def test_other_vm_image_or_nvram_reference_blocks_cleanup(self):
         for kind in ("disk","nvram"):
             if kind=="disk":
