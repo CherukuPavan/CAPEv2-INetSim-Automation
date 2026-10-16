@@ -45,6 +45,7 @@ import command3_cape_routing as route
 import command3_cape_tmpfs as tmpfs
 import command3_cape_services as services
 import command3_cape_restart_verified as restarting
+import command123_deployment_transaction as deployment_transaction
 
 DEFAULT_CONF_DIR = Path("/opt/CAPEv2/conf")
 DEFAULT_WITNESSES = Path("/var/lib/cape-command3-receipts")
@@ -234,6 +235,14 @@ def configure(args):
     need(os.geteuid() == 0 and sys.stdin.isatty(),
          "Configuration batch needs a root interactive terminal")
     approved_host(args.approved_host)
+    # The strict future three-command entrypoint supplies a pre-created
+    # transaction from Command 1; never invent an after-the-fact baseline.
+    deploy_id = getattr(args, "deployment_transaction", None)
+    if deploy_id is not None:
+        ledger_path, ledger = deployment_transaction.load(
+            deploy_id, args.approved_host)
+        need(ledger["phase"] == "active",
+             "Provided deployment transaction is not active")
     paths, staged = five_plans(args)
     initial = [(name, dict(plan)) for name, plan in staged]
     # Crucial ordering: Step3 sets [tmpfs] enabled=on. Even if its prior
@@ -287,6 +296,7 @@ def configure(args):
         "routing_unchanged": True,
         "VMs_unchanged": True,
         "full_command3_complete": False,
+        "deployment_transaction_id": deploy_id,
     }
     write_witness(target, witness, first=True)
     actions = [
@@ -306,7 +316,17 @@ def configure(args):
         witness["current_step"] = name
         write_witness(target, witness)
         try:
+            deploy_step = None
+            if deploy_id is not None:
+                # Durable pre-image FIRST; a partial write leaves a prepared
+                # ledger step and rollback must refuse uncertain ownership.
+                prepared = deployment_transaction.prepare_file(
+                    deploy_id, args.approved_host, "command3", paths[name])
+                deploy_step = prepared["step_id"]
             outcome = action()
+            if deploy_step is not None:
+                deployment_transaction.seal_file(
+                    deploy_id, args.approved_host, deploy_step)
             need(outcome.get("result") is not None and
                  (outcome.get("applied") is True or
                   outcome.get("applied") is False),
@@ -381,6 +401,8 @@ def main():
     p.add_argument("--backup-dir", type=Path, default=api.DEFAULT_BACKUPS)
     p.add_argument("--db-dsn-file", type=Path)
     p.add_argument("--witness-dir", type=Path, default=DEFAULT_WITNESSES)
+    p.add_argument("--deployment-transaction",
+                   help="Existing Command 1 transaction ID (no implicit baseline)")
     p.add_argument("--restart-witness-dir", type=Path,
                    default=restarting.RECEIPTS)
     args = p.parse_args()
