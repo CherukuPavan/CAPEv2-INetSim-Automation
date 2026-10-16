@@ -1,0 +1,159 @@
+"""Offline pinned CAPE upstream source installation acceptance tests.
+
+Uses a temporary local Git repository; NEVER downloads or runs CAPE installer
+code and NEVER changes the operator's host packages or virtual machines.
+"""
+from contextlib import ExitStack, nullcontext
+from copy import deepcopy
+from pathlib import Path
+import os
+import subprocess
+import tempfile
+import unittest
+from unittest import mock
+
+import command1_tracked_cape_source as s
+import command123_deployment_transaction as tx
+
+
+class SourceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.parent = Path(self.temp.name)
+        self.origin = self.parent / "origin"
+        self.origin.mkdir()
+        self.run_git(self.origin, "init", "-q")
+        self.run_git(self.origin, "config", "user.name", "OfflineTest")
+        self.run_git(self.origin, "config", "user.email", "test@example.invalid")
+        (self.origin / "README.md").write_text("Benign verified source\n")
+        (self.origin / "installer").mkdir()
+        (self.origin / "installer" / "do-not-execute.sh").write_text(
+            "#!/bin/sh\nprintf 'NOT RUN\\n'\n")
+        (self.origin / "installer" / "do-not-execute.sh").chmod(0o755)
+        self.run_git(self.origin, "add", ".")
+        self.run_git(self.origin, "commit", "-qm", "static fixture")
+        self.revision = self.run_git(self.origin, "rev-parse", "HEAD").strip()
+        self.target_root = self.parent / "installations"
+        self.txid = "a" * 32
+        self.doc = {"phase": "active", "entries": []}
+
+    def run_git(self, path, *args):
+        p = subprocess.run(["git", "-C", str(path), *args],
+                           capture_output=True, text=True, timeout=15)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        return p.stdout
+
+    def fake_safe_root(self, *, create=False):
+        if create:
+            self.target_root.mkdir(mode=0o755, exist_ok=True)
+        return self.target_root
+
+    def stage(self):
+        stack = ExitStack()
+        self.addCleanup(stack.close)
+        stack.enter_context(mock.patch.object(s, "DEST_ROOT", self.target_root))
+        stack.enter_context(mock.patch.object(s, "SOURCE", str(self.origin)))
+        stack.enter_context(mock.patch.object(s, "safe_root",
+                                               side_effect=self.fake_safe_root))
+        stack.enter_context(mock.patch.object(s.tx, "load",
+            return_value=(self.parent / "ledger.json", self.doc)))
+        stack.enter_context(mock.patch.object(
+            s.tx, "exclusive_transaction_lock", return_value=nullcontext()))
+        stack.enter_context(mock.patch.object(s.os, "geteuid", return_value=0))
+        stack.enter_context(mock.patch.object(s.sys.stdin, "isatty",
+                                               return_value=True))
+        stack.enter_context(mock.patch("builtins.input",
+            return_value="STAGE-PINNED-CAPE-SOURCE-" + self.txid))
+        stages = []
+        stack.enter_context(mock.patch.object(s.tx, "atomic_receipt",
+            side_effect=lambda *args, **kwargs: stages.append(
+                deepcopy(self.doc))))
+        return stages
+
+    def test_exact_git_tree_and_file_manifest(self):
+        info = s.pristine(self.origin, self.revision)
+        self.assertEqual(info["revision"], self.revision)
+        self.assertEqual(info["file_count"], 2)
+        self.assertTrue(info["total_bytes"] > 0)
+        self.assertEqual(len(info["content_sha256"]), 64)
+
+    def test_tampering_is_detected(self):
+        (self.origin / "README.md").write_text("foreign changes")
+        with self.assertRaises(s.SourceBlocked):
+            s.pristine(self.origin, self.revision)
+
+    def test_preexisting_symlink_is_not_trusted(self):
+        link = self.origin / "untrusted"
+        link.symlink_to("README.md")
+        self.run_git(self.origin, "add", "untrusted")
+        self.run_git(self.origin, "commit", "-qm", "untrusted symlink")
+        modified_rev = self.run_git(self.origin, "rev-parse", "HEAD").strip()
+        with self.assertRaises(s.SourceBlocked):
+            s.pristine(self.origin, modified_rev)
+
+    def test_plan_is_read_only_and_pinned(self):
+        stages = self.stage()
+        out = s.plan("rakshati", self.txid, self.revision)
+        self.assertFalse(out["host_mutated"])
+        self.assertFalse(self.target_root.exists())
+        self.assertEqual(stages, [])
+        self.assertFalse(out["complete_three_command_install"])
+
+    def test_unpinned_revision_is_refused_without_write(self):
+        self.stage()
+        with self.assertRaises(s.SourceBlocked):
+            s.plan("rakshati", self.txid, "development")
+        self.assertFalse(self.target_root.exists())
+
+    def test_installer_stages_exact_commit_and_durable_intent(self):
+        stages = self.stage()
+        original = s.execute_git
+        invocation = []
+        def observed_git(*args, **kwargs):
+            invocation.append((args, deepcopy(self.doc)))
+            return original(*args, **kwargs)
+        with mock.patch.object(s, "execute_git", side_effect=observed_git):
+            result = s.install("rakshati", self.txid, self.revision)
+        self.assertEqual(result["result"],
+                         "COMMAND1_CAPE_PINNED_SOURCE_STAGED_ONLY")
+        self.assertFalse(result["production_ready"])
+        self.assertEqual([x["entries"][0]["status"] for x in stages],
+                         ["prepared", "sealed"])
+        self.assertTrue(all(entry["entries"][0]["status"] == "prepared"
+                            for _, entry in invocation[:1]))
+        target = self.target_root / self.txid / "CAPEv2"
+        self.assertEqual(s.pristine(target, self.revision)["revision"],
+                         self.revision)
+        self.assertEqual(self.doc["entries"][0]["target"], str(target))
+
+    def test_duplicate_or_modified_source_refused(self):
+        self.stage()
+        s.install("rakshati", self.txid, self.revision)
+        with self.assertRaises(s.SourceBlocked):
+            s.plan("rakshati", self.txid, self.revision)
+
+    def test_operator_decline_causes_no_write(self):
+        stages = self.stage()
+        with mock.patch("builtins.input", return_value="NO"):
+            with self.assertRaises(s.SourceBlocked):
+                s.install("rakshati", self.txid, self.revision)
+        self.assertEqual(stages, [])
+        self.assertFalse(self.target_root.exists())
+
+    def test_fetch_failure_remains_prepared_no_auto_retry(self):
+        stages = self.stage()
+        def fail_git(path, *args, **kwargs):
+            if args[:1] == ("fetch",):
+                raise s.SourceBlocked("fake network failure")
+            return original(path, *args, **kwargs)
+        original = s.execute_git
+        with mock.patch.object(s, "execute_git", side_effect=fail_git):
+            with self.assertRaisesRegex(s.SourceBlocked, "partial"):
+                s.install("rakshati", self.txid, self.revision)
+        self.assertEqual(stages[-1]["entries"][0]["status"], "prepared")
+        self.assertEqual(self.doc["entries"][0]["status"], "prepared")
+
+
+if __name__ == "__main__":
+    unittest.main()
