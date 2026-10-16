@@ -156,7 +156,7 @@ class CheckoutTests(unittest.TestCase):
         self.assertEqual(h["Accept"], "application/vnd.github+json")
         self.assertEqual(c.request_headers("test-secrettoken")["Authorization"],
                          "Bearer test-secrettoken")
-        for bad in ("", "short", "a" * 501, "fake\\nsecret", "fake\\rsecret"):
+        for bad in ("", "short", "a" * 501, "fake\nsecret", "fake\rsecret"):
             with self.subTest(bad=repr(bad)), self.assertRaises(
                     c.CheckoutBlocked):
                 c.request_headers(bad)
@@ -187,7 +187,7 @@ class CheckoutTests(unittest.TestCase):
                 self.assertIsNone(token)
                 return entries()
             with mock.patch.object(c, "tree_entries",
-                                   side_effect=load_tree), \\
+                                   side_effect=load_tree), \
                  mock.patch.object(c, "archive_to_temp",
                                    side_effect=save_archive):
                 root=c.acquire(REV, None, Path(temp))
@@ -201,12 +201,12 @@ class CheckoutTests(unittest.TestCase):
         original_argv = sys.argv
         try:
             sys.argv=["pinned-checkout", "--revision", REV, "--public"]
-            with mock.patch.object(c.os, "geteuid", return_value=1000), \\
-                 mock.patch.object(c.sys.stdin, "isatty", return_value=True), \\
+            with mock.patch.object(c.os, "geteuid", return_value=1000), \
+                 mock.patch.object(c.sys.stdin, "isatty", return_value=True), \
                  mock.patch.object(c.os, "uname", return_value=SimpleNamespace(
-                     machine="x86_64")), \\
+                     machine="x86_64")), \
                  mock.patch.object(c.getpass, "getpass",
-                     side_effect=AssertionError("Public checkout must not ask for GitHub token")), \\
+                     side_effect=AssertionError("Public checkout must not ask for GitHub token")), \
                  mock.patch.object(c, "acquire",
                      return_value=Path("/tmp/public/"+REV)) as acquire:
                 self.assertEqual(c.main(), 0)
