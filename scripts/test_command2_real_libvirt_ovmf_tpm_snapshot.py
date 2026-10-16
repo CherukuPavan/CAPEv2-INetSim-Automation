@@ -9,6 +9,7 @@ it to user machine scripts or CAPE production acceptance.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import pwd
 import shutil
@@ -53,14 +54,14 @@ class RealLibvirtSnapshot(unittest.TestCase):
         with tempfile.TemporaryDirectory(
                 prefix="cape-blank-tcg-",dir=str(image_parent)) as tmp:
             root=Path(tmp)
-            root.chown(guest_user.pw_uid,guest_user.pw_gid)
+            os.chown(root,guest_user.pw_uid,guest_user.pw_gid)
             disk=root/"blank.qcow2"
             varsfile=root/"vars.qcow2"
             self.run_tool("qemu-img","create","-f","qcow2",str(disk),"128M")
             self.run_tool("qemu-img","convert","-f","raw","-O","qcow2",
                           str(template),str(varsfile))
-            disk.chown(guest_user.pw_uid,guest_user.pw_gid)
-            varsfile.chown(guest_user.pw_uid,guest_user.pw_gid)
+            os.chown(disk,guest_user.pw_uid,guest_user.pw_gid)
+            os.chown(varsfile,guest_user.pw_uid,guest_user.pw_gid)
             name="cape-ci-blank-"+uuid.uuid4().hex[:10]
             xml=f"""<domain type='qemu'>
   <name>{name}</name>
