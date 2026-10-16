@@ -20,9 +20,15 @@ import sys
 import uuid
 
 import command123_deployment_transaction as ledger
+import command123_hypervisor_release_compat as hypervisor
 
 BASE = ("python3", "python3-venv", "python3-pip", "git", "cpu-checker",
         "msr-tools", "acpica-tools")
+# Ubuntu 26.04 official LTS virtualization package set. In Ubuntu 24.04 the
+# historical 7-base-package component remains unchanged.
+VIRT26 = ("qemu-system-x86", "qemu-utils", "libvirt-clients",
+          "libvirt-daemon-system", "libvirt-daemon-config-network",
+          "ovmf", "swtpm", "swtpm-tools", "virtinst")
 ENV = {"LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive",
        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin"}
 PACKAGE = re.compile(r"[a-z0-9][a-z0-9+.-]*(?::[a-z0-9-]+)?\Z")
@@ -62,6 +68,7 @@ def verify_host():
     need(values.get("ID") == "ubuntu" and
          values.get("VERSION_ID") in ("24.04", "26.04"),
          "Requires supported Ubuntu 24.04 or 26.04 LTS")
+    return values["VERSION_ID"]
 
 
 def installed():
@@ -82,7 +89,7 @@ def installed():
 
 
 def simulate(names):
-    need(set(names) <= set(BASE), "Unapproved package")
+    need(set(names) <= set(BASE) | set(VIRT26), "Unapproved package")
     output = read_command(["apt-get", "-s", "-o", "Debug::NoLocking=true",
                            "install", "--no-install-recommends", *names])
     actions = []
@@ -98,9 +105,17 @@ def simulate(names):
 
 
 def plan():
-    verify_host()
+    release = verify_host()
+    # Meeting the package versions does NOT imply TPM-safe snapshot restore.
+    compat = None
+    allowed = BASE
+    if release == "26.04":
+        compat = hypervisor.plan()
+        need(compat["running_snapshot_stack_versions_admitted"],
+             "Resolute QEMU/libvirt APT candidates below floor")
+        allowed += VIRT26
     before = installed()
-    missing = sorted(pkg for pkg in BASE if pkg not in before)
+    missing = sorted(pkg for pkg in allowed if pkg not in before)
     simulated = simulate(missing) if missing else []
     need(not set(simulated) & set(before),
          "APT would upgrade or reinstall a preexisting package")
@@ -111,6 +126,11 @@ def plan():
             "baseline_inventory_sha256": hashlib.sha256(
                 snap_bytes(before)).hexdigest(),
             "host_modified": False,
+            "target_lts_release": release,
+            "resolute_virt26_binaries_in_scope": release == "26.04",
+            "qemu_libvirt_candidate_versions_admitted":
+                (compat is not None and
+                 compat["running_snapshot_stack_versions_admitted"]),
             "snapshot_stack_authorized": False}
 
 
@@ -148,7 +168,9 @@ def apply(transaction, host):
             return {"result": "CAPE_BASE_APT_ALREADY_PRESENT",
                     "mutated": False, "transaction": transaction}
         print(json.dumps(proposal, indent=2, sort_keys=True), flush=True)
-        phrase = "INSTALL-TRACKED-CAPE-BASE-PREREQUISITES"
+        phrase = ("INSTALL-TRACKED-CAPE-BASE-AND-VIRT26"
+                  if proposal.get("resolute_virt26_binaries_in_scope") else
+                  "INSTALL-TRACKED-CAPE-BASE-PREREQUISITES")
         need(input("Type " + phrase + ": ") == phrase,
              "APT package installation declined")
         need(plan() == proposal, "Package plan changed after approval")
@@ -192,9 +214,14 @@ def apply(transaction, host):
                                 else "PARTIAL_OR_UNEXPECTED_NO_AUTO_RETRY")
             ledger.atomic_receipt(receipt, doc)
             need(approved, "APT partial/unexpected change; stop and inspect")
-            return {"result": "CAPE_BASE_APT_INSTALLED_AND_PROVEN",
+            return {"result": (
+                        "CAPE_BASE_AND_RESOLUTE_VIRT26_BINARIES_INSTALLED"
+                        if proposal.get("resolute_virt26_binaries_in_scope")
+                        else "CAPE_BASE_APT_INSTALLED_AND_PROVEN"),
                     "transaction": transaction, "step_id": step_id,
                     "new_packages": len(changes["new_packages"]),
+                    "no_guest_started_or_snapshot_created": True,
+                    "TPM_coherent_restore_proven": False,
                     "package_rollback_supported": False}
         except Exception as err:
             # Even if snapshot or inspection fails, the prepared ledger
