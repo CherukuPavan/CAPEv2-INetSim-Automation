@@ -67,9 +67,10 @@ def need(ok,why):
 
 def canonical_host(approved):
     name=socket.gethostname().split(".",1)[0].lower()
-    need(name not in {"cse-ssl-55","ssl-55"} and
+    need(name not in {"cse-ssl-55","ssl-55",
+                      "cse-ssl-46","ssl-46"} and
          not SENTINEL.exists() and not SENTINEL.is_symlink(),
-         "Protected SSL-55: portable workflow forbidden")
+         "Protected SSL-55/SSL-46: portable workflow forbidden")
     need(type(approved) is str and re.fullmatch(r"[a-z0-9][a-z0-9_.-]{0,62}",approved) and
          name==approved,"Approved separate-host identity mismatch")
     return name
