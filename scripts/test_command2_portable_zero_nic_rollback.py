@@ -154,6 +154,91 @@ class CloneRecoveryTests(unittest.TestCase):
             u.record(path,future)
         self.assertIn(b"domain_undefined",path.read_bytes())
 
+    def test_full_untouched_vm_undo_preserves_both_images(self):
+        qc=self.folder/("."+self.disk.name+".quarantine-"+UID)
+        nv=self.folder/("."+self.nvram.name+".quarantine-"+UID)
+        original_d=self.disk.read_bytes()
+        original_n=self.nvram.read_bytes()
+        plan={"vm":VM,"uuid":UID,"host":HOST,
+              "disk":str(self.disk),"nvram":str(self.nvram),
+              "disk_quarantine":str(qc),"nvram_quarantine":str(nv),
+              "disk_sha256":u.sha256_file(self.disk),
+              "nvram_sha256":u.sha256_file(self.nvram)}
+        operations=[]
+        def guest(*args):
+            operations.append(args)
+            if args==("undefine",VM,"--keep-nvram"):return ""
+            if args==("list","--all","--name"):return ""
+            raise AssertionError("Unexpected libvirt mutation")
+        old_fstat=os.fstat
+        def fake_root(fd):
+            st=old_fstat(fd)
+            return SimpleNamespace(st_mode=st.st_mode,
+                    st_uid=0,st_nlink=st.st_nlink,st_size=st.st_size)
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(u.os,"geteuid",return_value=0))
+            stack.enter_context(mock.patch.object(u.sys.stdin,"isatty",
+                                                 return_value=True))
+            stack.enter_context(mock.patch.object(u,"plan",return_value=plan))
+            stack.enter_context(mock.patch.object(u,"expected",
+                                                 return_value=self.row))
+            stack.enter_context(mock.patch.object(stager,"exact_dir",
+                                                 return_value=self.folder))
+            stack.enter_context(mock.patch.object(u,"standalone_paths",
+                                                 return_value=(self.disk,self.nvram)))
+            stack.enter_context(mock.patch.object(stager,"virsh",
+                                                 side_effect=guest))
+            stack.enter_context(mock.patch.object(u.os,"fstat",
+                                                 side_effect=fake_root))
+            records=stack.enter_context(mock.patch.object(u,"record"))
+            stack.enter_context(mock.patch("builtins.input",
+                return_value="QUARANTINE-ONLY-UNTOUCHED-WIN11_1"))
+            result=u.revert(HOST,self.folder,VM)
+        self.assertEqual(result["result"],
+                         "COMMAND2_UNTOUCHED_ZERO_NIC_CLONE_QUARANTINED")
+        self.assertEqual(qc.read_bytes(),original_d)
+        self.assertEqual(nv.read_bytes(),original_n)
+        self.assertFalse(self.disk.exists())
+        self.assertFalse(self.nvram.exists())
+        self.assertEqual(operations[0],
+                         ("undefine",VM,"--keep-nvram"))
+        self.assertEqual([x.args[1]["status"] for x in records.call_args_list],
+                         ["prepared","domain_undefined","disk_quarantined",
+                          "nvram_quarantined","verified"])
+
+    def test_undefine_failure_keeps_all_vm_storage_bytes(self):
+        disk=self.disk.read_bytes()
+        nvram=self.nvram.read_bytes()
+        plan={"vm":VM,"uuid":UID,"host":HOST,
+              "disk":str(self.disk),"nvram":str(self.nvram),
+              "disk_sha256":u.sha256_file(self.disk),
+              "nvram_sha256":u.sha256_file(self.nvram)}
+        real_fstat=os.fstat
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(u.os,"geteuid",return_value=0))
+            stack.enter_context(mock.patch.object(u.sys.stdin,"isatty",
+                                                 return_value=True))
+            stack.enter_context(mock.patch.object(u,"plan",return_value=plan))
+            stack.enter_context(mock.patch.object(u,"expected",
+                                                 return_value=self.row))
+            stack.enter_context(mock.patch.object(stager,"exact_dir",
+                                                 return_value=self.folder))
+            stack.enter_context(mock.patch.object(u.os,"fstat",
+                side_effect=lambda fd: SimpleNamespace(
+                    st_mode=real_fstat(fd).st_mode,st_uid=0,
+                    st_nlink=real_fstat(fd).st_nlink,
+                    st_size=real_fstat(fd).st_size)))
+            stack.enter_context(mock.patch.object(u,"record"))
+            stack.enter_context(mock.patch.object(stager,"virsh",
+                                      side_effect=OSError("VM not removable")))
+            stack.enter_context(mock.patch("builtins.input",
+                return_value="QUARANTINE-ONLY-UNTOUCHED-WIN11_1"))
+            with self.assertRaisesRegex(
+                    u.CloneRollbackBlocked,"partial/unknown"):
+                u.revert(HOST,self.folder,VM)
+        self.assertEqual(self.disk.read_bytes(),disk)
+        self.assertEqual(self.nvram.read_bytes(),nvram)
+
     def test_decline_does_not_undefine_or_quarantine_vm(self):
         with mock.patch.object(u.os,"geteuid",return_value=0), \
              mock.patch.object(u.sys.stdin,"isatty",return_value=True), \
