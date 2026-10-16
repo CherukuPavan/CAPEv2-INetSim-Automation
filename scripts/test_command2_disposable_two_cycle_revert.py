@@ -137,7 +137,7 @@ class TwoCycleTests(unittest.TestCase):
     def test_disk_marker_challenge_seeds_then_reverts_both_mutations(self):
         calls, entries = self.scenario()
         with mock.patch.object(m, "seed_marker_from_stopped_guest",
-                               side_effect=lambda *a: calls.append("seed") or True) as seed, \
+                               side_effect=lambda *a, **k: calls.append("seed") or True) as seed, \
              mock.patch.object(m.marker, "read_marker",
                                side_effect=[False, True, False]) as reader, \
              mock.patch.object(m.marker, "create_marker",
@@ -152,6 +152,58 @@ class TwoCycleTests(unittest.TestCase):
         self.assertEqual(reader.call_count, 3)
         self.assertEqual(entries[-1][2],
                          "TWO_BENIGN_REVERT_CYCLES_AGENT_ONLY_VERIFIED")
+
+    def test_tpm_cng_key_challenge_probes_both_reverts_without_claiming_tpm_nv(self):
+        calls, entries = self.scenario()
+        with mock.patch.object(m, "seed_marker_from_stopped_guest",
+                               side_effect=lambda *a, **k:
+                               calls.append("seed_tpm") or True) as seed, \
+             mock.patch.object(m.tpm_key, "key_exists",
+                               side_effect=[False, True, False]) as found, \
+             mock.patch.object(m.tpm_key, "create_key",
+                               side_effect=lambda *a:
+                               calls.append("create_tpm") or True):
+            report = m.run(HOST, JOURNAL, VM, COLD, SHA,
+                           Path("/fake/private"), prove_tpm_key=True)
+        self.assertEqual(calls, ["seed_tpm", "revert", "create_tpm",
+                                 "shutdown", "revert", "shutdown"])
+        self.assertTrue(report["windows_tpm_backed_cng_key_rollback_tested"])
+        self.assertFalse(report["TPM_UEFI_full_state_revert_proven"])
+        self.assertFalse(report["production_ready"])
+        seed.assert_called_once()
+        self.assertEqual(seed.call_args.kwargs,
+                         {"disk_probe": False, "tpm_probe": True})
+        self.assertEqual(found.call_count, 3)
+
+    def test_persistent_tpm_key_after_first_revert_blocks_second(self):
+        calls, entries = self.scenario()
+        with mock.patch.object(m, "seed_marker_from_stopped_guest",
+                               return_value=True), \
+             mock.patch.object(m.tpm_key, "key_exists", return_value=True):
+            with self.assertRaises(m.TwoCycleBlocked):
+                m.run(HOST, JOURNAL, VM, COLD, SHA,
+                      Path("/fake/private"), prove_tpm_key=True)
+        self.assertEqual(calls, ["revert"])
+        self.assertEqual(entries[-1][2], "TWO_CYCLE_PARTIAL_OR_UNKNOWN")
+
+    def test_initial_guest_tpm_marker_checks_are_separate_from_disk_marker(self):
+        states = iter(["shut off", "running"])
+        def virsh(*args):
+            if args[0] == "domstate":
+                return next(states)
+            return ""
+        with mock.patch.object(m.once, "virsh", side_effect=virsh), \
+             mock.patch.object(m, "wait_agent_after_boot"), \
+             mock.patch.object(m.tpm_key, "key_exists",
+                               side_effect=[False, True]) as key, \
+             mock.patch.object(m.tpm_key, "create_key", return_value=True), \
+             mock.patch.object(m.marker, "read_marker",
+                 side_effect=AssertionError("Disk marker must stay unused")), \
+             mock.patch.object(m, "shut_down_without_force", return_value=True):
+            self.assertTrue(m.seed_marker_from_stopped_guest(
+                VM, "192.168.241.101", "192.168.241.1",
+                disk_probe=False, tpm_probe=True))
+        self.assertEqual(key.call_count, 2)
 
     def test_disk_marker_surviving_first_revert_stops_without_next_cycle(self):
         calls, entries = self.scenario()
