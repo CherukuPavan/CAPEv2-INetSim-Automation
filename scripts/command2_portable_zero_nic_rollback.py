@@ -138,14 +138,34 @@ def no_foreign_domain_uses_images(vm,disk,nvram):
                 ) from error
 
 
+def no_other_guest_live():
+    """Check every defined domain, including paused and PM-suspended VMs.
+
+    A running-only libvirt list does not include all VM states that still
+    hold resources. Refuse an inconsistent inventory or ANY non-shutoff
+    guest before staging-only image/TPM rollback.
+    """
+    raw=stager.virsh("list","--all","--name")
+    names=[name.strip() for name in raw.splitlines() if name.strip()]
+    need(len(names)<=256 and len(set(names))==len(names) and
+         all(re.fullmatch(r"[A-Za-z0-9_.-]{1,128}",name) for name in names),
+         "Unknown or duplicate libvirt guest inventory")
+    for name in names:
+        need(stager.virsh("domstate",name).strip().lower()=="shut off",
+             "Non-shutoff foreign guest blocks staged VM rollback")
+    after=[name.strip() for name in
+           stager.virsh("list","--all","--name").splitlines() if name.strip()]
+    need(sorted(after)==sorted(names),
+         "Guest inventory drift prevents staged VM rollback")
+
+
 def live_admission(row):
     vm=row["libvirt_name"]
     uid=row["libvirt_uuid_candidate"]
     need(stager.virsh("domuuid",vm).lower()==uid and
          stager.virsh("domstate",vm).lower()=="shut off",
          "Clone UUID changed or guest not completely shut off")
-    need(not stager.virsh("list","--name").strip(),
-         "Cannot modify clone while ANY libvirt guest runs")
+    no_other_guest_live()
     need(not stager.virsh("snapshot-list",vm,"--name").strip(),
          "Snapshot metadata exists: zero-NIC staged-only recovery forbidden")
     need(re.search(r"(?mi)^Managed save:\s*no\s*$",
