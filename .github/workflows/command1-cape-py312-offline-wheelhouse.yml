@@ -4,6 +4,10 @@ on:
   push:
     branches: [development]
     paths:
+      - "scripts/ci_normalize_python_tlsh_wheel.py"
+      - "scripts/test_ci_normalize_python_tlsh_wheel.py"
+      - "scripts/command1_cape_runtime_offline_admission.py"
+      - "scripts/command1_cape_runtime_rootless_stage.py"
       - ".github/workflows/command1-cape-py312-offline-wheelhouse.yml"
   workflow_dispatch:
 
