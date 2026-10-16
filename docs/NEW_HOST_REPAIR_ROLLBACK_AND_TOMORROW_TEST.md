@@ -170,3 +170,19 @@ YAML, docs and runs recovery/cloud tests in Python 3.10 and 3.12.
 existing synthetic Python regression suite. Neither workflow proves
 physical Windows/TPM restore, network containment or a portable host
 installation. A new-host trial is mandatory before claiming readiness.
+
+## 2026-10-17 read-only doctor corrections
+
+`scripts/command123_repair_doctor.py` now recognizes both Ubuntu 24.04 and
+26.04 as candidate host families. This is **not** full release approval:
+the official 26.04 virtualization package candidates passed separate
+disposable experiments, but the real Windows/TPM recovery contract remains
+independently unverified.
+
+The doctor now reads `virsh version --daemon` and applies the existing
+QEMU >= 9 / libvirt >= 10.10 experimental snapshot floor, reporting a
+specific blocker if versions are unavailable or too old. It checks the
+complete *defined* libvirt inventory (including third-party VMs) for
+exact `shut off` state, rejects unstable repeated inventories, and never
+starts, changes, reverts or undefines a VM. Other incomplete CAPE install,
+network and TPM rollback gates remain unchanged.

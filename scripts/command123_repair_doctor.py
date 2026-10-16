@@ -17,6 +17,8 @@ import socket
 import subprocess
 import sys
 
+import command2_native_snapshot_stack_guard as snapshot_guard
+
 SENSITIVE_OS_HOSTS = frozenset(("cse-ssl-55", "ssl-55", "cse-ssl-46", "ssl-46"))
 UNITS = ("cape.service", "cape-processor.service", "cape-rooter.service",
          "cape-web.service", "suricata.service")
@@ -94,8 +96,27 @@ def vm_status(count):
     if vms is None:
         return {"libvirt_query_available": False,
                 "expected_additional_vm_count": count,
-                "all_expected_vms_present": False}
-    names = set(vms.splitlines())
+                "all_expected_vms_present": False,
+                "all_domains_shut_off": False,
+                "libvirt_inventory_stable": False,
+                "no_vm_lifecycle_mutation": True}
+    raw_names = [line.strip() for line in vms.splitlines() if line.strip()]
+    # A read-only repair report is unsafe if defined third-party guests
+    # were omitted or their state cannot be inspected. Bound the number of
+    # state probes and require exact names without duplicated inventory.
+    inventory_valid = (
+        len(raw_names) <= 256 and len(raw_names) == len(set(raw_names)) and
+        all(re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", n) for n in raw_names))
+    names = set(raw_names) if inventory_valid else set()
+    states = ({name: read_command("virsh", "-c", "qemu:///system",
+                                  "domstate", name)
+               for name in raw_names} if inventory_valid else {})
+    reread = read_command("virsh", "-c", "qemu:///system",
+                          "list", "--all", "--name")
+    stable = (inventory_valid and reread is not None and
+              raw_names == [line.strip() for line in reread.splitlines()
+                            if line.strip()])
+    all_off = stable and all(state == "shut off" for state in states.values())
     expected = ["win11"] + ["win11_" + str(i)
                              for i in range(1, count + 1)]
     details = {}
@@ -103,8 +124,7 @@ def vm_status(count):
         if name not in names:
             details[name] = {"present": False}
             continue
-        state = read_command("virsh", "-c", "qemu:///system",
-                             "domstate", name)
+        state = states.get(name)
         snaps = read_command("virsh", "-c", "qemu:///system",
                              "snapshot-list", name, "--name")
         details[name] = {
@@ -117,6 +137,10 @@ def vm_status(count):
         }
     return {
         "libvirt_query_available": True,
+        "all_domains_shut_off": bool(all_off),
+        "libvirt_inventory_stable": bool(stable),
+        "defined_domain_count": len(raw_names) if inventory_valid else None,
+        "no_vm_lifecycle_mutation": True,
         "expected_additional_vm_count": count,
         "all_expected_vms_present": all(n in names for n in expected),
         "actual_vm_names_matched": sorted(n for n in names
@@ -124,6 +148,24 @@ def vm_status(count):
         "expected_vm_details": details,
         "snapshot_names_do_not_prove_revert_safety": True,
     }
+
+
+def snapshot_stack_status():
+    """Inspect installed libvirt daemon/QEMU versions; never infer TPM safety."""
+    raw = read_command("virsh", "-c", "qemu:///system",
+                       "version", "--daemon")
+    if raw is None:
+        return {"version_evidence_available": False,
+                "versions_meet_conservative_snapshot_lab_floor": False,
+                "running_windows_tpm_restore_proven": False}
+    try:
+        parsed = snapshot_guard.parse_versions(raw)
+    except (snapshot_guard.NativeBlocked, ValueError, TypeError):
+        return {"version_evidence_available": False,
+                "versions_meet_conservative_snapshot_lab_floor": False,
+                "running_windows_tpm_restore_proven": False}
+    return {"version_evidence_available": True, **parsed,
+            "running_windows_tpm_restore_proven": False}
 
 
 def os_status():
@@ -162,6 +204,7 @@ def inventory(host, count, storage):
     packages = package_status()
     services = service_status()
     vm = vm_status(count)
+    snapshot_stack = snapshot_stack_status()
     tmpfs = read_command("findmnt", "--mountpoint", "/mnt/tmpfs",
                          "-n", "-o", "FSTYPE")
     configs = {
@@ -169,8 +212,15 @@ def inventory(host, count, storage):
         for name in NAMES}
     blockers = []
     osinfo = os_status()
-    if osinfo.get("ID") != "ubuntu" or osinfo.get("VERSION_ID") != "24.04":
-        blockers.append("TARGET_NOT_UBUNTU_24_04")
+    if osinfo.get("ID") != "ubuntu" or osinfo.get("VERSION_ID") not in (
+            "24.04", "26.04"):
+        blockers.append("TARGET_OS_NOT_IN_APPROVED_UBUNTU_FAMILIES")
+    if not snapshot_stack["versions_meet_conservative_snapshot_lab_floor"]:
+        blockers.append("NATIVE_RUNNING_SNAPSHOT_STACK_NOT_ADMITTED")
+    if not vm.get("libvirt_inventory_stable"):
+        blockers.append("LIBVIRT_DOMAIN_INVENTORY_UNVERIFIED_OR_CHANGED")
+    if not vm.get("all_domains_shut_off"):
+        blockers.append("LIBVIRT_DOMAIN_LIVE_OR_STATE_UNKNOWN")
     if not Path("/dev/kvm").exists():
         blockers.append("KVM_DEVICE_MISSING")
     if not binaries["virsh"]:
@@ -192,7 +242,8 @@ def inventory(host, count, storage):
         "hostname": name, "requested_additional_clones": count,
         "operating_system": osinfo,
         "binaries": binaries, "apt_package_presence": packages,
-        "libvirt": vm, "service_status": services,
+        "libvirt": vm, "snapshot_stack": snapshot_stack,
+        "service_status": services,
         "cape_config_present": configs,
         "tmpfs_mounted": tmpfs == "tmpfs",
         "guest_storage": storage_status(storage),
@@ -202,6 +253,7 @@ def inventory(host, count, storage):
         "no_package_service_network_or_secret_changed": True,
         "rollback_and_repair_require_proven_per_resource_history": True,
         "TPM_snapshot_two_cycle_recovery_proven": False,
+        "running_snapshot_not_accepted_from_versions_or_names": True,
         "release_cleared_for_live_malware": False,
     }
 
