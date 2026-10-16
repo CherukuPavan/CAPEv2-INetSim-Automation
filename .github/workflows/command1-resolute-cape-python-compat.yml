@@ -1,0 +1,52 @@
+name: CAPEv2 Python runtime compatibility on official Ubuntu 26.04
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/command1-resolute-cape-python-compat.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  official-python-abi:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Probe CAPE pinned native Python dependencies without OS changes
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu && test "$VERSION_ID" = 26.04
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get install -y --no-install-recommends python3 python3-venv python3-pip
+          python3 --version
+          python3 -m venv /tmp/cape26-py-abi
+          /tmp/cape26-py-abi/bin/python -m pip --version
+          # CAPE upstream currently pins these C-extension versions.
+          # Binary-only wheel probes intentionally NEVER compile source
+          # or modify host Python, CAPE, a guest or a protected reference.
+          set +e
+          /tmp/cape26-py-abi/bin/python -m pip download -q             --only-binary=:all: --no-deps --dest /tmp/cape26-wheel-test             "greenlet==3.0.3" "gevent==24.2.1"
+          code=$?
+          set -e
+          printf 'CAPE_PINNED_NATIVE_DEPS_BINARY_WHEEL_PROBE_EXIT=%s\n' "$code"
+          if [ "$code" -eq 0 ]; then
+            echo "CAPE_NATIVE_DEPS_HAVE_ABI_WHEELS_FOR_RESOLUTE_PYTHON"
+          else
+            echo "CAPE_26_PYTHON_NATIVE_DEPENDENCY_CONFLICT_NEEDS_SEPARATE_RUNTIME"
+          fi
+          # Report an actual incompatibility as a RED check; do not
+          # mistake signed hypervisor package success for CAPE readiness.
+          exit "$code"
