@@ -113,7 +113,7 @@ class RootlessRuntimeTests(unittest.TestCase):
             return SimpleNamespace(
                 st_uid=0,st_mode=current.st_mode & ~0o022,
                 st_nlink=current.st_nlink,st_size=current.st_size)
-        with mock.patch.object(Path,"lstat",side_effect=protected):
+        with mock.patch.object(Path,"lstat",new=protected):
             witness=stage.verify_root_immutable_inputs(
                 manifest=self.manifest,lock=self.lock,
                 wheelhouse=self.wheels,uv=self.uv,
@@ -146,7 +146,7 @@ class RootlessRuntimeTests(unittest.TestCase):
                     st_uid=st_uid,st_mode=st_mode,
                     st_nlink=current.st_nlink,st_size=current.st_size)
             with self.subTest(fault=fault), \
-                 mock.patch.object(Path,"lstat",side_effect=read):
+                 mock.patch.object(Path,"lstat",new=read):
                 with self.assertRaisesRegex(
                         stage.RuntimeBlocked,"not root-owned"):
                     stage.verify_root_immutable_inputs(
