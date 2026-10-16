@@ -95,6 +95,29 @@ def no_guest_using_network():
          "Running VM detected; no network deletion authorized")
 
 
+def require_empty_kernel_bridge():
+    """Other TAP/veth/container ports may use this bridge without libvirt XML.
+
+    Never delete a named lab bridge while another host process still owns a
+    kernel port enslaved to it. Query by exact bridge master, not by substring.
+    """
+    raw = command("ip", "-j", "link", "show", "master", network.BRIDGE)
+    try:
+        links = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise NetworkRollbackBlocked(
+            "Cannot verify attached host bridge ports"
+        ) from error
+    need(type(links) is list and
+         all(type(row) is dict and
+             type(row.get("ifname")) is str and row["ifname"]
+             for row in links),
+         "Malformed Linux bridge port inventory")
+    need(not links,
+         "Host TAP/veth/other port still attached to CAPE bridge; "
+         "do not remove the libvirt network")
+
+
 def inspect(host, journal):
     workflow.canonical_host(host)
     doc = receipt.read(receipt.record_path(journal))
@@ -124,6 +147,7 @@ def inspect(host, journal):
     need(dig(stateless) == doc["post_nft_stateless_sha256"],
          "Owned nft table was changed; no automatic deletion")
     no_guest_using_network()
+    require_empty_kernel_bridge()
     return {
         "result": "COMMAND2_OWNED_ISOLATED_NETWORK_ROLLBACK_PLAN",
         "approved_host": host,
@@ -135,6 +159,7 @@ def inspect(host, journal):
         "live_nft_table_matches_stateless_sealed_receipt": True,
         "no_domain_references_network": True,
         "all_domains_shut_off": True,
+        "linux_bridge_has_no_foreign_ports": True,
         "resource_deletion_performed": False,
         "full_deployment_rollback_complete": False,
     }
