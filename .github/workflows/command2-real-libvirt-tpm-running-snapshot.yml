@@ -36,8 +36,10 @@ jobs:
           # GitHub's rootless Docker filesystem forbids trusted.* xattrs,
           # unlike a real host. Disable libvirt DAC relabeling ONLY in this
           # disposable container to reach QEMU protocol compatibility tests.
-          # Never use these security settings in a physical CAPE deployment.
-          printf '\nsecurity_driver = "none"\ndynamic_ownership = 0\nremember_owner = 0\n' >> /etc/libvirt/qemu.conf
+          # Container has read-only cgroups v2; turn off QEMU cgroup usage
+          # in this one disposable job. Never use any such security or
+          # resource-isolation relaxation in a physical CAPE deployment.
+          printf '\nsecurity_driver = "none"\ndynamic_ownership = 0\nremember_owner = 0\ncgroup_controllers = []\n' >> /etc/libvirt/qemu.conf
           virtlogd -d
           if command -v virtlockd >/dev/null 2>&1; then virtlockd -d; fi
           test -S /run/libvirt/virtlogd-sock
