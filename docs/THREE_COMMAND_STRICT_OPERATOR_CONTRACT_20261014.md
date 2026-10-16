@@ -112,6 +112,18 @@ regression tests can close that physical and integration gap.
 
 ## Current implementation status (explicit, fail closed)
 
+2026-10-16 implementation update: the development branch now has a
+root-private host-bound active transaction pointer, durable per-file
+prepare/seal receipts, a synthetic-test-covered missing-file repair and
+guarded file rollback, and an APT prerequisite component recording
+whole-dpkg before/after package snapshots. The partial Command1 base
+prerequisite flow and the partial Command3 configuration flow can resolve
+the active transaction internally. **This is NOT a deployable three-command
+installer**: there is no vetted full install/VM/snapshot/routing/TPM
+sequence, no deployment-wide package/VM/network undo, and no second-host
+benign running-snapshot restore acceptance. There is no published ready
+final three-command command set.
+
 As of this specification, **THE THREE-COMMAND RELEASE IS NOT BUILT**.
 There are numerous guarded subcommands and green offline tests, but:
 - Command1 `scripts/command1_pre_vm.sh` is itself labeled partial:
