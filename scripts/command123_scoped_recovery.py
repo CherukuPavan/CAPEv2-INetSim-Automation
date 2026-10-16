@@ -19,6 +19,7 @@ import sys
 import command123_deployment_transaction as transaction
 import command123_tracked_apt_rollback as packages
 import command1_tracked_cape_source as cape_source
+import command1_cape_runtime_rootless_rollback as cape_runtime
 
 
 class ScopedRecoveryBlocked(RuntimeError):
@@ -38,7 +39,7 @@ def owned_stage_plan(host, txid):
     names = [item.get("kind") for item in doc["entries"]]
     # Reject unknown/unfinished assets even if the helper subcommands
     # might independently permit a subset. No blind cleanup of VMs/etc.
-    need(set(names) <= {"file", "package", "cape_source"},
+    need(set(names) <= {"file", "package", "cape_source", "cape_runtime"},
          "Deployment includes unsupported VM/network/account/resource steps")
     prepared_files = [
         entry for entry in doc["entries"]
@@ -61,6 +62,22 @@ def owned_stage_plan(host, txid):
     if package_rows:
         need(package_rows[0].get("status") in ("sealed", "rollback_verified"),
              "Unverified or partial package installation/undo")
+    runtime_rows = [entry for entry in doc["entries"]
+                    if entry.get("kind") == "cape_runtime"]
+    need(len(runtime_rows) <= 1,
+         "Cannot attribute repeated rootless Python runtime attempts")
+    if runtime_rows:
+        need(runtime_rows[0].get("status") in (
+            "sealed", "rollback_verified"),
+            "Unsealed or partially reverted CAPE runtime blocks recovery")
+        runtime_inspection=cape_runtime.inspect(host,txid)
+        need(runtime_inspection["action"] ==
+             ("quarantine_owned_runtime" if
+              runtime_rows[0]["status"]=="sealed"
+              else "already_quarantined"),
+             "Owned Python environment provenance and quarantine disagree")
+    else:
+        runtime_inspection=None
     source_rows = [entry for entry in doc["entries"]
                    if entry.get("kind") == "cape_source"]
     need(len(source_rows) <= 1, "Cannot attribute repeated upstream CAPE checkout")
@@ -95,6 +112,11 @@ def owned_stage_plan(host, txid):
         "apt_new_packages_to_remove": (
             apt_inspection["packages_to_remove"] if apt_inspection else []),
         "apt_rollback_needed": apt_inspection is not None,
+        "runtime_rollback_needed": runtime_inspection is not None and
+                                  runtime_inspection["action"] ==
+                                  "quarantine_owned_runtime",
+        "runtime_rollback_action": (runtime_inspection["action"]
+                                    if runtime_inspection else None),
         "source_rollback_needed": source_inspection is not None and
                                   source_inspection["action"] ==
                                   "quarantine_owned_checkout",
@@ -124,6 +146,11 @@ def run(host, txid):
         result = transaction.rollback_files_first(txid, host, True)
         need(result["transaction_still_active"] is True,
              "File rollback not verified")
+    if initial.get("runtime_rollback_needed", False):
+        result = cape_runtime.undo(host, txid)
+        need(result["result"] ==
+             "COMMAND1_OWNED_PYTHON_RUNTIME_UNDEPLOYED_QUARANTINED",
+             "Owned CAPE Python venv was not quarantined")
     if initial.get("source_rollback_needed", False):
         result = cape_source.undo(host, txid)
         need(result["result"] == "COMMAND1_OWNED_SOURCE_UNDEPLOYED_QUARANTINED",
@@ -143,8 +170,8 @@ def run(host, txid):
         "result": "CAPE_ATTESTED_FILE_AND_BASE_APT_SUBSET_REVERSED",
         "transaction": txid,
         "resource_types_reversed": [
-            "reviewed_CAPE_files", "pinned_owned_CAPEv2_source_quarantined",
-            "base_apt_additions"],
+            "reviewed_CAPE_files", "pinned_owned_CAPE_Python_runtime_quarantined",
+            "pinned_owned_CAPEv2_source_quarantined", "base_apt_additions"],
         "other_resource_rollback_not_included": True,
         "full_three_command_rollback_verified": False,
     }
