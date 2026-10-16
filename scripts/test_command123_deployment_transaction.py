@@ -98,6 +98,62 @@ class TransactionTests(unittest.TestCase):
         self.assertEqual((receipt.parent / ("after-" + step)).read_bytes(),
                          b"changed")
 
+    def test_sealed_missing_file_repair_restores_exact_bytes(self):
+        self.config.write_bytes(b"original")
+        step = self.prepare()
+        self.config.write_bytes(b"deployed")
+        self.seal(step)
+        self.config.unlink()
+        plan = t.repair_plan(self.transaction, "rakshati")
+        self.assertTrue(plan["can_repair"])
+        self.assertEqual(plan["actions"][0]["action"], "recreate_from_sealed")
+        with mock.patch.object(t, "no_live_work"), \
+             mock.patch.object(t.sys.stdin, "isatty", return_value=True), \
+             mock.patch("builtins.input",
+                        return_value="REPAIR-CAPE-TRANSACTION-" +
+                                     self.transaction):
+            result = t.repair(self.transaction, "rakshati", True)
+        self.assertEqual(result["result"], "CAPE_TRACKED_MISSING_FILES_REPAIRED")
+        self.assertFalse(result["whole_deployment_repair_ready"])
+        self.assertEqual(self.config.read_bytes(), b"deployed")
+        self.assertEqual(t.load(self.transaction, "rakshati")[1]["phase"],
+                         "active")
+        self.assertTrue(t.rollback_plan(self.transaction, "rakshati")
+                        ["can_rollback"])
+
+    def test_repair_never_overwrites_foreign_drift(self):
+        self.config.write_bytes(b"original")
+        step = self.prepare()
+        self.config.write_bytes(b"deployed")
+        self.seal(step)
+        self.config.write_bytes(b"user changes")
+        plan = t.repair_plan(self.transaction, "rakshati")
+        self.assertFalse(plan["can_repair"])
+        self.assertEqual(plan["actions"][0]["action"], "BLOCKED_DRIFT")
+        self.assertEqual(self.config.read_bytes(), b"user changes")
+
+    def test_interrupted_repair_keeps_partial_receipt_and_blocks_retry(self):
+        step = self.prepare()
+        self.config.write_bytes(b"deployed")
+        self.seal(step)
+        self.config.unlink()
+        with mock.patch.object(t, "no_live_work"), \
+             mock.patch.object(t.sys.stdin, "isatty", return_value=True), \
+             mock.patch("builtins.input",
+                        return_value="REPAIR-CAPE-TRANSACTION-" +
+                                     self.transaction), \
+             mock.patch.object(t, "restore_original",
+                               side_effect=OSError("injected write failure")):
+            with self.assertRaisesRegex(t.TransactionBlocked,
+                                        "Partial repair"):
+                t.repair(self.transaction, "rakshati", True)
+        state = t.load(self.transaction, "rakshati")[1]
+        self.assertEqual(state["phase"], "repair_partial")
+        with self.assertRaises(t.TransactionBlocked):
+            t.repair_plan(self.transaction, "rakshati")
+        with self.assertRaises(t.TransactionBlocked):
+            t.rollback_plan(self.transaction, "rakshati")
+
     def test_unsealed_step_blocks_rollback(self):
         self.config.write_bytes(b"original")
         self.prepare()
