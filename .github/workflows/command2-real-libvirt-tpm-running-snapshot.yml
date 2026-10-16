@@ -1,0 +1,49 @@
+name: Real libvirt registered benign OVMF TPM running snapshots
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/test_command2_real_libvirt_ovmf_tpm_snapshot.py"
+      - ".github/workflows/command2-real-libvirt-tpm-running-snapshot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-libvirt-tcg:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install official signed libvirt/QEMU/swtpm/OVMF runtime
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu && test "$VERSION_ID" = 26.04
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get install -y --no-install-recommends             python3 libvirt-daemon-system libvirt-clients qemu-system-x86             qemu-utils swtpm swtpm-tools ovmf
+          libvirtd -d
+          for i in $(seq 1 25); do
+            if virsh -c qemu:///system version >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          virsh -c qemu:///system version
+          test -z "$(virsh -c qemu:///system list --all --name)"
+          test -z "$(virsh -c qemu:///system net-list --all --name)"
+      - name: Test actual libvirt full-system RUNNING snapshot and two reverts without guest NIC
+        env:
+          PYTHONPATH: scripts
+          PYTHONDONTWRITEBYTECODE: "1"
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -B -m unittest -v test_command2_real_libvirt_ovmf_tpm_snapshot
