@@ -35,6 +35,7 @@ Modes:
   safe-space-audit        READ-ONLY filesystem and candidate cache sizes, NEVER delete Win11/TPM/CAPE assets.
   ssl46-lan-stage         Plan/export/verify/upload exact cold master THROUGH approved SSHFS on SSL46.
   worldwide-drive-reader  Set up private, read-only service-account crypt access on ANY approved other host.
+  master-private-handoff   INTERNAL guarded reader -> encrypted download -> shutoff exact master import.
   repair-doctor           READ-ONLY new-host CAPE+VM+service+snapshot diagnostic (no repair writes).
   recovery                Tracked six-CAPE-config baseline/seal/plan-repair/repair/plan-rollback/rollback ONLY.
   coverage                Show human-reviewed automation coverage/status documentation.
@@ -165,6 +166,10 @@ case "$MODE" in
     ;;
   worldwide-drive-reader)
     exec python3 -B "$HERE/command1_worldwide_drive_reader.py" "$@"
+    ;;
+  master-private-handoff)
+    [[ $EUID -eq 0 ]] || { echo 'Master cold handoff requires root.' >&2; exit 2; }
+    exec python3 -B "$HERE/command1_private_master_handoff_sequence.py" "$@"
     ;;
   repair-doctor)
     exec python3 -B "$HERE/command123_repair_doctor.py" "$@"
