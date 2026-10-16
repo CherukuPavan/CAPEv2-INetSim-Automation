@@ -238,6 +238,11 @@ def configure(args):
     # The strict future three-command entrypoint supplies a pre-created
     # transaction from Command 1; never invent an after-the-fact baseline.
     deploy_id = getattr(args, "deployment_transaction", None)
+    if getattr(args, "use_active_transaction", False):
+        need(not deploy_id,
+             "Cannot combine explicit and active deployment transaction")
+        deploy_id = deployment_transaction.active_transaction(
+            args.approved_host)
     if deploy_id is not None:
         ledger_path, ledger = deployment_transaction.load(
             deploy_id, args.approved_host)
@@ -401,8 +406,12 @@ def main():
     p.add_argument("--backup-dir", type=Path, default=api.DEFAULT_BACKUPS)
     p.add_argument("--db-dsn-file", type=Path)
     p.add_argument("--witness-dir", type=Path, default=DEFAULT_WITNESSES)
-    p.add_argument("--deployment-transaction",
-                   help="Existing Command 1 transaction ID (no implicit baseline)")
+    transaction_source = p.add_mutually_exclusive_group()
+    transaction_source.add_argument("--deployment-transaction",
+        help="Existing Command 1 transaction ID (no implicit baseline)")
+    transaction_source.add_argument("--use-active-transaction",
+        action="store_true",
+        help="Resolve the existing root-private Command1 transaction automatically")
     p.add_argument("--restart-witness-dir", type=Path,
                    default=restarting.RECEIPTS)
     args = p.parse_args()
