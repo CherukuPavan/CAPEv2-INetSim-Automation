@@ -93,8 +93,31 @@ Desired postconditions:
 
 ## CURRENT IMPLEMENTATION — NOT YET THE CONTRACT ABOVE
 
-At present, `scripts/command123_repair_rollback.py` is a guarded reversible
-**six CAPE-configuration-files-only** tool. It can capture a root-private
+**2026-10-16 incremental implementation:** A new
+`scripts/command123_deployment_transaction.py` provides root-private,
+unique host-bound deployment transactions. It records exact before/after
+bytes, hashes, owners and modes for reviewed CAPE configuration or service
+unit **files**. Changes must be prepared **before** the writer runs and
+sealed afterward, and any incomplete/unowned operation blocks automatic
+rollback. Concurrent writers to the same transaction are refused through a
+root-only advisory lock. Approved repair recreates only missing sealed
+files; approved rollback restores verified original file bytes or quarantines
+new files, with service/guest stop checks and durable partial-state receipts.
+`command3_from_operator_reference.py --mode configure` can now attach its
+five config changes to an already-begun transaction via the OPTIONAL
+`--deployment-transaction` flag; it never fabricates a Command 1 baseline.
+
+**These are NOT final release features.** The new ledger does NOT yet
+automatically start inside the future Command 1 bootstrap; it cannot
+attribute package installations, account changes, VM disks/TPM, networks,
+firewall policy or systemd service enable/running state, and intentionally
+marks all those categories unsupported rather than attempting removal.
+There is no three-command deployment-wide undo, complete host repair, or
+genuine hardware qualification. Offline regression success only verifies
+software behavior under controlled test fixtures.
+
+The earlier `scripts/command123_repair_rollback.py` remains a separately
+guarded reversible **six CAPE-configuration-files-only** tool. It can capture a root-private
 before-state, seal after-state, create missing sealed config files and undo
 those six changes under strict conditions. It does **not** implement the
 whole-deployment transaction ledger or remove cloned guests, VM disks, TPM
