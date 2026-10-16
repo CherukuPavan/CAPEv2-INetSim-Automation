@@ -151,6 +151,76 @@ class TransactionTests(unittest.TestCase):
         self.assertTrue(t.rollback_plan(self.transaction, "rakshati")
                         ["can_rollback"])
 
+    def attach_package(self, status="sealed"):
+        path, doc = t.load(self.transaction, "rakshati")
+        entry = {"id": "d" * 32, "kind": "package", "stage": "command1",
+                 "status": status}
+        doc["entries"].append(entry)
+        t.atomic_receipt(path, doc)
+
+    def test_files_first_undo_then_apart_apt_plan(self):
+        self.attach_package()
+        self.config.write_bytes(b"before")
+        step = self.prepare()
+        self.config.write_bytes(b"deployed")
+        self.seal(step)
+        plan = t.rollback_plan(self.transaction, "rakshati", files_only=True)
+        self.assertTrue(plan["can_rollback"])
+        self.assertEqual([a["action"] for a in plan["actions"]],
+                         ["restore_before", "defer_package"])
+        with mock.patch.object(t, "no_live_work"), \
+             mock.patch.object(t.sys.stdin, "isatty", return_value=True), \
+             mock.patch("builtins.input",
+                 return_value="ROLLBACK-CAPE-FILES-BEFORE-APT-" +
+                              self.transaction):
+            answer = t.rollback_files_first(self.transaction, "rakshati", True)
+        self.assertTrue(answer["transaction_still_active"])
+        self.assertEqual(self.config.read_bytes(), b"before")
+        path, doc = t.load(self.transaction, "rakshati")
+        self.assertEqual(doc["phase"], "active")
+        self.assertEqual(doc["entries"][0]["status"], "sealed")
+        self.assertEqual(doc["entries"][1]["status"], "rollback_verified")
+        # APT is still pending; global rollback must remain closed.
+        self.assertFalse(t.rollback_plan(self.transaction, "rakshati")
+                         ["can_rollback"])
+        # Independently verified APT reversal completes the dependency order.
+        doc["entries"][0]["status"] = "rollback_verified"
+        t.atomic_receipt(path, doc)
+        self.assertTrue(t.rollback_plan(self.transaction, "rakshati")
+                        ["can_rollback"])
+
+    def test_first_undo_partial_failure_retains_ledger_and_blocks_retry(self):
+        self.attach_package()
+        self.config.write_bytes(b"before")
+        step = self.prepare()
+        self.config.write_bytes(b"deployed")
+        self.seal(step)
+        with mock.patch.object(t, "no_live_work"), \
+             mock.patch.object(t.sys.stdin, "isatty", return_value=True), \
+             mock.patch("builtins.input",
+                 return_value="ROLLBACK-CAPE-FILES-BEFORE-APT-" +
+                              self.transaction), \
+             mock.patch.object(t, "restore_original",
+                 side_effect=OSError("synthetic failure")):
+            with self.assertRaisesRegex(t.TransactionBlocked, "Partial file"):
+                t.rollback_files_first(self.transaction, "rakshati", True)
+        self.assertEqual(t.load(self.transaction, "rakshati")[1]["phase"],
+                         "file_rollback_partial")
+        with self.assertRaises(t.TransactionBlocked):
+            t.rollback_plan(self.transaction, "rakshati", files_only=True)
+
+    def test_first_undo_stops_on_foreign_file_drift(self):
+        self.attach_package()
+        self.config.write_bytes(b"before")
+        step = self.prepare()
+        self.config.write_bytes(b"deployed")
+        self.seal(step)
+        self.config.write_bytes(b"user changes")
+        plan = t.rollback_plan(self.transaction, "rakshati", files_only=True)
+        self.assertFalse(plan["can_rollback"])
+        self.assertEqual(plan["actions"][0]["action"], "BLOCKED_DRIFT")
+        self.assertEqual(self.config.read_bytes(), b"user changes")
+
     def test_repair_never_overwrites_foreign_drift(self):
         self.config.write_bytes(b"original")
         step = self.prepare()
