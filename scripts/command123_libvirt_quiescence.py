@@ -48,7 +48,7 @@ def enumerate_domains():
              "\x00" not in name and
              "\r" not in name and "\n" not in name for name in rows),
          "Invalid, duplicate or excessive libvirt guest inventory")
-    return tuple(rows)
+    return tuple(sorted(rows))
 
 
 def no_nonshutoff_domains():
