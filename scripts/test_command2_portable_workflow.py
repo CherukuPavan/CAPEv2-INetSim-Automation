@@ -218,6 +218,17 @@ class Workflow(unittest.TestCase):
             self.assertNotIn("10.255.255.0/24",argv)
             self.assertTrue(result["not_production_release"])
 
+    def test_network_rollback_is_independent_scoped_resource_phase(self):
+        with TemporaryDirectory() as td:
+            j,rows=self.makefixture(td)
+            script,argv,result=self.choose_fixture(
+                j,rows,"network-rollback","apply")
+            self.assertEqual(script.name,
+                             "command2_portable_network_rollback.py")
+            self.assertEqual(argv[argv.index("--mode")+1],"rollback")
+            self.assertEqual(argv[argv.index("--journal")+1],str(j))
+            self.assertTrue(result["not_production_release"])
+
     def test_guard_reboot_persistence_is_separate_create_only_phase(self):
         with TemporaryDirectory() as td:
             j,rows=self.makefixture(td)
