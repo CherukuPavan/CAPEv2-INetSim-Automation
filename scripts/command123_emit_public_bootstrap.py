@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import re
 
-SHA40 = re.compile(r"[0-9a-f]{40}\\Z")
+SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 TEMPLATE = r"""python3 - <<'CAPE_VERIFIED_PUBLIC_BOOTSTRAP'
 import base64
 import hashlib
@@ -45,7 +45,7 @@ try:
     if len(data) > 65536:
         raise ValueError("Oversized GitHub helper")
     actual = hashlib.sha1(
-        b"blob " + str(len(data)).encode("ascii") + b"\\0" + data
+        b"blob " + str(len(data)).encode("ascii") + b"\0" + data
     ).hexdigest()
     if actual != EXPECTED_BLOB:
         raise ValueError("Git source object hash mismatch")
