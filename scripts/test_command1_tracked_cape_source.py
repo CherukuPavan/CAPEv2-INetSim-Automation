@@ -133,6 +133,65 @@ class SourceTests(unittest.TestCase):
         with self.assertRaises(s.SourceBlocked):
             s.plan("rakshati", self.txid, self.revision)
 
+    def test_exact_owned_source_can_be_quarantined_after_vm_shutdown(self):
+        captures = self.stage()
+        s.install("rakshati", self.txid, self.revision)
+        before = s.undo_plan("rakshati", self.txid)
+        self.assertEqual(before["action"], "quarantine_owned_checkout")
+        with mock.patch.object(s.tx, "no_live_work"), \
+             mock.patch("builtins.input",
+                return_value="QUARANTINE-OWNED-CAPE-SOURCE-" + self.txid):
+            result = s.undo("rakshati", self.txid)
+        self.assertEqual(result["result"],
+                         "COMMAND1_OWNED_SOURCE_UNDEPLOYED_QUARANTINED")
+        target = self.target_root / self.txid / "CAPEv2"
+        self.assertFalse(target.exists())
+        quarantined = self.target_root / self.txid / (
+            ".quarantine-" + self.doc["entries"][0]["id"])
+        self.assertTrue(quarantined.is_dir())
+        self.assertEqual(self.doc["entries"][0]["status"], "rollback_verified")
+        self.assertEqual(s.pristine(quarantined, self.revision)["revision"],
+                         self.revision)
+        self.assertEqual(s.undo_plan("rakshati", self.txid)["action"],
+                         "already_quarantined")
+
+    def test_source_undo_preserves_foreign_code_modifications(self):
+        self.stage()
+        s.install("rakshati", self.txid, self.revision)
+        checkout = self.target_root / self.txid / "CAPEv2"
+        (checkout / "README.md").write_text("Foreign modifications")
+        with self.assertRaises(s.SourceBlocked):
+            s.undo_plan("rakshati", self.txid)
+        self.assertTrue(checkout.exists())
+        self.assertEqual(self.doc["entries"][0]["status"], "sealed")
+
+    def test_source_undo_precheck_requires_inactive_services_guests(self):
+        self.stage()
+        s.install("rakshati", self.txid, self.revision)
+        with mock.patch.object(s.tx, "no_live_work",
+                               side_effect=tx.TransactionBlocked(
+                                   "guest is running")), \
+             mock.patch("builtins.input",
+                return_value="QUARANTINE-OWNED-CAPE-SOURCE-" + self.txid):
+            with self.assertRaises(tx.TransactionBlocked):
+                s.undo("rakshati", self.txid)
+        self.assertEqual(self.doc["entries"][0]["status"], "sealed")
+
+    def test_source_quarantine_interruption_is_not_marked_verified(self):
+        self.stage()
+        s.install("rakshati", self.txid, self.revision)
+        with mock.patch.object(s.tx, "no_live_work"), \
+             mock.patch("builtins.input",
+                return_value="QUARANTINE-OWNED-CAPE-SOURCE-" + self.txid), \
+             mock.patch.object(s.os, "rename",
+                               side_effect=OSError("simulated interruption")):
+            with self.assertRaisesRegex(s.SourceBlocked, "interrupted"):
+                s.undo("rakshati", self.txid)
+        self.assertEqual(self.doc["entries"][0]["status"],
+                         "source_rollback_partial")
+        with self.assertRaises(s.SourceBlocked):
+            s.undo_plan("rakshati", self.txid)
+
     def test_operator_decline_causes_no_write(self):
         stages = self.stage()
         with mock.patch("builtins.input", return_value="NO"):
