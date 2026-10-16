@@ -51,7 +51,12 @@ try:
     if not isinstance(source, dict) or source.get("encoding") != "base64" or (
             source.get("sha") != EXPECTED_BLOB):
         raise ValueError("Source Git blob does not match reviewed SHA")
-    data = base64.b64decode(source["content"], validate=True)
+    encoded = source.get("content")
+    if not isinstance(encoded, str) or len(encoded) > 100000:
+        raise ValueError("Invalid GitHub base64 source payload")
+    # GitHub Contents API folds Base64 with CR/LF. Validate every remaining
+    # character rather than accepting arbitrary whitespace or extra bytes.
+    data = base64.b64decode("".join(encoded.splitlines()), validate=True)
     if len(data) > 65536:
         raise ValueError("Oversized GitHub helper")
     actual = hashlib.sha1(
