@@ -34,7 +34,7 @@ def need(ok, reason):
 
 def trusted_inventory_file(folder, filename, sha):
     need(type(filename) is str and
-         re.fullmatch(r"apt-(?:before|after)-[a-f0-9]{32}", filename) and
+         re.fullmatch(r"apt-(?:before|after|rollback)-[a-f0-9]{32}", filename) and
          isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{64}", sha),
          "Untrusted package inventory receipt")
     ledger.owner_dir(folder)
@@ -76,6 +76,38 @@ def eligible_entry(doc):
              re.fullmatch(r"[0-9a-f]{64}", rec[field]),
              "Missing original/installed package inventory proof")
     return rec
+
+
+def verify_reversed(transaction, host):
+    """Check an earlier base-APT rollback still matches original dpkg state.
+
+    No mutation, no permission to delete; a stale 'rollback_verified' flag
+    alone never proves that later third-party software has not appeared.
+    """
+    apt.verify_host()
+    receipt, doc = ledger.load(transaction, host)
+    need(doc["phase"] == "active",
+         "Package baseline verification requires active transaction")
+    records = [row for row in doc["entries"] if row.get("kind") == "package"]
+    need(len(records) == 1 and
+         records[0].get("status") == "rollback_verified",
+         "No independently completed package rollback")
+    row = records[0]
+    step = row["id"]
+    need(type(step) is str and re.fullmatch(r"[0-9a-f]{32}", step),
+         "Invalid APT rollback receipt identifier")
+    baseline = trusted_inventory_file(
+        receipt.parent, "apt-before-" + step, row["before_sha256"])
+    reverted_sha = row.get("rollback_after_sha256")
+    observed = trusted_inventory_file(
+        receipt.parent, "apt-rollback-" + step, reverted_sha)
+    need(observed == baseline and apt.installed() == baseline,
+         "Post-rollback package inventory no longer equals baseline")
+    return {"result": "CAPE_BASE_APT_REVERSE_STATE_REVERIFIED",
+            "transaction": transaction,
+            "before_package_count": len(baseline),
+            "preexisting_package_inventory_matches": True,
+            "mutated": False}
 
 
 def simulated_remove(names):
