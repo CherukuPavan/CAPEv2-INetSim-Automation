@@ -16,6 +16,11 @@ def report():
         "all_five_units_loaded":True,
         "tmpfs_ready":True,
         "routing_reference_matches_operator_values":True,
+        # Synthetic-only accepted evidence. The real inspect() function
+        # deliberately sets all three false until physical qualification.
+        "external_ipv4_ipv6_egress_negative_test_verified":True,
+        "guest_l2_containment_independently_verified":True,
+        "swtpm_coherent_two_cycle_restore_verified":True,
         "routing_file_sha256":"a"*64,
         "approved_five_units":list(m.UNITS),
     }
@@ -48,6 +53,11 @@ class RestartTests(unittest.TestCase):
         self.assertTrue(x["routing_reference_matches_operator_values"])
         self.assertFalse(x["restart_executed"])
         self.assertFalse(x["safe_to_analyze_untrusted_samples"])
+        self.assertFalse(x["external_ipv4_ipv6_egress_negative_test_verified"])
+        self.assertFalse(x["guest_l2_containment_independently_verified"])
+        self.assertFalse(x["swtpm_coherent_two_cycle_restore_verified"])
+        with self.assertRaisesRegex(m.RestartBlocked, "independent proof"):
+            m.admitted_status(x)
 
     def test_rejects_unmounted_tmpfs_and_uninstalled_units(self):
         for flag in ("tmpfs_ready","all_five_units_loaded",
@@ -57,6 +67,36 @@ class RestartTests(unittest.TestCase):
                 values[flag]=False
                 with self.assertRaises(m.RestartBlocked):
                     m.admitted_status(values)
+
+    def test_service_restart_refused_if_any_security_proof_missing(self):
+        for field in (
+                "external_ipv4_ipv6_egress_negative_test_verified",
+                "guest_l2_containment_independently_verified",
+                "swtpm_coherent_two_cycle_restore_verified"):
+            with self.subTest(field=field):
+                sample=report()
+                sample[field]=False
+                with self.assertRaisesRegex(m.RestartBlocked, "independent proof"):
+                    m.admitted_status(sample)
+
+    def test_never_restart_with_unqualified_host_even_if_operator_approves(self):
+        sample=report()
+        sample["external_ipv4_ipv6_egress_negative_test_verified"]=False
+        with patch.object(m.os,"geteuid",return_value=0), \
+             patch.object(m.sys.stdin,"isatty",return_value=True), \
+             patch.object(m,"target_host",return_value="target"), \
+             patch.object(m,"inspect",return_value=sample), \
+             patch("builtins.input",return_value=m.APPROVAL), \
+             patch.object(m,"restart_exact",
+                 side_effect=AssertionError("Unsafe services must never start")):
+            with self.assertRaisesRegex(m.RestartBlocked, "independent proof"):
+                m.apply("target",Path("route"),Path("cuckoo"),Path("receipts"))
+
+    def test_protected_ssl46_cannot_restart_services(self):
+        for host in ("ssl-46", "CSE-SSL-46"):
+            with patch.object(m.socket,"gethostname",return_value=host), \
+                 self.assertRaisesRegex(m.RestartBlocked,"SSL-46"):
+                m.target_host(host)
 
     def test_refuses_ssl55_mutation_even_when_root(self):
         with patch.object(m.socket,"gethostname",
