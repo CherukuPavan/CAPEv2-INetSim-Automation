@@ -110,6 +110,30 @@ registering the resulting guest with CAPE.
 Neither the presence of `/dev/kvm` on `rakshati` nor 1,500+ offline
 regression tests can close that physical and integration gap.
 
+## 2026-10-16 disposable snapshot two-cycle implementation — NOT production acceptance
+
+The development branch now includes
+`scripts/command2_disposable_two_cycle_revert.py`, an operator-approved
+two-cycle **actual** libvirt running-snapshot revert sequencer for one
+disposable, independently validated Windows clone. Each cycle calls the
+existing guarded restore and Agent health check, then requests a graceful
+Windows shutdown without force. A new optional
+`--prove-disk-marker` mode first boots the isolated guest and writes ONE
+harmless, fixed-name marker through the existing CAPE Agent; after each
+separate revert it verifies the marker disappeared. Root-private durable
+receipts record partial or completed cycles and forbid blind retries.
+`command2_disposable_guest_marker.py` accepts no arbitrary guest commands.
+
+This **does not** prove coordinated swtpm persistent/volatile state and
+OVMF variable rollback, Secure Boot/BitLocker key continuity or physical
+IPv4/IPv6/L2 egress isolation, and it does not import the exact master on a
+new host. The source VM and SSL46 backup are protected by host guards. No
+physical disposable guest was operated in GitHub CI; the CI tests use
+synthetic libvirt and Agent responses. Until real disposable-host tests
+and TPM/UEFI continuity succeed for master and each clone, none of the
+snapshot candidates authorize malware analysis or count as completion
+of the strict three commands.
+
 ## Current implementation status (explicit, fail closed)
 
 2026-10-16 implementation update: the development branch now has a
