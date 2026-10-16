@@ -44,6 +44,20 @@ class ShellTransactionGuards(unittest.TestCase):
         self.assertEqual(p.returncode, 2)
         self.assertIn("Invalid approved host", p.stderr)
 
+    def test_active_pointer_and_explicit_id_are_mutually_exclusive(self):
+        p = self.run_shell("--apply",
+                           "--use-active-transaction",
+                           "--deployment-transaction", "a" * 32,
+                           "--approved-host", "rakshati")
+        self.assertEqual(p.returncode, 2)
+        self.assertIn("mutually exclusive", p.stderr)
+
+    def test_active_pointer_disallowed_in_plan(self):
+        p = self.run_shell("--plan", "--use-active-transaction",
+                           "--approved-host", "rakshati")
+        self.assertEqual(p.returncode, 2)
+        self.assertIn("requires --apply", p.stderr)
+
     def test_script_delegates_transaction_to_provenance_wrapper(self):
         text = SCRIPT.read_text()
         self.assertIn('command123_tracked_prereqs.py" --mode apply', text)
