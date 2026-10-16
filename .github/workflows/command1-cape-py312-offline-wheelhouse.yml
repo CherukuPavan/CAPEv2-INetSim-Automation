@@ -28,6 +28,12 @@ jobs:
           UV_PYTHON_INSTALL_BIN: "0"
           UV_NO_CACHE: "1"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
+          # Fixed build epoch eliminates time-dependent ZIP metadata for
+          # locally built CAPE SDist wheels. No floating install versions.
+          SOURCE_DATE_EPOCH: "1700000000"
+          PYTHONHASHSEED: "0"
+          TZ: UTC
+          LC_ALL: C.UTF-8
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -57,9 +63,34 @@ jobs:
           # Source distribution build hooks run ONLY in this disposable
           # credential-free CI container, never as CAPE service/root on host.
           /tmp/cape-build/bin/python -m pip wheel \
+            --no-cache-dir \
             --require-hashes \
             --wheel-dir /tmp/cape-built-wheels \
             --requirement /tmp/cape-hashed-source-deps.txt
+          mkdir -p /tmp/cape-replayed-wheels
+          /tmp/cape-build/bin/python -m pip wheel \
+            --no-cache-dir \
+            --require-hashes \
+            --wheel-dir /tmp/cape-replayed-wheels \
+            --requirement /tmp/cape-hashed-source-deps.txt
+          python3 -B - <<'PY'
+          from pathlib import Path
+          import hashlib
+          def digests(path):
+              return {
+                p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in Path(path).glob('*.whl')
+              }
+          a=digests('/tmp/cape-built-wheels')
+          b=digests('/tmp/cape-replayed-wheels')
+          assert len(a)>=160 and a.keys()==b.keys(), (len(a),len(b))
+          changed=sorted(name for name in a if a[name]!=b[name])
+          print("CAPE_TWICE_BUILT_WHEEL_DIFF_COUNT",len(changed))
+          for name in changed:
+              print("DIFFERENT_WHEEL_HASH",name)
+          assert not changed, "Wheel files must be bit-reproducible in one reviewed build"
+          print("CAPE_170_WHEELS_REBUILT_WITH_IDENTICAL_SHA256")
+          PY
           /tmp/cape-build/bin/python - <<'PY'
           from pathlib import Path
           from pip._vendor.packaging.utils import parse_wheel_filename
