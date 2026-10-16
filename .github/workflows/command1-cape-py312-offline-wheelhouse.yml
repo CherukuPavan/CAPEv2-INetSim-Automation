@@ -1,0 +1,137 @@
+name: Build and reinstall CAPE Python3.12 wheelhouse fully offline
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/command1-cape-py312-offline-wheelhouse.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  locked-offline-wheelhouse:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Produce reviewed platform-specific Python wheelhouse from pinned CAPE metadata
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          UPSTREAM_REV: 004d73c51dcd12dacb97b3657262bdea8376d710
+          UV_PYTHON_INSTALL_DIR: /tmp/cape-python-versions
+          UV_PYTHON_INSTALL_BIN: "0"
+          UV_NO_CACHE: "1"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu && test "$VERSION_ID" = 26.04
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get install -y --no-install-recommends \
+            python3 python3-venv python3-pip git ca-certificates \
+            build-essential cmake pkg-config libssl-dev libffi-dev \
+            zlib1g-dev libjpeg-dev libmagic-dev libfuzzy-dev \
+            libyara-dev libpq-dev libxml2-dev libxslt1-dev
+          python3 -m venv /tmp/cape-uv-tool
+          /tmp/cape-uv-tool/bin/python -m pip install --only-binary=:all: "uv==0.9.15"
+          /tmp/cape-uv-tool/bin/uv python install "3.12.12" --no-bin
+          /tmp/cape-uv-tool/bin/uv venv --managed-python --seed \
+              --python "3.12.12" /tmp/cape-build
+          git clone -q --filter=blob:none --no-checkout \
+              https://github.com/kevoreilly/CAPEv2.git /tmp/cape-upstream
+          git -C /tmp/cape-upstream checkout -q --detach "$UPSTREAM_REV"
+          test "$(git -C /tmp/cape-upstream rev-parse HEAD)" = "$UPSTREAM_REV"
+          /tmp/cape-uv-tool/bin/uv pip compile \
+            --python /tmp/cape-build/bin/python \
+            --generate-hashes \
+            --output-file /tmp/cape-hashed-source-deps.txt \
+            /tmp/cape-upstream/pyproject.toml
+          mkdir -p /tmp/cape-built-wheels
+          # Source distribution build hooks run ONLY in this disposable
+          # credential-free CI container, never as CAPE service/root on host.
+          /tmp/cape-build/bin/python -m pip wheel \
+            --require-hashes \
+            --wheel-dir /tmp/cape-built-wheels \
+            --requirement /tmp/cape-hashed-source-deps.txt
+          /tmp/cape-build/bin/python - <<'PY'
+          from pathlib import Path
+          from pip._vendor.packaging.utils import parse_wheel_filename
+          import hashlib, json
+          wheels=sorted(Path('/tmp/cape-built-wheels').glob('*.whl'))
+          assert len(wheels)>=160, len(wheels)
+          records={}
+          for path in wheels:
+              name,version,build,tags=parse_wheel_filename(path.name)
+              name=str(name).lower()
+              assert name not in records, "Multiple platform versions: "+name
+              digest=hashlib.sha256(path.read_bytes()).hexdigest()
+              records[name]={"version":str(version),"wheel":path.name,
+                             "size":path.stat().st_size,"sha256":digest}
+          assert 'gevent' in records and 'greenlet' in records
+          assert records['gevent']['version']=='24.2.1'
+          assert records['greenlet']['version']=='3.0.3'
+          lock=Path('/tmp/cape-offline-wheels-hash.lock')
+          lock.write_text(''.join(
+              f"{name}=={data['version']} --hash=sha256:{data['sha256']}\\n"
+              for name,data in sorted(records.items())))
+          manifest={
+             "source_commit":"004d73c51dcd12dacb97b3657262bdea8376d710",
+             "python_version":"3.12.12",
+             "uv_build_version":"0.9.15",
+             "platform":"ubuntu-26.04-amd64",
+             "wheel_count":len(wheels),
+             "total_wheel_bytes":sum(p.stat().st_size for p in wheels),
+             "lock_sha256":hashlib.sha256(lock.read_bytes()).hexdigest(),
+             "wheels":records,
+             "not_an_approved_host_installer":True
+          }
+          Path('/tmp/cape-wheel-manifest.json').write_text(
+              json.dumps(manifest,sort_keys=True,indent=2)+'\\n')
+          print("OFFLINE_WHEELHOUSE_LOCKED",len(wheels),manifest["lock_sha256"])
+          PY
+      - name: Fresh isolated Python 3.12 can install and execute pinned CAPE dependency CLI with NO network
+        env:
+          UV_NO_CACHE: "1"
+          PIP_NO_INDEX: "1"
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          /tmp/cape-uv-tool/bin/uv venv --managed-python --seed \
+            --python "3.12.12" /tmp/cape-fully-offline
+          /tmp/cape-fully-offline/bin/python -m pip install \
+            --no-index --no-deps --only-binary=:all: --require-hashes \
+            --find-links=/tmp/cape-built-wheels \
+            --requirement /tmp/cape-offline-wheels-hash.lock
+          /tmp/cape-fully-offline/bin/python - <<'PY'
+          import gevent,greenlet,django,sqlalchemy,yara,sys
+          assert sys.version_info[:2] == (3,12)
+          assert gevent.__version__=='24.2.1'
+          assert greenlet.__version__=='3.0.3'
+          print("CAPE_OFFLINE_NATIVE_PACKAGES_IMPORT_SUCCESS")
+          PY
+          mkdir -p /tmp/cape-cli-test
+          chown nobody:nogroup /tmp/cape-cli-test
+          cd /tmp/cape-upstream
+          runuser -u nobody -- env HOME=/tmp/cape-cli-test \
+            /tmp/cape-fully-offline/bin/python -B \
+            /tmp/cape-upstream/cuckoo.py --help >/tmp/cape-offline-help
+          grep -q -- '--help' /tmp/cape-offline-help
+          test "$(python3 --version)" = "Python 3.14.4"
+          echo "CAPE_PINNED_UNPRIVILEGED_CLI_HELP_SUCCEEDED_WITH_OFFLINE_WHEELS"
+      - name: Preserve SHA256 manifest and strict offline lock for independent review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-ubuntu26-py312-offline-wheelhouse-manifest
+          path: |
+            /tmp/cape-wheel-manifest.json
+            /tmp/cape-offline-wheels-hash.lock
+          if-no-files-found: warn
+          retention-days: 14
