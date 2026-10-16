@@ -1,5 +1,22 @@
 # CAPEv2 + INetSim Automation
 
+> **2026-10-17 executable orchestration work (development only):**
+> The existing Command1 integrated cold sequence now *actually invokes*
+> the reviewed, journaled 170-wheel offline Python 3.12 runtime installer
+> **between** signed host/CAPE source installation and authorized private
+> master cold import, when all pinned runtime artifacts are supplied.
+> Runtime failure blocks master import and preserves partial state.
+> The joined Command3 entrypoint now supports a single `--mode run`
+> operation which sequentially configures all five CAPE files and
+> restarts the five verified systemd units, with one outer private
+> receipt plus separate per-stage journals; it does not auto-write
+> routing or claim Windows TPM/safe analysis acceptance.
+> [Proof scope and failure tests](
+> docs/COMMAND1_COMMAND3_JOINED_STAGE_EVIDENCE_20261017.md).
+> Source checkout, runtime account, reviewed wheelhouse and the privately
+> encrypted exact Windows master still require pre-provisioned trusted
+> inputs; these improvements are NOT the final three-command release.
+>
 > **2026-10-16 development update (NOT a final deployment):** the
 > [transaction engine](scripts/command123_deployment_transaction.py) now
 > creates a root-private, host-bound active deployment ID, tracks approved
