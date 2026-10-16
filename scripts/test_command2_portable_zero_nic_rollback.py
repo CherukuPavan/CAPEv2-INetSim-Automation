@@ -196,6 +196,72 @@ class CloneRecoveryTests(unittest.TestCase):
             self.assertIsNone(u.no_foreign_domain_uses_images(
                 VM,str(self.disk),str(self.nvram)))
 
+    def test_indirect_foreign_backing_blocks_vm_rollback(self):
+        foreign=self.folder/"foreign-overlay.qcow2"
+        foreign.write_bytes(b"synthetic independent VM disk")
+        xml=(f'<domain><name>unrelated</name><devices>'
+             f'<disk device="disk"><source file="{foreign}"/></disk>'
+             '</devices></domain>')
+        def fake_virsh(*args):
+            if args==("list","--all","--name"):
+                return VM+"\\nunrelated\\n"
+            if args==("dumpxml","--inactive","unrelated"):
+                return xml
+            raise AssertionError("Unexpected libvirt query")
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(
+                stager,"virsh",side_effect=fake_virsh))
+            audit=stack.enter_context(mock.patch.object(
+                u.disk_audit,"require_no_foreign_qcow2_backing_reference",
+                side_effect=u.disk_audit.DiskAdmissionBlocked(
+                    "Indirect reference to clone disk")))
+            with self.assertRaisesRegex(
+                    u.CloneRollbackBlocked,"backing chain"):
+                u.no_foreign_domain_uses_images(VM,str(self.disk),
+                                                str(self.nvram))
+        audit.assert_called_once_with(str(foreign),
+                                      (str(self.disk),str(self.nvram)))
+        self.assertTrue(self.disk.exists())
+        self.assertTrue(self.nvram.exists())
+
+    def test_readable_unrelated_foreign_backing_is_allowed(self):
+        foreign=self.folder/"foreign-base.qcow2"
+        foreign.write_bytes(b"fake foreign image")
+        xml=(f'<domain><name>unrelated</name><devices>'
+             f'<disk device="disk"><source file="{foreign}"/></disk>'
+             '</devices></domain>')
+        def fake_virsh(*args):
+            if args==("list","--all","--name"):
+                return VM+"\\nunrelated\\n"
+            if args==("dumpxml","--inactive","unrelated"):
+                return xml
+            raise AssertionError("Unexpected libvirt query")
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(
+                stager,"virsh",side_effect=fake_virsh))
+            audit=stack.enter_context(mock.patch.object(
+                u.disk_audit,"require_no_foreign_qcow2_backing_reference",
+                return_value={"foreign_chain_independent_of_owned_clone":True}))
+            self.assertIsNone(u.no_foreign_domain_uses_images(
+                VM,str(self.disk),str(self.nvram)))
+        audit.assert_called_once()
+
+    def test_foreign_disk_protocol_is_not_silently_ignored(self):
+        xml=('<domain><name>unrelated</name><devices>'
+             '<disk device="disk"><source protocol="rbd" '
+             'name="pool/image"/></disk></devices></domain>')
+        def fake_virsh(*args):
+            if args==("list","--all","--name"):
+                return VM+"\\nunrelated\\n"
+            if args==("dumpxml","--inactive","unrelated"):
+                return xml
+            raise AssertionError("Unexpected libvirt query")
+        with mock.patch.object(stager,"virsh",side_effect=fake_virsh):
+            with self.assertRaisesRegex(
+                    u.CloneRollbackBlocked,"opaque/unknown"):
+                u.no_foreign_domain_uses_images(VM,str(self.disk),
+                                                str(self.nvram))
+
     def test_inactive_guest_xml_with_nic_cannot_be_removed(self):
         xml=(f'<domain type="kvm"><name>{VM}</name><uuid>{UID}</uuid>'
              f'<genid>{GENID}</genid>'
