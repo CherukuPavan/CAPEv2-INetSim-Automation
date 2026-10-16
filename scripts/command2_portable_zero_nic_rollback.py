@@ -23,7 +23,7 @@ from pathlib import Path
 import re
 import stat
 import sys
-import uuid
+import tempfile
 import xml.etree.ElementTree as ET
 
 import command2_portable_zero_nic_stager as stager
@@ -98,13 +98,17 @@ def live_admission(row):
          "Cannot modify clone while ANY libvirt guest runs")
     need(not stager.virsh("snapshot-list",vm,"--name").strip(),
          "Snapshot metadata exists: zero-NIC staged-only recovery forbidden")
-    need(stager.virsh("dominfo",vm).find("Managed save: yes")<0,
-         "Saved guest RAM state exists")
+    need(re.search(r"(?mi)^Managed save:\s*no\s*$",
+                   stager.virsh("dominfo",vm)) is not None,
+         "Cannot prove absence of guest managed RAM save")
     raw=stager.virsh("dumpxml","--inactive",vm)
     root=ET.fromstring(raw)
     need(root.tag=="domain" and root.get("type")=="kvm" and
          root.findtext("name")==vm and root.findtext("uuid")==uid and
-         not root.findall("./devices/interface"),
+         root.findtext("genid")==row["smbios_generation_id_candidate"] and
+         not root.findall("./devices/interface") and
+         not root.findall("./devices/hostdev") and
+         not root.findall("./devices/filesystem"),
          "Guest XML no longer matches exact shutoff zero-NIC clone")
     disks=root.findall("./devices/disk[@device='disk']/source")
     need(len(disks)==1 and disks[0].get("file")==row["disk_target"] and
@@ -175,13 +179,46 @@ def plan(host,folder,vm):
 
 
 def record(path,payload,first=False):
-    stager.atomic_note(path.parent,path.name,payload) if first else _update(path,payload)
-
-
-def _update(path,payload):
-    # Reuse root-private atomic receipt handling from existing deployment.
-    import command123_deployment_transaction as tx
-    tx.atomic_receipt(path,payload)
+    need(type(payload) is dict and payload.get("schema") == 1 and
+         payload.get("status") in STATES and
+         type(payload.get("vm")) is str and
+         VM.fullmatch(payload["vm"]) is not None,
+         "Malformed zero-NIC recovery receipt")
+    raw=(json.dumps(payload,sort_keys=True,separators=(",",":"))+"\n").encode()
+    need(len(raw)<=16384,"Oversized VM undo receipt")
+    if first:
+        stager.atomic_note(path.parent,path.name,payload)
+        return
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
+    try:
+        st=os.fstat(fd)
+        need(stat.S_ISREG(st.st_mode) and st.st_uid==0 and
+             st.st_nlink==1 and stat.S_IMODE(st.st_mode)==0o600 and
+             0<st.st_size<=16384,"Untrusted previous VM undo receipt")
+        before=os.read(fd,16385)
+        need(len(before)==st.st_size,"VM undo record changed during read")
+    finally:
+        os.close(fd)
+    previous=json.loads(before)
+    need(previous.get("schema")==1 and
+         previous.get("vm")==payload["vm"] and
+         previous.get("uuid")==payload["uuid"] and
+         previous.get("before")==payload["before"] and
+         previous.get("status") in STATES and
+         STATES.index(payload["status"]) ==
+         STATES.index(previous["status"])+1,
+         "VM rollback receipt state changed or skipped")
+    fd,tmp=tempfile.mkstemp(dir=path.parent,prefix=".vm-undo-")
+    try:
+        with os.fdopen(fd,"wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fchmod(stream.fileno(),0o600)
+            os.fsync(stream.fileno())
+        os.replace(tmp,path)
+    finally:
+        if os.path.lexists(tmp):os.unlink(tmp)
+    _fsync(path.parent)
 
 
 def revert(host,folder,vm):
@@ -227,7 +264,7 @@ def revert(host,folder,vm):
             need(sha256_file(disk)==initial["disk_sha256"],
                  "Disk changed during VM undefinition")
             os.rename(disk,initial["disk_quarantine"])
-            stager.tx_fsync_dir(disk.parent) if hasattr(stager,"tx_fsync_dir") else _fsync(disk.parent)
+            _fsync(disk.parent)
             data["status"]="disk_quarantined"
             record(record_path,data)
             need(sha256_file(nvram)==initial["nvram_sha256"],
