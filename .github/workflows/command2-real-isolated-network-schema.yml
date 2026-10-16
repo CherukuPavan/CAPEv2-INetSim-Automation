@@ -24,7 +24,7 @@ jobs:
       - name: Install libvirt XML validator and nft syntax checker in disposable runner
         run: |
           sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libvirt-clients libvirt-daemon-config-network nftables
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libvirt-clients libvirt-daemon-config-network libxml2-utils nftables
           virt-xml-validate --version
           nft --version
       - name: Read-only real libvirt schema and nft syntax checks
