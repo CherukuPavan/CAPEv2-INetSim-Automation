@@ -51,6 +51,31 @@ class ScopedRecoveryTests(unittest.TestCase):
                          ["python3-pip", "python3-wheel"])
         self.assertFalse(result["full_three_command_rollback_verified"])
 
+    def test_sealed_apt_reversal_is_reverified_before_finalization(self):
+        with ExitStack() as stack:
+            self.patch_stage(stack, doc(package_status="rollback_verified"))
+            verifier = stack.enter_context(mock.patch.object(
+                m.packages, "verify_reversed", return_value={
+                    "preexisting_package_inventory_matches": True}))
+            result = m.owned_stage_plan("rakshati", TX)
+        self.assertFalse(result["apt_rollback_needed"])
+        verifier.assert_called_once_with(TX, "rakshati")
+
+    def test_later_package_drift_blocks_scoped_rollback(self):
+        with ExitStack() as stack:
+            self.patch_stage(stack, doc(package_status="rollback_verified"))
+            stack.enter_context(mock.patch.object(
+                m.packages, "verify_reversed",
+                side_effect=t.TransactionBlocked("dpkg drift")))
+            with self.assertRaises(t.TransactionBlocked):
+                m.owned_stage_plan("rakshati", TX)
+
+    def test_no_attested_resources_is_not_a_successful_rollback(self):
+        with ExitStack() as stack:
+            self.patch_stage(stack, {"phase": "active", "entries": []})
+            with self.assertRaises(m.ScopedRecoveryBlocked):
+                m.owned_stage_plan("rakshati", TX)
+
     def test_rejects_unknown_vm_domain_entry(self):
         with ExitStack() as stack:
             self.patch_stage(stack, doc(unknown=True))
