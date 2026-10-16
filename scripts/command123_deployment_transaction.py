@@ -455,15 +455,41 @@ def repair(transaction, host, approved=False):
         raise TransactionBlocked("Partial repair retained for manual recovery") from error
 
 
+def service_inactive_from_systemd(raw):
+    """Only exact inactive stopped/missing units admit recovery.
+
+    'systemctl is-active' uses different nonzero codes for inactive versus
+    missing. A freshly interrupted installation may legitimately have never
+    created a CAPE unit, so read both explicit systemd properties.
+    """
+    need(type(raw) is str and len(raw) < 1024, "Untrusted systemd response")
+    pairs = {}
+    for line in raw.strip().splitlines():
+        require_pair = line.split("=", 1)
+        need(len(require_pair) == 2 and
+             require_pair[0] in ("LoadState", "ActiveState") and
+             require_pair[0] not in pairs,
+             "Unexpected systemd unit state")
+        pairs[require_pair[0]] = require_pair[1]
+    need(set(pairs) == {"LoadState", "ActiveState"},
+         "Incomplete systemd unit state")
+    return (pairs["ActiveState"] == "inactive" and
+            pairs["LoadState"] in ("loaded", "not-found"))
+
+
 def no_live_work():
     for unit in SERVICE_STOPS:
         try:
-            p = subprocess.run(["systemctl", "is-active", "--quiet", unit],
-                               stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL, timeout=8)
+            p = subprocess.run(
+                ["systemctl", "show", "--no-pager", "-p", "LoadState",
+                 "-p", "ActiveState", unit],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                text=True, timeout=8, check=False)
         except (OSError, subprocess.TimeoutExpired) as error:
             raise TransactionBlocked("Cannot safely verify CAPE service state") from error
-        need(p.returncode == 3, "CAPE services must be confirmed inactive")
+        need(p.returncode == 0 and
+             service_inactive_from_systemd(p.stdout),
+             "CAPE service is active, failed, masked or state is unknown")
     try:
         p = subprocess.run(["virsh", "-c", "qemu:///system", "list",
                             "--state-running", "--name"],
