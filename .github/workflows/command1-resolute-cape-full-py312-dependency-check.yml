@@ -53,15 +53,15 @@ jobs:
           assert 'gevent==24.2.1' in deps
           print('CAPE_REVISION_PINNED_AND_METADATA_PARSED', len(deps))
           PY
-          # Intentionally metadata-only (no sudo CAPE installer, VM, or pip
-          # into system Python). Binary-only resolution shows unsatisfied C
-          # extension dependencies, without trying arbitrary build scripts.
+          # Binary-only metadata resolution stopped on bs4==0.0.1,
+          # a pure-Python source distribution without any wheels. This
+          # runner has NO cloud credentials, guest disks or host access;
+          # allow isolated SDist metadata builds here, not on a CAPE host.
           /tmp/cape-uv-tool/bin/uv pip compile \
              --python /tmp/cape-py312/bin/python \
-             --only-binary=:all: \
              --output-file /tmp/cape-fully-resolved-cp312.txt \
              /tmp/cape-upstream/pyproject.toml
           test -s /tmp/cape-fully-resolved-cp312.txt
           test "$(python3 --version)" = "Python 3.14.4"
-          echo "PINNED_CAPE_UPSTREAM_CP312_FULL_DEPENDENCY_METADATA_RESOLVED"
-          echo "DEPENDENCIES_NOT_INSTALLED_OR_EXECUTED"
+          echo "PINNED_CAPE_UPSTREAM_CP312_METADATA_RESOLVED_WITH_ISOLATED_SDIST_BUILDS"
+          echo "CAPE_NOT_INSTALLED;_ISOLATED_SDIST_METADATA_BUILD_SCRIPTS_MAY_HAVE_RUN"
