@@ -30,7 +30,7 @@ BASE = ("python3", "python3-venv", "python3-pip", "git", "cpu-checker",
 # historical 7-base-package component remains unchanged.
 VIRT26 = ("qemu-system-x86", "qemu-utils", "libvirt-clients",
           "libvirt-daemon-system", "libvirt-daemon-config-network",
-          "ovmf", "swtpm", "swtpm-tools", "virtinst")
+          "ovmf", "swtpm", "swtpm-tools", "virtinst", "rclone")
 ENV = {"LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive",
        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin"}
 PACKAGE = re.compile(r"[a-z0-9][a-z0-9+.-]*(?::[a-z0-9-]+)?\Z")
