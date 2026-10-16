@@ -59,7 +59,7 @@ def request_headers(token: str | None) -> dict:
     # Never add a bogus "Bearer None" header to public HTTPS requests.
     if token is not None:
         require(type(token) is str and 8 <= len(token) <= 500 and
-                "\\n" not in token and "\\r" not in token,
+                "\n" not in token and "\r" not in token,
                 "Invalid optional read-only GitHub token")
         headers["Authorization"] = "Bearer " + token
     return headers
@@ -67,7 +67,7 @@ def request_headers(token: str | None) -> dict:
 
 def api_json(path: str, token: str | None) -> dict:
     require(re.fullmatch(r"/git/commits/[0-9a-f]{40}", path) is not None or
-            re.fullmatch(r"/git/trees/[0-9a-f]{40}\\?recursive=1", path) is not None,
+            re.fullmatch(r"/git/trees/[0-9a-f]{40}\?recursive=1", path) is not None,
             "Disallowed GitHub API endpoint")
     req = Request(API + path, headers=request_headers(token))
     with urlopen(req, timeout=30) as response:
