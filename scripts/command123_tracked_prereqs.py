@@ -55,8 +55,13 @@ def verify_host():
         if "=" in line and not line.startswith("#"):
             key, val = line.split("=", 1)
             values[key] = val.strip('"')
+    # Ubuntu 26.04 LTS ships official signed QEMU/libvirt versions meeting
+    # the native snapshot VERSION thresholds. This only permits the seven
+    # tracked base prerequisites; it is NOT authorization to install the
+    # hypervisor, run guests, or assume swtpm snapshot coherence.
     need(values.get("ID") == "ubuntu" and
-         values.get("VERSION_ID") == "24.04", "Requires Ubuntu 24.04")
+         values.get("VERSION_ID") in ("24.04", "26.04"),
+         "Requires supported Ubuntu 24.04 or 26.04 LTS")
 
 
 def installed():
