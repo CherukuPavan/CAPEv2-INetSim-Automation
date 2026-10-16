@@ -30,6 +30,7 @@ import uuid
 import command3_cape_services as services
 import command3_cape_tmpfs as tmpfs
 import command3_cape_routing as routing
+import command3_service_owned_rollback as owned
 
 UNITS=services.OPERATOR_ORDER
 RECEIPTS=Path("/var/lib/cape-command3-restart-receipts")
@@ -195,12 +196,19 @@ def apply(host,routing_conf,cuckoo_conf,receipts):
          second["approved_five_units"]==first["approved_five_units"] and
          second["all_five_units_loaded"] and second["tmpfs_ready"],
          "Routing/units/tmpfs changed after approval")
+    # Capture exact pre-restart process invocation and unit-file states.
+    # Without this baseline, a later deployment-scoped rollback cannot
+    # distinguish CAPE services already running from deployment-started
+    # services; stop only the latter.
+    baseline=owned.snapshot()
     folder=witness_dir(receipts)
     path=folder/("command3-five-units."+uuid.uuid4().hex+".json")
     document={
         "result":"COMMAND3_FIVE_SERVICE_RESTART_STARTED",
         "target_host":name,"approved_units":list(UNITS),
         "completed":[],"current_step":None,
+        "service_states_before":baseline,
+        "service_states_after":{},
         "routing_sha256":first["routing_file_sha256"],
         "guest_or_snapshot_modified":False,
         "malware_analysis_authorized":False,
@@ -217,10 +225,21 @@ def apply(host,routing_conf,cuckoo_conf,receipts):
             need(latest["routing_file_sha256"]==first["routing_file_sha256"],
                  "Routing config changed while restarting services")
             restart_exact(unit)
+            post=owned.unit_state(unit)
+            need(post["ActiveState"]=="active" and
+                 post["UnitFileState"]==baseline[unit]["UnitFileState"] and
+                 post["FragmentPath"]==baseline[unit]["FragmentPath"],
+                 "Systemd unit state or file drifted after restart")
+            document["service_states_after"][unit]=post
             document["completed"].append(unit)
             document["current_step"]=None
             record(path,document)
         final=wait_active()
+        last=owned.snapshot()
+        need(all(last[unit]==document["service_states_after"][unit]
+                 for unit in UNITS),
+             "Service invocation changed during post-restart health check")
+        document["service_states_after"]=last
         need([v["unit"] for v in final]==list(UNITS),
              "Unexpected systemd status listing after restart")
         document["result"]="COMMAND3_FIVE_SERVICE_RESTARTS_ACTIVE_VERIFIED"
@@ -233,6 +252,8 @@ def apply(host,routing_conf,cuckoo_conf,receipts):
             "systemd_units_active_at_check":True,
             "guest_or_snapshot_modified":False,
             "network_containment_or_TPM_revert_attested":False,
+            "owned_service_rollback_receipt_available":True,
+            "preexisting_active_services_preserved_by_rollback":True,
             "CAPE_READY_FOR_SAMPLE_ANALYSIS":False,
         }
     except Exception as exc:
