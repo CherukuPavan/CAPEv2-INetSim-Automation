@@ -38,6 +38,7 @@ SHUTDOWN_BATCH_PHASE="graceful-shutdown-batch"
 PHASES={
     "stage":("command2_portable_zero_nic_entrypoint.py","stage","plan"),
     "network-install":("command2_portable_network_install.py","install","plan"),
+    "network-rollback":("command2_portable_network_rollback.py","rollback","plan"),
     "guard-persistence":("command2_portable_guard_persistence.py","install","plan"),
     "identity-build":("command2_portable_guest_identity_iso.py","build","plan"),
     "identity-attach":("command2_portable_guest_identity_attach.py","attach","plan"),
@@ -137,9 +138,10 @@ def choose(args):
         return script_path,argv,{"stage":"ZERO_NIC_COUNT_DRIVEN_ONLY","vm_count":args.count,
                  "guest_approval_or_boot_performed":False}
 
-    if phase in ("snapshot-batch","cape-register","network-install","guard-persistence"):
+    if phase in ("snapshot-batch","cape-register","network-install",
+                  "network-rollback","guard-persistence"):
         absolute(args.journal,"journal")
-        if phase not in ("network-install","guard-persistence"):
+        if phase not in ("network-install","network-rollback","guard-persistence"):
             need(args.witness_dir is not None,"Separate private revert witness folder required")
         # Validate the target subnet using the first canonical guest config,
         # never using a caller-invented subnet.
@@ -149,7 +151,7 @@ def choose(args):
         for row in rows:
             _,current,_=load_guest(args.journal,host,row["libvirt_name"])
             need(current==subnet,"Mixed guest analysis subnets refused")
-        if phase in ("network-install","guard-persistence"):
+        if phase in ("network-install","network-rollback","guard-persistence"):
             argv=["--mode",mode,"--approved-host",host,"--journal",str(args.journal)]
         else:
             argv=["--approved-host",host,"--journal",str(args.journal),
