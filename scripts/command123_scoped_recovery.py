@@ -32,6 +32,7 @@ def owned_stage_plan(host, txid):
     source, doc = transaction.load(txid, host)
     need(doc["phase"] == "active",
          "Transaction must be in active state (not partial or completed)")
+    need(bool(doc["entries"]), "Transaction has no attested resources to reverse")
     names = [item.get("kind") for item in doc["entries"]]
     # Reject unknown/unfinished assets even if the helper subcommands
     # might independently permit a subset. No blind cleanup of VMs/etc.
@@ -66,6 +67,8 @@ def owned_stage_plan(host, txid):
                       if package_rows and
                          package_rows[0]["status"] == "sealed"
                       else None)
+    if package_rows and package_rows[0]["status"] == "rollback_verified":
+        packages.verify_reversed(txid, host)
     need(apt_inspection is None or
          apt_inspection["exact_dpkg_after_state_matches"],
          "Cannot safely remove package additions")
