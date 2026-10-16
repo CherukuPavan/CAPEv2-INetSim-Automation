@@ -17,11 +17,11 @@ class PublicBootstrapTests(unittest.TestCase):
     def test_single_paste_command_compiles_and_pins_both_objects(self):
         command = e.render(REV, BLOB)
         self.assertTrue(command.startswith(
-            "python3 - <<'CAPE_VERIFIED_PUBLIC_BOOTSTRAP'\\n"))
+            "python3 - <<'CAPE_VERIFIED_PUBLIC_BOOTSTRAP'\n"))
         self.assertTrue(command.rstrip().endswith(
             "CAPE_VERIFIED_PUBLIC_BOOTSTRAP"))
-        raw = command.split("\\n",1)[1].rsplit(
-            "\\nCAPE_VERIFIED_PUBLIC_BOOTSTRAP",1)[0]
+        raw = command.split("\n",1)[1].rsplit(
+            "\nCAPE_VERIFIED_PUBLIC_BOOTSTRAP",1)[0]
         ast.parse(raw)
         self.assertIn('REVISION = "'+REV+'"',raw)
         self.assertIn('EXPECTED_BLOB = "'+BLOB+'"',raw)
@@ -52,12 +52,12 @@ class PublicBootstrapTests(unittest.TestCase):
         original = sys.argv
         try:
             sys.argv=["verified-public-source","--revision",REV,"--public"]
-            with mock.patch.object(checkout.os,"geteuid",return_value=1000), \\
-                 mock.patch.object(checkout.sys.stdin,"isatty",return_value=True), \\
+            with mock.patch.object(checkout.os,"geteuid",return_value=1000), \
+                 mock.patch.object(checkout.sys.stdin,"isatty",return_value=True), \
                  mock.patch.object(checkout.os,"uname",return_value=SimpleNamespace(
-                     machine="x86_64")), \\
+                     machine="x86_64")), \
                  mock.patch.object(checkout.getpass,"getpass",
-                                   side_effect=AssertionError("must not prompt")), \\
+                                   side_effect=AssertionError("must not prompt")), \
                  mock.patch.object(checkout,"acquire",
                                    return_value=Path("/tmp/public-source/"+REV)) as acquire:
                 self.assertEqual(checkout.main(),0)
