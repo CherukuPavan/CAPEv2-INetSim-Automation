@@ -117,6 +117,36 @@ class CloneRecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(u.CloneRollbackBlocked,"Snapshot"):
                 u.live_admission(self.row)
 
+    def test_other_vm_image_or_nvram_reference_blocks_cleanup(self):
+        for kind in ("disk","nvram"):
+            shared=(f'<disk device="disk"><source file="{self.disk}"/></disk>'
+                    if kind=="disk" else
+                    f'<os><nvram>{self.nvram}</nvram></os>')
+            xml='<domain><name>unrelated</name><devices>'+shared+'</devices></domain>'
+            def mocked_virsh(*args):
+                if args==("list","--all","--name"):
+                    return "win11_1\nunrelated\n"
+                if args==("dumpxml","--inactive","unrelated"):
+                    return xml
+                raise AssertionError("Unexpected libvirt request")
+            with mock.patch.object(stager,"virsh",side_effect=mocked_virsh):
+                with self.subTest(kind=kind), self.assertRaisesRegex(
+                        u.CloneRollbackBlocked,"Another defined VM"):
+                    u.no_foreign_domain_uses_images(VM,str(self.disk),
+                                                    str(self.nvram))
+
+    def test_no_foreign_vm_storage_sharing_is_admitted(self):
+        xml='<domain><name>unrelated</name><devices></devices></domain>'
+        def mocked(*args):
+            if args==("list","--all","--name"):
+                return "win11_1\nunrelated\n"
+            if args==("dumpxml","--inactive","unrelated"):
+                return xml
+            raise AssertionError("Unexpected query")
+        with mock.patch.object(stager,"virsh",side_effect=mocked):
+            self.assertIsNone(u.no_foreign_domain_uses_images(
+                VM,str(self.disk),str(self.nvram)))
+
     def test_inactive_guest_xml_with_nic_cannot_be_removed(self):
         xml=(f'<domain type="kvm"><name>{VM}</name><uuid>{UID}</uuid>'
              f'<genid>{GENID}</genid>'
