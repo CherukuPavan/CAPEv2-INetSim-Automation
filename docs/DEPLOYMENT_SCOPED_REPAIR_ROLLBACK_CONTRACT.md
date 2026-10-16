@@ -145,6 +145,25 @@ later reviews. Any guest, network, firewall, account or unowned transaction
 entry causes the scoped controller to STOP without attempting deletion.
 This remains an incremental recovery subset, not universal uninstall.
 
+**2026-10-16 pinned upstream CAPE source:** the development branch now
+has `scripts/command1_tracked_cape_source.py`. Under an existing private
+Command 1 transaction it prepares a durable ledger entry **before**
+creating a new `/opt/cape-deployments/<transaction>/CAPEv2` source checkout.
+It fetches an explicitly provided 40-hex upstream Git commit (never a
+floating branch), rejects links, submodules and untracked files, and
+records the observed pristine checkout tree and source-file SHA256 manifest.
+Its guarded `undo` never touches a checkout with changed files or an
+unrelated destination. Instead it quarantines only that transaction-owned
+checkout on the SAME filesystem, preserving the forensic copy, after
+checking that CAPE services and VMs are stopped. The scoped recovery
+controller now reverses recorded CAPE files, quarantines this pristine
+owned source, then removes only the proven newly installed base packages;
+remaining source quarantine bytes require separate explicit disposal.
+Synthetic tests include actual local Git init/fetch/checkout and tamper
+cases, not physical host CAPE installation. This is source staging only:
+no CAPE installer, Python environment, databases, services, QEMU/libvirt,
+Windows master, TPM restore, networking or full undo has been delivered.
+
 **These are NOT final release features.** The new ledger does NOT yet
 automatically start inside a fully implemented fresh-host Command 1
 bootstrap; it cannot safely undo other CAPE dependencies/packages,
