@@ -222,6 +222,7 @@ def verified_receipt(path):
     need(type(obj) is dict and obj.get("schema") == 1 and
          type(obj.get("entries")) is list and
          obj.get("phase") in ("active", "repair_partial",
+                               "file_rollback_partial",
                                "rollback_partial", "rolled_back"),
          "Invalid ledger schema")
     return obj
@@ -402,7 +403,7 @@ def read_backup(folder, item, state):
     return raw
 
 
-def rollback_plan(transaction, host):
+def rollback_plan(transaction, host, *, files_only=False):
     receipt, doc = load(transaction, host)
     need(doc["phase"] == "active",
          "Rollback planning refuses partial or completed transactions")
@@ -410,14 +411,26 @@ def rollback_plan(transaction, host):
     for entry in reversed(doc["entries"]):
         kind, step_id = entry["kind"], entry["id"]
         if kind == "package" and entry["status"] == "rollback_verified":
-            # Package removals have their own separate verified recovery,
-            # with exact before/after dpkg state evidence.
             actions.append({"id": step_id, "action": "keep",
                             "already_reversed_by": "tracked_apt_rollback"})
             continue
+        if kind == "package" and entry["status"] == "sealed" and files_only:
+            # Release files in reverse deployment order before uninstalling
+            # packages. Keep package receipt active for later exact APT undo.
+            actions.append({"id": step_id, "action": "defer_package"})
+            continue
+        if kind == "file" and entry["status"] == "rollback_verified":
+            _, current = observed_file(entry["path"])
+            action = "keep" if current == entry["before"] else "BLOCKED_DRIFT"
+            if action != "keep":
+                blocked.append(step_id)
+            actions.append({"id": step_id, "path": entry["path"],
+                            "action": action})
+            continue
         if kind != "file" or entry["status"] != "sealed":
             blocked.append(step_id)
-            actions.append({"id": step_id, "action": "BLOCKED_UNOWNED_OR_INCOMPLETE"})
+            actions.append({"id": step_id,
+                            "action": "BLOCKED_UNOWNED_OR_INCOMPLETE"})
             continue
         before, after = entry["before"], entry["after"]
         _, current = observed_file(entry["path"])
@@ -428,15 +441,100 @@ def rollback_plan(transaction, host):
         else:
             action = "BLOCKED_DRIFT"
             blocked.append(step_id)
-        # Prove that rollback payloads remain authentic before advertising.
         if action == "restore_before":
             read_backup(receipt.parent, "before-" + step_id, before)
         actions.append({"id": step_id, "path": entry["path"], "action": action})
-    return {"result": "CAPE_DEPLOYMENT_TRANSACTION_ROLLBACK_PLAN",
+    return {"result": ("CAPE_DEPLOYMENT_FILE_FIRST_ROLLBACK_PLAN"
+                       if files_only else
+                       "CAPE_DEPLOYMENT_TRANSACTION_ROLLBACK_PLAN"),
             "transaction_id": transaction, "can_rollback": not blocked,
             "blocked_ids": blocked, "actions": actions,
+            "package_rollback_deferred": files_only,
             "all_deployment_resource_types_supported": False,
             "no_changes_performed": True}
+
+
+@serialized_transaction
+def rollback_files_first(transaction, host, approved=False):
+    """Reverse tracked files, leaving separately tracked APT in place.
+
+    The transaction remains ACTIVE after successful file restoration.
+    Only then may the exact separately guarded APT rollback run.
+    """
+    need(approved is True and sys.stdin.isatty() and os.geteuid() == 0,
+         "File-first rollback requires interactive root")
+    receipt, doc = load(transaction, host)
+    need(doc["phase"] == "active", "Cannot replay interrupted file undo")
+    preview = rollback_plan(transaction, host, files_only=True)
+    need(preview["can_rollback"] and
+         any(x["kind"] == "file" and x["status"] == "sealed"
+             for x in doc["entries"]),
+         "Unowned changes or no pending tracked files")
+    no_live_work()
+    phrase = "ROLLBACK-CAPE-FILES-BEFORE-APT-" + transaction
+    need(input("Type " + phrase + ": ").strip() == phrase,
+         "File rollback not approved")
+    need(rollback_plan(transaction, host, files_only=True) == preview,
+         "File rollback targets drifted before consent")
+    doc["phase"] = "file_rollback_partial"
+    doc["current_step"] = None
+    atomic_receipt(receipt, doc)
+    completed = []
+    try:
+        for action in preview["actions"]:
+            step = action["id"]
+            entry = next(item for item in doc["entries"] if item["id"] == step)
+            if entry["kind"] == "package":
+                need(action["action"] in ("defer_package", "keep"),
+                     "Package state changed during file undo")
+                continue
+            doc["current_step"] = step
+            atomic_receipt(receipt, doc)
+            if entry["status"] == "rollback_verified":
+                need(action["action"] == "keep", "Tracked file drift")
+            elif action["action"] == "keep":
+                _, current = observed_file(entry["path"])
+                need(current == entry["before"], "File drift on rollback")
+            else:
+                _, current = observed_file(entry["path"])
+                need(current == entry["after"], "File drift on rollback")
+                if action["action"] == "restore_before":
+                    data = read_backup(receipt.parent, "before-" + step,
+                                       entry["before"])
+                    restore_original(entry["path"], data, entry["before"])
+                elif action["action"] == "quarantine_created":
+                    quarantine = receipt.parent / "quarantine"
+                    quarantine.mkdir(mode=0o700, exist_ok=True)
+                    owner_dir(quarantine)
+                    target = quarantine / step
+                    need(not target.exists() and not target.is_symlink(),
+                         "Quarantine file conflict")
+                    os.rename(entry["path"], target)
+                    fsync_dir(quarantine)
+                    fsync_dir(Path(entry["path"]).parent)
+                else:
+                    need(False, "Unexpected file rollback action")
+            _, verified = observed_file(entry["path"])
+            need(verified == entry["before"],
+                 "Original file did not return to baseline")
+            entry["status"] = "rollback_verified"
+            entry["file_rollback_action"] = action["action"]
+            completed.append(step)
+            doc["completed_steps"] = completed
+            doc["current_step"] = None
+            atomic_receipt(receipt, doc)
+        doc["phase"] = "active"
+        doc.pop("completed_steps", None)
+        doc.pop("current_step", None)
+        atomic_receipt(receipt, doc)
+        return {"result": "CAPE_RECORDED_FILES_REVERSED_APT_STILL_PENDING",
+                "file_steps": completed,
+                "transaction_still_active": True,
+                "full_deployment_rollback_ready": False}
+    except Exception as error:
+        raise TransactionBlocked(
+            "Partial file undo retained for manual recovery; no blind retry"
+        ) from error
 
 
 def repair_plan(transaction, host):
@@ -652,6 +750,7 @@ def main():
     p.add_argument("--mode", required=True,
                    choices=("begin", "current", "prepare-file", "seal-file",
                             "record-unsupported", "plan-repair", "repair",
+                            "plan-files-first", "rollback-files-first",
                             "plan-rollback", "rollback"))
     p.add_argument("--approved-host", required=True)
     p.add_argument("--transaction")
@@ -683,6 +782,12 @@ def main():
                 output = repair_plan(args.transaction, args.approved_host)
             elif args.mode == "repair":
                 output = repair(args.transaction, args.approved_host, True)
+            elif args.mode == "plan-files-first":
+                output = rollback_plan(args.transaction, args.approved_host,
+                                       files_only=True)
+            elif args.mode == "rollback-files-first":
+                output = rollback_files_first(args.transaction, args.approved_host,
+                                              True)
             elif args.mode == "plan-rollback":
                 output = rollback_plan(args.transaction, args.approved_host)
             else:
