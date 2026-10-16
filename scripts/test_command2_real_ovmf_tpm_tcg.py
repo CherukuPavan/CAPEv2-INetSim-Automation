@@ -16,6 +16,9 @@ import time
 from test_command2_real_swtpm_snapshot_tcg import QMP, wait_for
 
 
+@unittest.skipUnless(
+    all(shutil.which(x) for x in ("qemu-system-x86_64","qemu-img","swtpm")),
+    "Requires official QEMU/swtpm binaries; dedicated real-tool CI installs them")
 class RealOVMFQcow2Snapshot(unittest.TestCase):
     def command(self,*args):
         r=subprocess.run(args,text=True,capture_output=True,timeout=45,
