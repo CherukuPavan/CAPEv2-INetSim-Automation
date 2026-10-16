@@ -88,6 +88,29 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+def no_foreign_domain_uses_images(vm,disk,nvram):
+    """A user's other guest must never lose shared Windows storage."""
+    names=[x.strip() for x in
+           stager.virsh("list","--all","--name").splitlines() if x.strip()]
+    need(len(names)<=128 and len(names)==len(set(names)),
+         "Cannot trust libvirt domain inventory")
+    need(vm in names, "Target clone not present in complete VM inventory")
+    for other in names:
+        if other==vm:
+            continue
+        need(re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", other) is not None,
+             "Foreign libvirt name invalid; stop cleanup")
+        root=ET.fromstring(stager.virsh("dumpxml","--inactive",other))
+        need(root.tag=="domain" and root.findtext("name")==other,
+             "Cannot review other domain storage")
+        disks={elem.get("file") for elem in
+               root.findall("./devices/disk/source") if elem.get("file")}
+        fw=root.findtext("./os/nvram")
+        need(disk not in disks and nvram not in disks and
+             fw not in (disk,nvram),
+             "Another defined VM references this clone's OS/UEFI storage")
+
+
 def live_admission(row):
     vm=row["libvirt_name"]
     uid=row["libvirt_uuid_candidate"]
@@ -122,6 +145,8 @@ def live_admission(row):
     tpm_dir=Path("/var/lib/libvirt/swtpm")/uid
     need(not tpm_dir.exists() and not tpm_dir.is_symlink(),
          "Persistent/volatile swtpm state exists: require different coherent recovery")
+    no_foreign_domain_uses_images(vm,row["disk_target"],
+                                  row["uefi_nvram_target"])
     return raw
 
 
