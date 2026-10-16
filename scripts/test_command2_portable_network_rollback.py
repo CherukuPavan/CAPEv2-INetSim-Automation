@@ -47,7 +47,7 @@ class RollbackTests(unittest.TestCase):
         self.doc = sealed(self.journal)
 
     def stubs(self, stack, *, nft=NFT, xml=NET_XML, guest=False,
-              guest_xml=GUEST_XML):
+              guest_xml=GUEST_XML, guest_state="shut off"):
         stack.enter_context(mock.patch.object(
             m.workflow, "canonical_host", return_value=HOST))
         stack.enter_context(mock.patch.object(
@@ -63,6 +63,8 @@ class RollbackTests(unittest.TestCase):
                 return "win11_1" if guest else ""
             if args == ("list", "--name"):
                 return ""
+            if args == ("domstate", "win11_1"):
+                return guest_state
             if args == ("dumpxml", "--inactive", "win11_1"):
                 return guest_xml
             raise AssertionError("Unexpected libvirt call "+str(args))
@@ -125,6 +127,18 @@ class RollbackTests(unittest.TestCase):
             self.stubs(stack, guest=True, guest_xml=domain)
             result = m.inspect(HOST, self.journal)
         self.assertTrue(result["no_domain_references_network"])
+
+    def test_paused_or_suspended_unrelated_guest_blocks_network_undo(self):
+        unrelated=('<domain><name>win11_1</name><devices>'
+                   '<interface type="bridge"><source bridge="virbr0"/>'
+                   '</interface></devices></domain>')
+        for state in ("paused","pmsuspended","running","crashed"):
+            with self.subTest(state=state), ExitStack() as stack:
+                self.stubs(stack,guest=True,guest_xml=unrelated,
+                           guest_state=state)
+                with self.assertRaisesRegex(
+                        m.NetworkRollbackBlocked,"Non-shutoff"):
+                    m.inspect(HOST,self.journal)
 
     def test_refuse_kernel_tap_or_veth_port_before_network_delete(self):
         for links in ('[{"ifname":"veth4"}]',
