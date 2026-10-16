@@ -157,6 +157,8 @@ def preflight(args):
     }
 
 def execute(args):
+    # Reject malformed partial runtime profiles before even TTY/host probes.
+    runtime_arguments(args)
     need(sys.stdin.isatty(),"Use interactive root terminal")
     initial=preflight(args)
     print(json.dumps(initial,indent=2,sort_keys=True),flush=True)
