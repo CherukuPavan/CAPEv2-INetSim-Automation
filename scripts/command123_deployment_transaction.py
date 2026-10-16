@@ -170,7 +170,8 @@ def verified_receipt(path):
     obj = json.loads(raw)
     need(type(obj) is dict and obj.get("schema") == 1 and
          type(obj.get("entries")) is list and
-         obj.get("phase") in ("active", "rollback_partial", "rolled_back"),
+         obj.get("phase") in ("active", "repair_partial",
+                               "rollback_partial", "rolled_back"),
          "Invalid ledger schema")
     return obj
 
@@ -343,6 +344,8 @@ def read_backup(folder, item, state):
 
 def rollback_plan(transaction, host):
     receipt, doc = load(transaction, host)
+    need(doc["phase"] == "active",
+         "Rollback planning refuses partial or completed transactions")
     actions, blocked = [], []
     for entry in reversed(doc["entries"]):
         kind, step_id = entry["kind"], entry["id"]
@@ -368,6 +371,88 @@ def rollback_plan(transaction, host):
             "blocked_ids": blocked, "actions": actions,
             "all_deployment_resource_types_supported": False,
             "no_changes_performed": True}
+
+
+def repair_plan(transaction, host):
+    receipt, doc = load(transaction, host)
+    need(doc["phase"] == "active",
+         "Repair planning refuses partial or rolled back transactions")
+    actions, blocked = [], []
+    for entry in doc["entries"]:
+        step = entry["id"]
+        if entry["kind"] != "file" or entry["status"] != "sealed":
+            blocked.append(step)
+            actions.append({"id": step,
+                            "action": "BLOCKED_UNOWNED_OR_INCOMPLETE"})
+            continue
+        after = entry["after"]
+        _, observed = observed_file(entry["path"])
+        if observed == after:
+            action = "keep"
+        elif observed is None and after is not None:
+            action = "recreate_from_sealed"
+            read_backup(receipt.parent, "after-" + step, after)
+        else:
+            action = "BLOCKED_DRIFT"
+            blocked.append(step)
+        actions.append({"id": step, "path": entry["path"], "action": action})
+    return {"result": "CAPE_DEPLOYMENT_TRANSACTION_REPAIR_PLAN",
+            "transaction_id": transaction, "can_repair": not blocked,
+            "blocked_ids": blocked, "actions": actions,
+            "all_deployment_resource_types_supported": False,
+            "no_changes_performed": True}
+
+
+@serialized_transaction
+def repair(transaction, host, approved=False):
+    need(approved is True and sys.stdin.isatty() and os.geteuid() == 0,
+         "Repair requires interactive root approval")
+    receipt, doc = load(transaction, host)
+    need(doc["phase"] == "active", "Unsafe to replay partial repair")
+    preview = repair_plan(transaction, host)
+    need(preview["can_repair"] and doc["entries"],
+         "Unsealed or unsupported resource prevents repair")
+    no_live_work()
+    phrase = "REPAIR-CAPE-TRANSACTION-" + transaction
+    need(input("Type " + phrase + ": ").strip() == phrase,
+         "Explicit repair approval declined")
+    need(repair_plan(transaction, host) == preview,
+         "Repair targets changed after approval")
+    doc["phase"] = "repair_partial"
+    doc["current_step"] = None
+    atomic_receipt(receipt, doc)
+    completed = []
+    try:
+        for action in preview["actions"]:
+            step = action["id"]
+            entry = next(x for x in doc["entries"] if x["id"] == step)
+            doc["current_step"] = step
+            atomic_receipt(receipt, doc)
+            if action["action"] == "keep":
+                pass
+            elif action["action"] == "recreate_from_sealed":
+                _, observed = observed_file(entry["path"])
+                need(observed is None, "File unexpectedly reappeared")
+                raw = read_backup(receipt.parent, "after-" + step,
+                                  entry["after"])
+                restore_original(entry["path"], raw, entry["after"])
+                _, restored = observed_file(entry["path"])
+                need(restored == entry["after"],
+                     "Repair readback mismatch")
+            else:
+                need(False, "Unexpected repair action")
+            completed.append(step)
+            doc["completed_steps"] = completed
+            doc["current_step"] = None
+            atomic_receipt(receipt, doc)
+        doc["phase"] = "active"
+        doc.pop("completed_steps", None)
+        doc.pop("current_step", None)
+        atomic_receipt(receipt, doc)
+        return {"result": "CAPE_TRACKED_MISSING_FILES_REPAIRED",
+                "steps": completed, "whole_deployment_repair_ready": False}
+    except Exception as error:
+        raise TransactionBlocked("Partial repair retained for manual recovery") from error
 
 
 def no_live_work():
@@ -470,7 +555,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--mode", required=True,
                    choices=("begin", "prepare-file", "seal-file",
-                            "record-unsupported", "plan-rollback", "rollback"))
+                            "record-unsupported", "plan-repair", "repair",
+                            "plan-rollback", "rollback"))
     p.add_argument("--approved-host", required=True)
     p.add_argument("--transaction")
     p.add_argument("--stage", choices=sorted(STAGES))
@@ -493,6 +579,10 @@ def main():
             elif args.mode == "record-unsupported":
                 output = record_unsupported(args.transaction, args.approved_host,
                                             args.stage, args.kind, args.identity)
+            elif args.mode == "plan-repair":
+                output = repair_plan(args.transaction, args.approved_host)
+            elif args.mode == "repair":
+                output = repair(args.transaction, args.approved_host, True)
             elif args.mode == "plan-rollback":
                 output = rollback_plan(args.transaction, args.approved_host)
             else:
