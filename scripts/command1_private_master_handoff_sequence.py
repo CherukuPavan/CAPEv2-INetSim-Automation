@@ -102,6 +102,8 @@ def inputs(args):
          re.fullmatch(r"cape-master-[A-Za-z0-9_-]{4,72}", args.bundle_id)
          is not None,
          "Exact approved master bundle ID required")
+    need(args.bundle_destination.name == args.bundle_id,
+         "Local golden bundle directory must match exact encrypted remote bundle ID")
     return {
         "result": "COMMAND1_PRIVATE_MASTER_HANDOFF_PREFLIGHT",
         "approved_host": args.approved_host,
