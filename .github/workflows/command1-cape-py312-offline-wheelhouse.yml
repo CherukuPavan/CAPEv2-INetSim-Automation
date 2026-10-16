@@ -166,6 +166,54 @@ jobs:
             /tmp/cape-replayed-wheels/python_tlsh-*.whl
           if-no-files-found: warn
           retention-days: 3
+      - name: Check real 170-wheel approved assets cannot be replaced by CAPE runtime user
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONPATH: scripts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # /tmp is intentionally not protected and is forbidden for a real
+          # operator install. Place exact wheel artifacts in a root-owned
+          # secure staging directory before giving CAPE a read-only view.
+          install -d -m 0755 /opt/cape-reviewed-python
+          install -d -m 0755 /opt/cape-reviewed-python/wheels
+          install -d -m 0755 /opt/cape-reviewed-python/source
+          install -d -m 0755 /opt/cape-reviewed-python/bin
+          install -m 0644 /tmp/cape-wheel-manifest.json \
+            /opt/cape-reviewed-python/manifest.json
+          install -m 0644 /tmp/cape-offline-wheels-hash.lock \
+            /opt/cape-reviewed-python/lock.txt
+          install -m 0755 /tmp/cape-uv-tool/bin/uv \
+            /opt/cape-reviewed-python/bin/uv
+          find /tmp/cape-built-wheels -maxdepth 1 -type f -name '*.whl' \
+            -exec install -m 0644 -t /opt/cape-reviewed-python/wheels '{}' +
+          test "$(find /opt/cape-reviewed-python/wheels -type f | wc -l)" = 170
+          python3 -B - <<'PY'
+          from pathlib import Path
+          from command1_cape_runtime_rootless_stage import (
+              verify_root_immutable_inputs, RuntimeBlocked)
+          root=Path('/opt/cape-reviewed-python')
+          params=dict(
+              manifest=root/'manifest.json',lock=root/'lock.txt',
+              wheelhouse=root/'wheels',uv=root/'bin/uv',
+              python=Path('/usr/bin/python3.14'),
+              cape_source=root/'source'
+          )
+          out=verify_root_immutable_inputs(**params)
+          assert out['immutable_root_owned_wheels_verified']==170
+          print('REAL_170_ROOT_OWNED_IMMUTABLE_RUNTIME_WHEELS_ACCEPTED')
+          candidate=next((root/'wheels').glob('*.whl'))
+          candidate.chmod(0o666)
+          try:
+              verify_root_immutable_inputs(**params)
+              raise AssertionError('Writability must block execution')
+          except RuntimeBlocked as exc:
+              assert 'not root-owned' in str(exc), str(exc)
+          finally:
+              candidate.chmod(0o644)
+          print('RUNTIME_USER_WRITABLE_WHEEL_BLOCKED_PREEXECUTION')
+          PY
       - name: Fresh isolated Python 3.12 can install and execute pinned CAPE dependency CLI with NO network
         env:
           UV_NO_CACHE: "1"
