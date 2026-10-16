@@ -36,7 +36,8 @@ SERVICE_STOPS = tuple(sorted(UNIT_FILES))
 BLOCKED_HOSTS = frozenset(("ssl-55", "cse-ssl-55", "ssl-46", "cse-ssl-46"))
 MAX_FILE = 2 * 1024 * 1024
 MAX_RECEIPT = 1024 * 1024
-KINDS = frozenset(("file", "package", "libvirt_domain", "libvirt_network",
+KINDS = frozenset(("file", "package", "cape_runtime",
+                   "libvirt_domain", "libvirt_network",
                    "nft_table", "service_state", "account"))
 STAGES = frozenset(("command1", "command2", "command3"))
 
@@ -414,6 +415,20 @@ def rollback_plan(transaction, host, *, files_only=False):
             actions.append({"id": step_id, "action": "keep",
                             "already_reversed_by": "tracked_apt_rollback"})
             continue
+        if kind == "cape_runtime" and entry["status"] == "rollback_verified":
+            # Verify preserved runtime quarantine with its independent
+            # receipt before sealing the enclosing deployment as reversed.
+            try:
+                from command1_cape_runtime_rootless_rollback import inspect as runtime_undo_plan
+                witness = runtime_undo_plan(host, transaction)
+                need(witness["action"] == "already_quarantined" and
+                     witness["step_id"] == step_id,
+                     "Owned CAPE Python runtime undo not independently verified")
+            except (OSError, ValueError, RuntimeError) as error:
+                raise TransactionBlocked("Runtime undo unverifiable") from error
+            actions.append({"id":step_id,"action":"keep",
+                            "already_reversed_by":"runtime_quarantine"})
+            continue
         if kind == "cape_source" and entry["status"] == "rollback_verified":
             # Recheck actual pristine quarantine, not just journal status.
             try:
@@ -426,6 +441,11 @@ def rollback_plan(transaction, host, *, files_only=False):
                 raise TransactionBlocked("Owned CAPE source undo unverifiable") from error
             actions.append({"id": step_id, "action": "keep",
                             "already_reversed_by": "tracked_cape_source"})
+            continue
+        if kind == "cape_runtime" and entry["status"] == "sealed" and files_only:
+            # File restoration must happen before owned runtime quarantine,
+            # and both must finish before source/package rollback.
+            actions.append({"id":step_id,"action":"defer_runtime"})
             continue
         if kind == "cape_source" and entry["status"] == "sealed" and files_only:
             actions.append({"id": step_id, "action": "defer_source"})
