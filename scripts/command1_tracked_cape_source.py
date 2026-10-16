@@ -77,7 +77,9 @@ def execute_git(path, *args, timeout=120):
     need(path.is_absolute() and path.is_dir() and not path.is_symlink(),
          "Untrusted Git execution directory")
     result = subprocess.run(
-        ["git", "-C", str(path), "-c", "core.hooksPath=/dev/null", *args],
+        ["git", "-C", str(path), "-c", "core.hooksPath=/dev/null",
+         "-c", "core.fsmonitor=false",
+         "-c", "core.externalDiff=false", *args],
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         env=GIT_ENV, timeout=timeout, check=False)
     need(result.returncode == 0 and len(result.stdout) <= MAX_BYTES,
@@ -165,8 +167,10 @@ def plan(host, transaction, revision):
          "Source has already been attempted in this transaction")
     root = safe_root(create=False)
     dest = root / transaction
-    need(not dest.exists() and not dest.is_symlink(),
-         "Source checkout destination already exists")
+    staging = root / (".cape-stage-" + transaction)
+    need(not dest.exists() and not dest.is_symlink() and
+         not staging.exists() and not staging.is_symlink(),
+         "Source checkout destination or abandoned staging area exists")
     return {"result": "COMMAND1_PINNED_CAPE_SOURCE_PLAN_ONLY",
             "source": SOURCE, "revision": revision,
             "target": str(dest / "CAPEv2"),
@@ -192,12 +196,17 @@ def install(host, transaction, revision):
         entry = {"id": step, "kind": "cape_source", "stage": "command1",
                  "status": "prepared", "git_source": SOURCE,
                  "revision": revision, "target": str(dest / "CAPEv2"),
+                 "staging": str(DEST_ROOT / (".cape-stage-" + transaction)),
                  "before_present": False, "after": None}
         ledger["entries"].append(entry)
         tx.atomic_receipt(receipt, ledger)
         # All source writes happen strictly after durable prepare receipt.
         safe_root(create=True)
-        stage = Path(tempfile.mkdtemp(prefix=".cape-source-", dir=DEST_ROOT))
+        stage = DEST_ROOT / (".cape-stage-" + transaction)
+        need(not stage.exists() and not stage.is_symlink(),
+             "Transaction already has an abandoned staged checkout")
+        stage.mkdir(mode=0o700)
+        tx.fsync_dir(DEST_ROOT)
         try:
             execute_git(stage, "init", "-q")
             execute_git(stage, "remote", "add", "origin", SOURCE)
@@ -207,10 +216,12 @@ def install(host, transaction, revision):
             identity = pristine(stage, revision)
             # Stage becomes CAPEv2 only in its own isolated transaction root.
             dest.mkdir(mode=0o755)
+            dest.chmod(0o755)
             tx.fsync_dir(DEST_ROOT)
             final = dest / "CAPEv2"
             need(not final.exists(), "Source checkout target collision")
             os.rename(stage, final)
+            final.chmod(0o755)  # Public upstream code; readable by CAPE service.
             tx.fsync_dir(dest)
             need(pristine(final, revision) == identity,
                  "Post-placement Git checkout verification failed")
