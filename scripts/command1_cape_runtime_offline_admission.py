@@ -70,37 +70,66 @@ def read_regular(path, maximum):
 
 
 def safe_wheel(p, expected_length, expected_sha):
+    """Stream wheel SHA256 without buffering hundreds of MB in memory."""
     need(type(expected_length) is int and
          0 < expected_length <= MAX_WHEEL_SIZE and
          type(expected_sha) is str and SHA256.fullmatch(expected_sha),
          "Untrusted package hash/size")
-    content, actual = read_regular(p, MAX_WHEEL_SIZE)
-    need(len(content) == expected_length and actual == expected_sha,
+    target = Path(p)
+    need(target.is_absolute() and
+         not any(x.is_symlink() for x in (target, *target.parents)),
+         "Untrusted path/symlink")
+    prior = target.lstat()
+    need(stat.S_ISREG(prior.st_mode) and prior.st_nlink == 1 and
+         prior.st_size == expected_length,
          "Wheel byte count or SHA256 mismatch")
-    from io import BytesIO
+    fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
-        with zipfile.ZipFile(BytesIO(content), "r") as archive:
-            members = archive.infolist()
-            need(members and len(members) <= 40000,
-                 "Unexpected ZIP membership count")
-            uncompressed = 0
-            seen_names = set()
-            for member in members:
-                name = member.filename
-                need(name and not name.startswith(("/", "\\")) and
-                     "\\" not in name and "\x00" not in name and
-                     all(segment not in ("", ".", "..")
-                         for segment in name.rstrip("/").split("/")),
-                     "Untrusted wheel ZIP member")
-                need(name not in seen_names, "Duplicate ZIP member")
-                seen_names.add(name)
-                uncompressed += member.file_size
-                need(uncompressed <= MAX_WHEEL_SIZE * 4,
-                     "Oversized wheel expanded data")
-    except (zipfile.BadZipFile, ValueError) as exc:
-        raise AdmissionBlocked("Damaged or unsafe wheel ZIP") from exc
-    return actual
-
+        with os.fdopen(fd, "rb", closefd=True) as src:
+            actual_stat = os.fstat(src.fileno())
+            need((actual_stat.st_dev, actual_stat.st_ino, actual_stat.st_size) ==
+                 (prior.st_dev, prior.st_ino, prior.st_size),
+                 "Wheel changed before opening")
+            digest = hashlib.sha256()
+            remaining = prior.st_size
+            while remaining:
+                block = src.read(min(1024 * 1024, remaining))
+                need(block, "Wheel truncated during SHA256 read")
+                digest.update(block)
+                remaining -= len(block)
+            need(digest.hexdigest() == expected_sha,
+                 "Wheel byte count or SHA256 mismatch")
+            after = os.fstat(src.fileno())
+            need((after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) ==
+                 (prior.st_dev, prior.st_ino, prior.st_size, prior.st_mtime_ns),
+                 "Wheel changed during verification")
+            src.seek(0)
+            try:
+                with zipfile.ZipFile(src, "r") as archive:
+                    members = archive.infolist()
+                    need(members and len(members) <= 40000,
+                         "Unexpected ZIP membership count")
+                    uncompressed = 0
+                    seen_names = set()
+                    for member in members:
+                        name = member.filename
+                        need(name and not name.startswith(("/", "\\\\")) and
+                             "\\\\" not in name and "\\x00" not in name and
+                             all(part not in ("", ".", "..")
+                                 for part in name.rstrip("/").split("/")),
+                             "Untrusted wheel ZIP member")
+                        need(name not in seen_names, "Duplicate ZIP member")
+                        seen_names.add(name)
+                        uncompressed += member.file_size
+                        need(uncompressed <= MAX_WHEEL_SIZE * 4,
+                             "Oversized wheel expanded data")
+            except (zipfile.BadZipFile, ValueError) as exc:
+                raise AdmissionBlocked("Damaged or unsafe wheel ZIP") from exc
+    except Exception:
+        # os.fdopen takes ownership of fd once entered. Never retry or
+        # continue installation after a failed hash/ZIP identity check.
+        raise
+    return expected_sha
 
 def plan(manifest_path, lock_path, wheel_dir, externally_approved_hash,
          min_count=160):
