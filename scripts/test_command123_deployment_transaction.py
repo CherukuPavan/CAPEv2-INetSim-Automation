@@ -50,6 +50,8 @@ class TransactionTests(unittest.TestCase):
             linked = ""
         if (linked.endswith("/ledger.json") or
                 linked.endswith("/.transaction.lock") or
+                linked.endswith("/.active.lock") or
+                linked.endswith("/active.json") or
                 "/transactions/" in linked and
                 ("/before-" in linked or "/after-" in linked)):
             return SimpleNamespace(st_mode=st.st_mode, st_nlink=st.st_nlink,
@@ -83,6 +85,34 @@ class TransactionTests(unittest.TestCase):
         self.assertFalse(doc["whole_deployment_rollback_ready"])
         self.assertEqual(path.stat().st_mode & 0o777, 0o600)
         self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
+
+    def test_active_pointer_is_private_and_second_begin_refused(self):
+        ident = t.active_transaction("rakshati")
+        self.assertEqual(ident, self.transaction)
+        marker = self.root / "active.json"
+        self.assertEqual(marker.stat().st_mode & 0o777, 0o600)
+        with self.assertRaises(t.TransactionBlocked):
+            t.begin("rakshati")
+
+    def test_pointer_symlink_and_tampering_block_discovery(self):
+        marker = self.root / "active.json"
+        marker.unlink()
+        marker.symlink_to(self.root / "evil")
+        with self.assertRaises(t.TransactionBlocked):
+            t.active_transaction("rakshati")
+        marker.unlink()
+        marker.write_text(
+            '{"schema":1,"host":"rakshati","transaction_id":"' +
+            "f" * 32 + '"}')
+        with self.assertRaises(t.TransactionBlocked):
+            t.active_transaction("rakshati")
+
+    def test_current_discovery_refuses_rolled_back_transaction(self):
+        path, doc = t.load(self.transaction, "rakshati")
+        doc["phase"] = "rolled_back"
+        t.atomic_receipt(path, doc)
+        with self.assertRaises(t.TransactionBlocked):
+            t.active_transaction("rakshati")
 
     def test_prepare_before_mutation_and_seal_attest_after(self):
         self.config.write_bytes(b"initial")
