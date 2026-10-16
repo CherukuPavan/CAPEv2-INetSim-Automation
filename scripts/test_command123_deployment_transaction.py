@@ -427,7 +427,28 @@ class ServiceRecoveryGuards(unittest.TestCase):
             raise AssertionError("unexpected host command")
         with mock.patch.object(t.subprocess, "run", side_effect=run) as proc:
             t.no_live_work()
-        self.assertEqual(proc.call_count, len(t.SERVICE_STOPS) + 1)
+        # Libvirt all-domains inventory is checked twice to reject drift.
+        self.assertEqual(proc.call_count, len(t.SERVICE_STOPS) + 2)
+
+    def test_no_live_work_rejects_paused_libvirt_guest(self):
+        libvirt_calls=[]
+        def run(cmd, **kwargs):
+            if cmd[0] == "systemctl":
+                return SimpleNamespace(returncode=0,stdout=(
+                    "LoadState=not-found\\nActiveState=inactive\\n"))
+            if cmd[0] == "virsh":
+                libvirt_calls.append(cmd)
+                if "list" in cmd:
+                    return SimpleNamespace(returncode=0,stdout="win11_1\\n")
+                return SimpleNamespace(returncode=0,stdout="paused\\n")
+            raise AssertionError("Unexpected command")
+        with mock.patch.object(t.subprocess,"run",side_effect=run):
+            with self.assertRaisesRegex(
+                    t.TransactionBlocked, "every libvirt domain shut off"):
+                t.no_live_work()
+        self.assertEqual(
+            libvirt_calls[1],
+            ["virsh","-c","qemu:///system","domstate","win11_1"])
 
     def test_no_live_work_refuses_active_cape_unit(self):
         def run(cmd, **kwargs):
