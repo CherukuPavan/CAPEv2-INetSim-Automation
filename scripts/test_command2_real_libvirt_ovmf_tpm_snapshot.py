@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import os
 from pathlib import Path
 import pwd
 import shutil
@@ -120,11 +121,39 @@ class RealLibvirtSnapshot(unittest.TestCase):
                 },sort_keys=True))
             finally:
                 if domain_created:
-                    subprocess.run(["virsh","-c","qemu:///system","destroy",name],
-                                   capture_output=True,timeout=25,check=False)
-                    subprocess.run(["virsh","-c","qemu:///system","undefine",name,
-                                    "--nvram","--snapshots-metadata"],
-                                   capture_output=True,timeout=25,check=False)
+                    # Restricted GitHub Docker can hang in libvirt shutdown
+                    # when its cgroup v2 mount is read-only. This test is
+                    # allowed to tolerate that ONLY in an ephemeral container
+                    # explicitly acknowledged by the CI workflow. The whole
+                    # container including the guest disk is destroyed by
+                    # GitHub after the job. Never permit this on a real host.
+                    ephemeral=(os.environ.get(
+                        "CAPE_DISPOSABLE_LIBVIRT_CONTAINER")=="1" and
+                        os.environ.get("GITHUB_ACTIONS")=="true")
+                    failures=[]
+                    for cmd in (
+                        ("destroy",name),
+                        ("undefine",name,"--nvram","--snapshots-metadata")
+                    ):
+                        try:
+                            p=subprocess.run(
+                                ["virsh","-c","qemu:///system",*cmd],
+                                capture_output=True,text=True,
+                                timeout=12,check=False)
+                            if p.returncode != 0:
+                                failures.append(cmd[0]+": "+p.stderr[:120])
+                        except (subprocess.TimeoutExpired,OSError):
+                            failures.append(cmd[0]+": timeout/unavailable")
+                    if failures:
+                        if not ephemeral:
+                            raise AssertionError(
+                                "Benign libvirt guest cleanup failed: "+str(failures))
+                        print(json.dumps({
+                            "container_local_guest_cleanup_incomplete":True,
+                            "runner_discards_whole_container":True,
+                            "cleanup_errors":failures,
+                            "physical_host_cleanup_success_claimed":False,
+                        },sort_keys=True))
 
 
 if __name__=="__main__":
