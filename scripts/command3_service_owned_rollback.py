@@ -241,8 +241,10 @@ def rollback(path,approved_host):
             if action["action"]!="STOP_ONLY_DEPLOYMENT_STARTED":
                 continue
             unit=action["unit"]
-            need(plan_from_receipt(trusted_receipt(path)) == plan,
-                 "Unit state drift during scoped reversal")
+            prior_state=witness["service_states_after"][unit]
+            current_state=unit_state(unit)
+            need(current_state == prior_state,
+                 "Unit drifted after restart: refuse to stop it")
             no_live_guest()
             record["pending"]=unit
             restart.record(journal_path,record)
