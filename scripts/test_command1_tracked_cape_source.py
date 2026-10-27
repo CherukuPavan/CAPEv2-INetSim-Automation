@@ -122,6 +122,33 @@ class SourceTests(unittest.TestCase):
             with self.assertRaises(s.SourceBlocked):
                 s.portable_quarantine_digest(self.origin,pinned)
 
+    def test_vetted_symlink_source_quarantine_can_be_rechecked(self):
+        # A vetted link must be accepted at both write and read of the
+        # rollback receipt. Prior code wrote the digest with revision
+        # but rechecked it without revision, permanently blocking undo.
+        branch=self.origin / "data" / "yara" / "monitor"
+        branch.mkdir(parents=True)
+        (branch / "yara").symlink_to("analyzer/windows/data/yara/")
+        self.run_git(self.origin, "add", "data/yara/monitor/yara")
+        self.run_git(self.origin, "update-index", "--add", "--cacheinfo",
+                     "160000", self.revision, "tests/data")
+        self.run_git(self.origin, "commit", "-qm", "vetted CAPE source")
+        (self.origin / "tests" / "data").mkdir(parents=True)
+        revision=self.run_git(self.origin, "rev-parse", "HEAD").strip()
+        self.stage()
+        with mock.patch.object(s, "VETTED_CAPE_SPECIAL_REV", revision), \
+             mock.patch.object(s, "VETTED_SOURCE_GITLINKS",
+                               {"tests/data": self.revision}):
+            s.install("rakshati", self.txid, revision)
+            with mock.patch.object(s.tx, "no_live_work"), \
+                 mock.patch("builtins.input", return_value=(
+                     "QUARANTINE-OWNED-CAPE-SOURCE-" + self.txid)):
+                result=s.undo("rakshati", self.txid)
+            self.assertEqual(result["result"],
+                             "COMMAND1_OWNED_SOURCE_UNDEPLOYED_QUARANTINED")
+            proof=s.undo_plan("rakshati", self.txid)
+            self.assertEqual(proof["action"], "already_quarantined")
+
     def test_unvetted_revision_rejects_even_known_link(self):
         branch=self.origin / "data" / "yara" / "monitor"
         branch.mkdir(parents=True)
