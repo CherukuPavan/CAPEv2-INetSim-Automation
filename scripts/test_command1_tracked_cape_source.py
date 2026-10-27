@@ -324,6 +324,73 @@ class SourceTests(unittest.TestCase):
         with self.assertRaises(s.SourceBlocked):
             s.undo_plan("rakshati", self.txid)
 
+    @unittest.skipUnless(os.geteuid() == 0, "Source receipt recovery needs real root")
+    def test_prepared_actual_checkout_is_recovered_without_refetch(self):
+        self.stage()
+        self.target_root.mkdir(mode=0o755)
+        staging=self.target_root / (".cape-stage-" + self.txid)
+        staging.mkdir(mode=0o700)
+        s.execute_git(staging,"init","-q")
+        s.execute_git(staging,"remote","add","origin",str(self.origin))
+        s.execute_git(staging,"fetch","--no-tags","--depth=1","origin",
+                      self.revision)
+        s.execute_git(staging,"checkout","-q","--detach","FETCH_HEAD")
+        self.doc["entries"]=[{
+            "id":"f"*32,"kind":"cape_source","stage":"command1",
+            "status":"prepared","git_source":s.SOURCE,
+            "revision":self.revision,
+            "target":str(self.target_root/self.txid/"CAPEv2"),
+            "staging":str(staging),
+            "before_present":False,"after":None}]
+        original=s.execute_git
+        seen=[]
+        def guarded_git(*args,**kwargs):
+            seen.append(args[1])
+            if args[1] == "fetch":
+                raise AssertionError("Recovery must not refetch the source")
+            return original(*args,**kwargs)
+        with mock.patch("command1_sealed_base_handoff.attest",
+             return_value={"transaction_id":self.txid}), \
+             mock.patch("builtins.input",return_value=(
+                 "RECOVER-VERIFIED-CAPE-SOURCE-"+self.txid)), \
+             mock.patch.object(s,"execute_git",side_effect=guarded_git):
+            out=s.recover_prepared("rakshati",self.txid,self.revision)
+        self.assertEqual(out["result"],
+                         "COMMAND1_PREPARED_CAPE_SOURCE_RECOVERED_AND_SEALED")
+        self.assertEqual(self.doc["entries"][0]["status"],"sealed")
+        self.assertNotIn("fetch",seen)
+        self.assertFalse(staging.exists())
+        self.assertTrue((self.target_root/self.txid/"CAPEv2").is_dir())
+
+    @unittest.skipUnless(os.geteuid() == 0, "Source receipt recovery needs real root")
+    def test_prepared_source_tampering_stops_before_rename(self):
+        self.stage()
+        self.target_root.mkdir(mode=0o755)
+        staging=self.target_root / (".cape-stage-" + self.txid)
+        staging.mkdir(mode=0o700)
+        s.execute_git(staging,"init","-q")
+        s.execute_git(staging,"remote","add","origin",str(self.origin))
+        s.execute_git(staging,"fetch","--no-tags","--depth=1","origin",
+                      self.revision)
+        s.execute_git(staging,"checkout","-q","--detach","FETCH_HEAD")
+        (staging/"MALICIOUS_UNTRACKED").write_text("do not trust")
+        self.doc["entries"]=[{
+            "id":"f"*32,"kind":"cape_source","stage":"command1",
+            "status":"prepared","git_source":s.SOURCE,
+            "revision":self.revision,
+            "target":str(self.target_root/self.txid/"CAPEv2"),
+            "staging":str(staging),
+            "before_present":False,"after":None}]
+        with mock.patch("command1_sealed_base_handoff.attest",
+             return_value={"transaction_id":self.txid}), \
+             mock.patch("builtins.input") as consent:
+            with self.assertRaisesRegex(s.SourceBlocked,
+                                        "Unexpected source changes"):
+                s.recover_prepared("rakshati",self.txid,self.revision)
+        consent.assert_not_called()
+        self.assertTrue(staging.exists())
+        self.assertEqual(self.doc["entries"][0]["status"],"prepared")
+
     def test_operator_decline_causes_no_write(self):
         stages = self.stage()
         with mock.patch("builtins.input", return_value="NO"):
