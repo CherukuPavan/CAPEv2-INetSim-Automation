@@ -317,7 +317,7 @@ jobs:
                       assert target.is_relative_to(root), (entry,target)
           print('PY312_MANAGED_INTERPRETER_RELOCATED_AND_SYMLINK_SAFE')
           PY
-          sha256sum /tmp/cape-python312-managed-runtime.tar /tmp/cape-uv-tool/bin/uv             /tmp/cape-wheel-manifest.json /tmp/cape-offline-wheels-hash.lock             > /tmp/cape-runtime-build-input-sha256.txt
+          sha256sum /tmp/cape-python312-managed-runtime.tar /tmp/cape-uv-tool/bin/uv /tmp/cape-wheel-manifest.json /tmp/cape-offline-wheels-hash.lock > /tmp/cape-runtime-build-input-sha256.txt
           CAPE_DIST_NAME="$(basename "$dist")" python3 -B - <<'PY'
           import hashlib,json,os
           from pathlib import Path
@@ -341,7 +341,7 @@ jobs:
              'guest_snapshots_not_tested':True,
           }
           Path('/tmp/cape-runtime-inputs-provenance.json').write_text(
-              json.dumps(meta,sort_keys=True,indent=2)+'\\n')
+              json.dumps(meta,sort_keys=True,indent=2)+'\n')
           print('SOURCE_MATCHED_OFFLINE_PYTHON_AND_UV_INPUTS_ATTESTED')
           PY
       - name: Preserve portable Python runtime toolchain for external hash review
