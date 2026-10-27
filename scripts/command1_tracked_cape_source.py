@@ -102,7 +102,7 @@ def tracked_hash(directory, pinned=None):
     need(directory.is_absolute() and not directory.is_symlink(),
          "Source path invalid")
     raw = execute_git(directory, "ls-files", "--stage", "-z")
-    rows = raw.split(b"\\0")
+    rows = raw.split(b"\0")
     need(rows[-1] == b"" and 0 < len(rows) - 1 <= MAX_TRACKED,
          "Git checkout tracked-file inventory invalid")
     summary = hashlib.sha256()
@@ -110,8 +110,8 @@ def tracked_hash(directory, pinned=None):
     seen = set()
     has_specials = pinned == VETTED_CAPE_SPECIAL_REV
     for row in rows[:-1]:
-        need(b"\\t" in row, "Malformed Git tracked-file record")
-        header, encoded_path = row.split(b"\\t", 1)
+        need(b"\t" in row, "Malformed Git tracked-file record")
+        header, encoded_path = row.split(b"\t", 1)
         fields = header.split()
         need(len(fields) == 3 and fields[2] == b"0",
              "Unmerged Git index entry")
@@ -175,7 +175,7 @@ def tracked_hash(directory, pinned=None):
             finally:
                 os.close(fd)
         need(total <= MAX_BYTES, "Source checkout unexpectedly large")
-        summary.update(encoded_path + b"\\0" + mode + b"\\0")
+        summary.update(encoded_path + b"\0" + mode + b"\0")
         summary.update(current)
     return {"file_count": len(seen), "total_bytes": total,
             "content_sha256": summary.hexdigest()}
@@ -314,7 +314,7 @@ def portable_quarantine_digest(directory, revision=None):
                      relative in VETTED_SOURCE_SYMLINKS and
                      os.readlink(item.path) == VETTED_SOURCE_SYMLINKS[relative],
                      "Quarantine contains unapproved symbolic link")
-                digest.update(b"L" + relative.encode("utf-8") + b"\\0")
+                digest.update(b"L" + relative.encode("utf-8") + b"\0")
                 digest.update(VETTED_SOURCE_SYMLINKS[relative].encode())
                 continue
             if stat.S_ISDIR(st.st_mode):
