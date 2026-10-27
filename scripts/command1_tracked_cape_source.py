@@ -39,7 +39,7 @@ MAX_BYTES = 2 * 1024 * 1024 * 1024
 # This pin prevents loosening symlink/submodule admission for other commits.
 VETTED_CAPE_SPECIAL_REV = "297bbbcc15386e903734cec8f8a7c805053d6d0c"
 VETTED_SOURCE_SYMLINKS = {"data/yara/monitor/yara": "analyzer/windows/data/yara/"}
-VETTED_SOURCE_GITLINKS = {"tests/data": "b394a00ba3649afc69e7f22ad845a3a8a659200"}
+VETTED_SOURCE_GITLINKS = {"tests/data": "b394a00ba3649afc69e7f22ad845a3a8a659200e"}
 GIT_ENV = {
     "LC_ALL": "C",
     "PATH": "/usr/bin:/bin",
