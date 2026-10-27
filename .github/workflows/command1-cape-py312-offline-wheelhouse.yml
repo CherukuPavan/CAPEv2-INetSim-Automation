@@ -290,11 +290,12 @@ jobs:
       - name: Package exact managed Python 3.12 and uv as hashable offline runtime inputs
         shell: bash
         run: |
-          set -Eeuo pipefail
+          set -Eeuxo pipefail
           # An arbitrary new Ubuntu host cannot reconstruct a pinned
           # isolated interpreter from the wheelhouse alone. Export the
           # interpreter tree + uv from the same disposable build.
-          mapfile -t distdirs < <(find /tmp/cape-python-versions -mindepth 1 -maxdepth 1 -type d | sort)
+          find /tmp/cape-python-versions -mindepth 1 -maxdepth 2 -printf '%y %p\\n' | head -n 35
+          mapfile -t distdirs < <(find /tmp/cape-python-versions -mindepth 1 -maxdepth 1 -type d -name 'cpython-3.12.12-*' | sort)
           test "${#distdirs[@]}" -eq 1
           dist="${distdirs[0]}"
           test -x "$dist/bin/python3.12"
