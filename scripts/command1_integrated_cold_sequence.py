@@ -65,11 +65,11 @@ def runtime_preflight(args):
         return {"requested": False, "runtime_stage_performed": False}
     # Refuse Ubuntu 22/24 wheels before a fresh-host installer can create
     # a base transaction, even when optional profile arguments are complete.
-    runtime.verified_runtime_release()
     admission = runtime.wheels.plan(
         fields["runtime_manifest"], fields["runtime_lock"],
         fields["runtime_wheelhouse"],
         fields["runtime_approved_manifest_sha256"])
+    runtime.verified_runtime_release(admission["target_platform"])
     need(admission["source_sha"] == args.cape_revision,
          "Offline runtime source differs from pinned CAPE commit")
     need(runtime.sha_file(fields["runtime_uv"]) ==
