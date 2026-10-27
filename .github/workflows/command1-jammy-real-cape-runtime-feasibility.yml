@@ -93,6 +93,64 @@ jobs:
           grep -q -- '--help' /tmp/cape-jammy-help.txt
           echo "JAMMY_EXACT_PINNED_CAPEV2_PY312_CLI_SUCCESS_WHEELS=$count"
           echo "NO_CAPE_SYSTEMD_LIBVIRT_SNAPSHOTS_INSTALLED_OR_TESTED"
+      - name: Attest exact Jammy runtime wheels and preserve reviewable bytes
+        if: success()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          /tmp/cape-py312/bin/python - <<'PY'
+          from pathlib import Path
+          from pip._vendor.packaging.utils import parse_wheel_filename
+          import hashlib,json
+          root=Path('/tmp/cape-jammy-wheels')
+          wheel_files=sorted(root.glob('*.whl'))
+          assert len(wheel_files)>=160
+          packages={}
+          for path in wheel_files:
+              name,ver,_,_=parse_wheel_filename(path.name)
+              name=str(name).lower()
+              assert name not in packages,name
+              packages[name]={
+                  'version':str(ver), 'wheel':path.name,
+                  'size':path.stat().st_size,
+                  'sha256':hashlib.sha256(path.read_bytes()).hexdigest()
+              }
+          lock=Path('/tmp/cape-jammy-built-hash.lock')
+          payload={
+              'source_commit':'297bbbcc15386e903734cec8f8a7c805053d6d0c',
+              'platform':'ubuntu-22.04-amd64',
+              'python_version':'3.12.12','uv_build_version':'0.9.15',
+              'wheel_count':len(packages),
+              'total_wheel_bytes':sum(v['size'] for v in packages.values()),
+              'lock_sha256':hashlib.sha256(lock.read_bytes()).hexdigest(),
+              'wheels':packages,
+              'not_an_approved_host_installer':True,
+          }
+          meta=Path('/tmp/cape-jammy-wheel-manifest.json')
+          meta.write_text(json.dumps(payload,sort_keys=True,indent=2)+'\n')
+          print('JAMMY_SOURCE297_WHEELS',len(packages))
+          print('JAMMY_SOURCE297_MANIFEST_SHA256',hashlib.sha256(meta.read_bytes()).hexdigest())
+          PY
+          sha256sum /tmp/cape-jammy-wheel-manifest.json /tmp/cape-jammy-built-hash.lock
+      - name: Preserve Jammy SHA256 manifest and offline install lock
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-source297-jammy-python312-wheel-manifest
+          path: |
+            /tmp/cape-jammy-wheel-manifest.json
+            /tmp/cape-jammy-built-hash.lock
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve Jammy verified wheelhouse for offline target admission
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-source297-jammy-python312-wheels
+          path: /tmp/cape-jammy-wheels/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
       - name: Preserve pinned dependency report for verification
         if: always()
         uses: actions/upload-artifact@v4
