@@ -13,13 +13,13 @@ import command123_deployment_transaction as tx
 
 class TrackedAPTTests(unittest.TestCase):
     def test_exact_supported_lts_host_versions_for_base_apt_only(self):
-        for release in ("24.04", "26.04"):
+        for release in ("22.04", "24.04", "26.04"):
             with self.subTest(release=release), \
                  mock.patch.object(a.platform, "machine", return_value="x86_64"), \
                  mock.patch.object(Path, "read_text", return_value=(
                      'NAME="Ubuntu"\nID=ubuntu\nVERSION_ID="'+release+'"\n')):
                 self.assertEqual(a.verify_host(), release)
-        for release in ("22.04", "25.10", "26.10", "99.99"):
+        for release in ("20.04", "25.10", "26.10", "99.99"):
             with self.subTest(release=release), \
                  mock.patch.object(a.platform, "machine", return_value="x86_64"), \
                  mock.patch.object(Path, "read_text", return_value=(
@@ -82,6 +82,24 @@ class TrackedAPTTests(unittest.TestCase):
                     with self.assertRaises(tx.TransactionBlocked):
                         a.plan()
                 inventory.assert_not_called()
+
+    def test_jammy_only_seven_base_prerequisites_no_hypervisor(self):
+        # The user's actual fresh Jammy VMware guest is a base-only
+        # staging target. Never borrow Resolute virtualization packages.
+        with mock.patch.object(a,"verify_host",return_value="22.04"), \
+             mock.patch.object(a,"installed",return_value={"dpkg":"1"}), \
+             mock.patch.object(a,"simulate",
+                 side_effect=lambda names:list(names)) as simulation, \
+             mock.patch.object(a.hypervisor,"plan") as newer, \
+             mock.patch.object(a,"no_shadowed_virtualization_executables") as shadow:
+            report=a.plan()
+        self.assertTrue(report["jammy_base_prerequisites_only"])
+        self.assertFalse(report["resolute_virt26_binaries_in_scope"])
+        self.assertFalse(report["snapshot_stack_authorized"])
+        self.assertEqual(set(report["requested_missing"]),set(a.BASE))
+        newer.assert_not_called()
+        shadow.assert_not_called()
+        simulation.assert_called_once_with(sorted(a.BASE))
 
     def test_noble_plan_remains_exact_old_seven_base_packages(self):
         with mock.patch.object(a,"verify_host",return_value="24.04"), \
