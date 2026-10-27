@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Root-private tracked APT prerequisite and Ubuntu26 virtualization binaries.
 
-Ubuntu 24.04 stages ONLY the prior seven base prerequisites. Official Ubuntu
+Ubuntu 22.04 / 24.04 stage ONLY the seven base prerequisites. Official Ubuntu
 26.04 additionally offers reviewed QEMU/libvirt/OVMF/swtpm binary packages
 after positive version admission. The operator must separately approve before
 mutation; full dpkg inventory is journaled. No guest/TPM state is touched and
@@ -26,8 +26,8 @@ import command123_hypervisor_release_compat as hypervisor
 
 BASE = ("python3", "python3-venv", "python3-pip", "git", "cpu-checker",
         "msr-tools", "acpica-tools")
-# Ubuntu 26.04 official LTS virtualization package set. In Ubuntu 24.04 the
-# historical 7-base-package component remains unchanged.
+# Ubuntu 26.04 official LTS virtualization package set. On Jammy/Noble
+# only the historical 7-base-package component is permitted.
 VIRT26 = ("qemu-system-x86", "qemu-utils", "libvirt-clients",
           "libvirt-daemon-system", "libvirt-daemon-config-network",
           "ovmf", "swtpm", "swtpm-tools", "virtinst", "rclone")
@@ -63,13 +63,12 @@ def verify_host():
         if "=" in line and not line.startswith("#"):
             key, val = line.split("=", 1)
             values[key] = val.strip('"')
-    # Ubuntu 26.04 LTS ships official signed QEMU/libvirt versions meeting
-    # the native snapshot VERSION thresholds. This only permits the seven
-    # tracked base prerequisites; it is NOT authorization to install the
-    # hypervisor, run guests, or assume swtpm snapshot coherence.
+    # Jammy is admitted for the existing SEVEN BASE PREREQUISITES ONLY.
+    # Jammy QEMU 6.2 and libvirt 8.0 fail the experimental running
+    # snapshot gate. Do not stage hypervisor binaries or claim CAPE ready.
     need(values.get("ID") == "ubuntu" and
-         values.get("VERSION_ID") in ("24.04", "26.04"),
-         "Requires supported Ubuntu 24.04 or 26.04 LTS")
+         values.get("VERSION_ID") in ("22.04", "24.04", "26.04"),
+         "Requires Ubuntu 22.04, 24.04 or 26.04 LTS for base APT")
     return values["VERSION_ID"]
 
 
@@ -166,6 +165,7 @@ def plan():
             "host_modified": False,
             "target_lts_release": release,
             "resolute_virt26_binaries_in_scope": release == "26.04",
+            "jammy_base_prerequisites_only": release == "22.04",
             "qemu_libvirt_candidate_versions_admitted":
                 (compat is not None and
                  compat["running_snapshot_stack_versions_admitted"]),
