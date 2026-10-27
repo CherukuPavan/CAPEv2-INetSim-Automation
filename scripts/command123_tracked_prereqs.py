@@ -31,6 +31,14 @@ BASE = ("python3", "python3-venv", "python3-pip", "git", "cpu-checker",
 VIRT26 = ("qemu-system-x86", "qemu-utils", "libvirt-clients",
           "libvirt-daemon-system", "libvirt-daemon-config-network",
           "ovmf", "swtpm", "swtpm-tools", "virtinst", "rclone")
+# Fresh Jammy images can require coordinated updates of Python 3.10 runtime
+# binaries in order to install python3-venv. Never admit unrelated packages,
+# QEMU/libvirt or removals through this exception. Old versions are recorded.
+JAMMY_PYTHON_UPGRADE_ALLOWLIST = frozenset((
+    "python3.10", "python3.10-minimal", "libpython3.10-stdlib",
+    "libpython3.10-minimal", "python3-pkg-resources", "python3-distutils",
+    "python3-lib2to3",
+))
 ENV = {"LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive",
        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin"}
 PACKAGE = re.compile(r"[a-z0-9][a-z0-9+.-]*(?::[a-z0-9-]+)?\Z")
@@ -154,8 +162,13 @@ def plan():
         (simulate(missing, allow_virt26=True) if release == "26.04"
          else simulate(missing))
         if missing else [])
-    need(not set(simulated) & set(before),
-         "APT would upgrade or reinstall a preexisting package")
+    planned_upgrades = sorted(set(simulated) & set(before))
+    # This is a bounded exception for the user's newly installed Jammy host.
+    # Other Ubuntu versions retain the strict no-upgrade rule.
+    need(not planned_upgrades or (release == "22.04" and
+         set(planned_upgrades) <= JAMMY_PYTHON_UPGRADE_ALLOWLIST),
+         "APT would upgrade preexisting packages outside Jammy Python "
+         "compatibility allowlist: " + ",".join(planned_upgrades[:15]))
     return {"result": "CAPE_BASE_APT_REVIEW_ONLY",
             "requested_missing": missing,
             "simulated_installations": simulated,
@@ -166,6 +179,8 @@ def plan():
             "target_lts_release": release,
             "resolute_virt26_binaries_in_scope": release == "26.04",
             "jammy_base_prerequisites_only": release == "22.04",
+            "approved_existing_python_package_upgrades": planned_upgrades,
+            "package_rollback_supported": False,
             "qemu_libvirt_candidate_versions_admitted":
                 (compat is not None and
                  compat["running_snapshot_stack_versions_admitted"]),
@@ -225,6 +240,10 @@ def apply(transaction, host):
                   "simulated": proposal["simulated_installations"],
                   "before_sha256": hashlib.sha256(original).hexdigest(),
                   "after_sha256": None,
+                  "preexisting_python_upgrade_versions_before": {
+                      name: before[name] for name in
+                      proposal.get("approved_existing_python_package_upgrades", [])
+                  },
                   "package_rollback_supported": False}
         doc["entries"].append(record)
         # Durably record intent BEFORE apt can mutate the host.
@@ -245,7 +264,8 @@ def apply(transaction, host):
             record["apt_exit_code"] = proc.returncode
             approved = (proc.returncode == 0 and
                         all(n in after for n in proposal["requested_missing"]) and
-                        not changes["preexisting_changed"] and
+                        set(changes["preexisting_changed"]) ==
+                        set(proposal.get("approved_existing_python_package_upgrades", [])) and
                         not changes["preexisting_removed"] and
                         not changes["unplanned_additions"])
             record["status"] = ("sealed" if approved
