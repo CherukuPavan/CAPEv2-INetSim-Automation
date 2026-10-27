@@ -36,7 +36,7 @@ VIRT26 = ("qemu-system-x86", "qemu-utils", "libvirt-clients",
 # QEMU/libvirt or removals through this exception. Old versions are recorded.
 JAMMY_PYTHON_UPGRADE_ALLOWLIST = frozenset((
     "python3.10", "python3.10-minimal", "libpython3.10-stdlib",
-    "libpython3.10-minimal", "python3-pkg-resources", "python3-distutils",
+    "libpython3.10-minimal", "libpython3.10", "python3-pkg-resources", "python3-distutils",
     "python3-lib2to3",
 ))
 ENV = {"LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive",
