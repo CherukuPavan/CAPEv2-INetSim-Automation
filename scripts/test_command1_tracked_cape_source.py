@@ -39,7 +39,9 @@ class SourceTests(unittest.TestCase):
         self.doc = {"phase": "active", "entries": []}
 
     def run_git(self, path, *args):
-        p = subprocess.run(["git", "-C", str(path), *args],
+        p = subprocess.run(["git", "-C", str(path),
+                            "-c", "maintenance.auto=false",
+                            "-c", "gc.auto=0", *args],
                            capture_output=True, text=True, timeout=15)
         self.assertEqual(p.returncode, 0, p.stderr)
         return p.stdout
