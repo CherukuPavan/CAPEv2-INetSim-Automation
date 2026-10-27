@@ -80,15 +80,78 @@ jobs:
           sha256sum output/*-part-* > output/parts.sha256
           cat output/parts.sha256
           cat output/whole-input.sha256
-      - name: Upload each split segment with enforced size below connector transfer limit
+      - name: Upload wheels part 00
         uses: actions/upload-artifact@v4
         with:
-          name: cape-jammy-runtime-split-bundle
+          name: cape-jammy-wheels-part-00
+          path: output/wheels-part-00
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+      - name: Upload wheels part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-jammy-wheels-part-01
+          path: output/wheels-part-01
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+      - name: Upload wheels part 02
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-jammy-wheels-part-02
+          path: output/wheels-part-02
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+      - name: Upload wheels part 03
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-jammy-wheels-part-03
+          path: output/wheels-part-03
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+      - name: Upload python part 00
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-jammy-python-part-00
+          path: output/python-part-00
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+      - name: Upload python part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-jammy-python-part-01
+          path: output/python-part-01
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+      - name: Upload python part 02
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-jammy-python-part-02
+          path: output/python-part-02
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+      - name: Upload python part 03
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-jammy-python-part-03
+          path: output/python-part-03
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+      - name: Upload manifest, uv and part hashes
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-jammy-transfer-manifest
           path: |
-            output/wheels-part-*
-            output/python-part-*
             output/cape-jammy-uv
             output/parts.sha256
             output/whole-input.sha256
+          if-no-files-found: error
           compression-level: 0
           retention-days: 14
