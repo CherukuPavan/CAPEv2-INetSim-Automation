@@ -113,6 +113,22 @@ class TrackedAPTTests(unittest.TestCase):
         self.assertFalse(report["package_rollback_supported"])
         self.assertFalse(report["snapshot_stack_authorized"])
 
+    def test_real_jammy_20261028_six_python_dependency_upgrades(self):
+        # Reproduce fresh 22.04.5 host plan from the uploaded operator log.
+        upgrades = ["libpython3.10", "libpython3.10-minimal",
+                    "libpython3.10-stdlib", "python3-pkg-resources",
+                    "python3.10", "python3.10-minimal"]
+        baseline = {"dpkg": "1", **{pkg: "old" for pkg in upgrades}}
+        with mock.patch.object(a, "verify_host", return_value="22.04"), \
+             mock.patch.object(a, "installed", return_value=baseline), \
+             mock.patch.object(a, "simulate",
+                 return_value=["python3-pip"] + upgrades):
+            proposed = a.plan()
+        self.assertEqual(proposed["approved_existing_python_package_upgrades"],
+                         sorted(upgrades))
+        self.assertFalse(proposed["snapshot_stack_authorized"])
+        self.assertFalse(proposed["package_rollback_supported"])
+
     def test_jammy_unrelated_upgrade_remains_blocked(self):
         with mock.patch.object(a,"verify_host",return_value="22.04"), \
              mock.patch.object(a,"installed",return_value={"dpkg":"1","libc6":"1"}), \
