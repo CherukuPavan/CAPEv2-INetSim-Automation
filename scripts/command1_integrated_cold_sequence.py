@@ -63,6 +63,9 @@ def runtime_preflight(args):
     fields = runtime_arguments(args)
     if fields is None:
         return {"requested": False, "runtime_stage_performed": False}
+    # Refuse Ubuntu 22/24 wheels before a fresh-host installer can create
+    # a base transaction, even when optional profile arguments are complete.
+    runtime.verified_runtime_release()
     admission = runtime.wheels.plan(
         fields["runtime_manifest"], fields["runtime_lock"],
         fields["runtime_wheelhouse"],
