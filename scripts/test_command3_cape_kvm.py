@@ -209,6 +209,8 @@ class KvmMachineTests(unittest.TestCase):
             if args not in values: raise AssertionError(args)
             return values[args].replace("\\\\n","\\n")
         with patch.object(nat.workflow,"canonical_host"), \
+             patch.object(m.quiescence,"no_nonshutoff_domains",
+                          return_value={"only_shutoff_domains_observed":True}) as quiet, \
              patch.object(m.os,"geteuid",return_value=0), \
              patch.object(nat,"journal_rows",return_value=[row]), \
              patch.object(nat,"virsh",side_effect=fake_virsh), \
@@ -238,6 +240,22 @@ class KvmMachineTests(unittest.TestCase):
             self.assertEqual(gateway,"192.168.122.1")
             ram.assert_called_once_with("win11_1",True)
             disk.assert_called_once_with(row,True)
+            quiet.assert_called_once_with()
+
+    def test_command3_registration_quiescence_fail_closed(self):
+        # Refuse registration if a paused, suspended, or newly renamed
+        # foreign domain survives ordinary active-list inspection.
+        import command2_portable_master_nat_attach as nat
+        with patch.object(nat.workflow,"canonical_host"), \
+             patch.object(m.os,"geteuid",return_value=0), \
+             patch.object(nat,"journal_rows",return_value=[{"libvirt_name":"win11_1"}]), \
+             patch.object(m.quiescence,"no_nonshutoff_domains",
+                          side_effect=m.quiescence.QuiescenceBlocked(
+                              "Libvirt domain is live, paused, suspended or state unknown")), \
+             patch.object(nat,"check_network_references",
+                          side_effect=AssertionError("Must stop before network audit")), \
+             self.assertRaises(m.quiescence.QuiescenceBlocked):
+            m.discover("other-host",Path("/root/private/journal.json"),"Afterfull")
 
     def test_read_only_plan_no_mutation_and_no_cape_claim(self):
         with tempfile.TemporaryDirectory() as td:
