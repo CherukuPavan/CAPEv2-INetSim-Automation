@@ -66,6 +66,25 @@ class IntegratedColdTests(unittest.TestCase):
                 seq.execute(self.args)
         mutate.assert_not_called()
 
+    def test_preflight_blocks_mismatched_python_abi_before_mutation(self):
+        for key in seq.RUNTIME_FIELDS:
+            setattr(self.args,key,("a"*64 if "sha256" in key
+                                   else self.path/key))
+        with mock.patch.object(seq,"admitted",return_value={
+                 "service_account_email_to_share_with_as_viewer":
+                 "viewer@example.invalid"}), \
+             mock.patch.object(seq.base,"preflight",return_value={}), \
+             mock.patch.object(seq.runtime,
+                 "verified_runtime_release",
+                 side_effect=seq.runtime.RuntimeBlocked(
+                     "Reviewed CAPE native wheelhouse targets Ubuntu 26.04")) as v, \
+             mock.patch.object(seq.base,"apply") as install:
+            with self.assertRaisesRegex(seq.runtime.RuntimeBlocked,
+                                        "Ubuntu 26.04"):
+                seq.preflight(self.args)
+        install.assert_not_called()
+        v.assert_called_once()
+
     def test_admission_checks_credentials_before_base_transaction(self):
         with ExitStack() as st:
             st.enter_context(mock.patch.object(seq.os,"geteuid",return_value=0))
