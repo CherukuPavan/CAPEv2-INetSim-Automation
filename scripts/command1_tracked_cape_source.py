@@ -383,7 +383,7 @@ def undo_plan(host, transaction):
              type(entry.get("quarantine_content_sha256")) is str and
              re.fullmatch(r"[0-9a-f]{64}",
                           entry["quarantine_content_sha256"]) and
-             portable_quarantine_digest(quarantine) ==
+             portable_quarantine_digest(quarantine, entry["revision"]) ==
              entry["quarantine_content_sha256"],
              "Completed source undo quarantine no longer verified")
         action = "already_quarantined"
