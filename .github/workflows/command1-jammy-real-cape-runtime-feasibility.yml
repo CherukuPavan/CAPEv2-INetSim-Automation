@@ -1,0 +1,83 @@
+name: Exact CAPEv2 Python runtime feasibility on user's Ubuntu 22.04
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/command1-jammy-real-cape-runtime-feasibility.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  jammy-cape-py312:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build and run exact user-source CAPE Python runtime on disposable Jammy container
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          UV_NO_CACHE: "1"
+          UV_PYTHON_INSTALL_DIR: /tmp/cape-pyversions
+          UV_PYTHON_INSTALL_BIN: "0"
+          SOURCE_DATE_EPOCH: "1700000000"
+          CAPE_SOURCE_REV: 297bbbcc15386e903734cec8f8a7c805053d6d0c
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu && test "$VERSION_ID" = 22.04
+          apt-get update -o APT::Get::Update::Error-Mode=any
+          apt-get install -y --no-install-recommends \
+            python3 python3-venv python3-pip git ca-certificates \
+            build-essential cmake pkg-config libssl-dev libffi-dev \
+            zlib1g-dev libjpeg-dev libmagic-dev libfuzzy-dev \
+            libyara-dev libpq-dev libxml2-dev libxslt1-dev
+          python3 -m venv /tmp/cape-uv-tool
+          /tmp/cape-uv-tool/bin/python -m pip install --no-cache-dir --only-binary=:all: uv==0.9.15
+          /tmp/cape-uv-tool/bin/uv python install 3.12.12 --no-bin
+          /tmp/cape-uv-tool/bin/uv venv --managed-python --seed --python 3.12.12 /tmp/cape-py312
+          git clone -q --no-checkout --filter=blob:none https://github.com/kevoreilly/CAPEv2.git /tmp/cape-upstream
+          git -C /tmp/cape-upstream -c maintenance.auto=false -c gc.auto=0 checkout -q --detach "$CAPE_SOURCE_REV"
+          test "$(git -C /tmp/cape-upstream rev-parse HEAD)" = "$CAPE_SOURCE_REV"
+          /tmp/cape-uv-tool/bin/uv pip compile \
+            --python /tmp/cape-py312/bin/python --generate-hashes \
+            --output-file /tmp/cape-jammy-lock.txt \
+            /tmp/cape-upstream/pyproject.toml
+          mkdir -p /tmp/cape-jammy-wheels
+          /tmp/cape-py312/bin/python -m pip wheel \
+            --no-cache-dir --require-hashes --wheel-dir /tmp/cape-jammy-wheels \
+            --requirement /tmp/cape-jammy-lock.txt
+          count="$(find /tmp/cape-jammy-wheels -maxdepth 1 -type f -name '*.whl' | wc -l)"
+          test "$count" -ge 160
+          /tmp/cape-py312/bin/python -m pip install \
+            --no-index --no-deps --only-binary=:all: \
+            --find-links=/tmp/cape-jammy-wheels \
+            --requirement /tmp/cape-jammy-lock.txt
+          /tmp/cape-py312/bin/python - <<'PY'
+          import sys,gevent,greenlet,django,sqlalchemy,yara
+          assert sys.version_info[:3] == (3,12,12),sys.version
+          print('JAMMY_EXACT_CAPE_PY312_CORE_PACKAGES_IMPORT_OK')
+          PY
+          install -d -m 0755 /tmp/cape-runtime-probe
+          chown nobody:nogroup /tmp/cape-runtime-probe
+          cd /tmp/cape-upstream
+          runuser -u nobody -- env HOME=/tmp/cape-runtime-probe \
+            /tmp/cape-py312/bin/python -B /tmp/cape-upstream/cuckoo.py --help \
+            > /tmp/cape-jammy-help.txt
+          grep -q -- '--help' /tmp/cape-jammy-help.txt
+          echo "JAMMY_EXACT_PINNED_CAPEV2_PY312_CLI_SUCCESS_WHEELS=$count"
+          echo "NO_CAPE_SYSTEMD_LIBVIRT_SNAPSHOTS_INSTALLED_OR_TESTED"
+      - name: Preserve pinned dependency report for verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-source297-jammy-py312-dependency-lock
+          path: /tmp/cape-jammy-lock.txt
+          if-no-files-found: warn
+          retention-days: 14
