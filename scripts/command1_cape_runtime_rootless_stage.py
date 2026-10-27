@@ -147,23 +147,25 @@ def source_entry(doc):
     return matches[0]
 
 
-def verified_runtime_release():
-    """Require the exact Ubuntu 26.04 ABI used to build approved wheels.
+def verified_runtime_release(approved_platform="ubuntu-26.04-amd64"):
+    """Bind independently SHA-reviewed native wheels to EXACT Ubuntu ABI.
 
-    The source-only and base APT stages may run on Jammy/Noble, but the
-    CPython3.12 native wheels built on Resolute must never be installed into
-    an older glibc host. Fail before journaling or executing uv.
+    Jammy and Resolute binaries are independently built and must never be
+    cross-installed; no unreviewed Noble/mixed-version profile is accepted.
     """
     release = apt.verify_host()
-    need(release == "26.04",
-         "Reviewed CAPE native wheelhouse targets Ubuntu 26.04 x86_64 only")
+    expected = "ubuntu-" + release + "-amd64"
+    need(approved_platform in ("ubuntu-22.04-amd64",
+                               "ubuntu-26.04-amd64") and
+         approved_platform == expected,
+         "Reviewed CAPE native wheelhouse targets " +
+         approved_platform + ", but host is " + expected)
     return release
 
 
 def plan(host, transaction, manifest, lock, wheelhouse, approved_manifest,
          uv, approved_uv_sha, python, approved_python_sha, user):
     tx.host_guard(host)
-    verified_runtime_release()
     need(type(transaction) is str and
          re.fullmatch(r"[0-9a-f]{32}",transaction),
          "Exact active deployment ID needed")
@@ -187,6 +189,7 @@ def plan(host, transaction, manifest, lock, wheelhouse, approved_manifest,
          sha_file(python) == approved_python_sha,
          "Isolated Python binary does not match approved SHA256")
     packages=wheels.plan(manifest,lock,wheelhouse,approved_manifest)
+    verified_runtime_release(packages["target_platform"])
     protected=verify_root_immutable_inputs(
         manifest=manifest,lock=lock,wheelhouse=wheelhouse,uv=uv,
         python=python,cape_source=original)
