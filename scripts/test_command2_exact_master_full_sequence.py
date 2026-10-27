@@ -21,7 +21,7 @@ class SequenceTests(unittest.TestCase):
 
     def test_count_bounds_and_additional_semantics(self):
         self.assertEqual(s.vm_names(3),["win11_1","win11_2","win11_3"])
-        self.assertEqual(len(s.phases(3)),2+3*4+3)
+        self.assertEqual(len(s.phases(3)),3+3*4+4)
         for n in (-1,0,17,100):
             with self.assertRaises(s.SequenceBlocked):
                 s.vm_names(n)
@@ -35,21 +35,23 @@ class SequenceTests(unittest.TestCase):
 
     def test_order_strict_sequential_windows_identities_and_final_shutdown(self):
         exact=s.phases(2)
-        self.assertEqual(exact[:2],[
-            ("cold_count_stage",None),("all_clone_uefi_qcow2",None)])
-        self.assertEqual(exact[2:6],[
+        self.assertEqual(exact[:3],[
+            ("cold_count_stage",None),("all_clone_uefi_qcow2",None),
+            ("verify_all_clone_uefi_qcow2",None)])
+        self.assertEqual(exact[3:7],[
             ("boot_exact_windows","win11_1"),
             ("upload_trusted_windows_setup","win11_1"),
             ("request_benign_windows_identity","win11_1"),
             ("independently_verify_windows","win11_1")])
-        self.assertEqual(exact[6:10],[
+        self.assertEqual(exact[7:11],[
             ("boot_exact_windows","win11_2"),
             ("upload_trusted_windows_setup","win11_2"),
             ("request_benign_windows_identity","win11_2"),
             ("independently_verify_windows","win11_2")])
-        self.assertEqual(exact[-3:],[
+        self.assertEqual(exact[-4:],[
             ("all_clones_agent_health",None),
             ("capture_all_running_candidates",None),
+            ("verify_all_running_candidates",None),
             ("all_graceful_shutdown",None)])
 
     def test_exact_private_journal_guest_ip_and_media_binding(self):
@@ -74,6 +76,22 @@ class SequenceTests(unittest.TestCase):
             with self.assertRaisesRegex(s.SequenceBlocked,"Unapproved"):
                 s.child_args(a,2,p,"arbitrary-cape-analysis")
 
+    def test_converted_firmware_and_snapshot_capture_reverified_before_handoff(self):
+        with tempfile.TemporaryDirectory() as td:
+            a=self.args(td,2)
+            for phase, expected_mode in (
+                ("verify_all_clone_uefi_qcow2", "verify"),
+                ("verify_all_running_candidates", "verify"),
+            ):
+                argv=s.child_args(a,2,
+                    "/trusted/scripts/"+s.STEPS[phase],phase)
+                self.assertEqual(argv[argv.index("--mode")+1], expected_mode)
+            ordered=s.phases(2)
+            self.assertLess(ordered.index(("all_clone_uefi_qcow2",None)),
+                            ordered.index(("verify_all_clone_uefi_qcow2",None)))
+            self.assertLess(ordered.index(("verify_all_running_candidates",None)),
+                            ordered.index(("all_graceful_shutdown",None)))
+
     def test_read_only_plan_delegates_to_existing_source_admission_only(self):
         with tempfile.TemporaryDirectory() as td:
             a=self.args(td,3)
@@ -85,7 +103,7 @@ class SequenceTests(unittest.TestCase):
                 r=s.plan(a)
             self.assertEqual(r["additional_vm_count"],3)
             self.assertEqual(r["vm_names"],["win11_1","win11_2","win11_3"])
-            self.assertEqual(r["step_count"],2+12+3)
+            self.assertEqual(r["step_count"],3+12+4)
             self.assertFalse(r["host_modified"])
             self.assertFalse(r["TPM_safe_snapshot_restore_proven"])
             self.assertEqual(len(calls),1)
@@ -139,7 +157,7 @@ class SequenceTests(unittest.TestCase):
             invoked=[]
             def child(argv):
                 invoked.append(argv)
-                if len(invoked)==4:return 2
+                if len(invoked)==5:return 2
                 return 0
             with patch.object(s.os,"geteuid",return_value=0), \
                  patch.object(s.sys.stdin,"isatty",return_value=True), \
@@ -153,13 +171,13 @@ class SequenceTests(unittest.TestCase):
                  patch.object(s,"run_child",side_effect=child), \
                  self.assertRaisesRegex(s.SequenceBlocked,"PARTIAL_OR_UNKNOWN"):
                 s.execute(a)
-            self.assertEqual(len(invoked),4)
+            self.assertEqual(len(invoked),5)
             last=receipts[-1]
             self.assertEqual(last["result"],"COMMAND2_SEQUENCE_PARTIAL_OR_UNKNOWN")
             self.assertEqual(last["failed_step"]["step"],
                              "upload_trusted_windows_setup")
             self.assertEqual(last["failed_step"]["vm"],"win11_1")
-            self.assertEqual(len(last["completed"]),3)
+            self.assertEqual(len(last["completed"]),4)
 
     def test_reference_ssl55_never_stages_even_root(self):
         with tempfile.TemporaryDirectory() as td:
