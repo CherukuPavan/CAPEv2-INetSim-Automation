@@ -74,6 +74,9 @@ class IntegratedColdTests(unittest.TestCase):
                  "service_account_email_to_share_with_as_viewer":
                  "viewer@example.invalid"}), \
              mock.patch.object(seq.base,"preflight",return_value={}), \
+             mock.patch.object(seq.runtime.wheels,"plan",return_value={
+                 "target_platform":"ubuntu-26.04-amd64",
+                 "source_sha":self.args.cape_revision}), \
              mock.patch.object(seq.runtime,
                  "verified_runtime_release",
                  side_effect=seq.runtime.RuntimeBlocked(
@@ -83,7 +86,7 @@ class IntegratedColdTests(unittest.TestCase):
                                         "Ubuntu 26.04"):
                 seq.preflight(self.args)
         install.assert_not_called()
-        v.assert_called_once()
+        v.assert_called_once_with("ubuntu-26.04-amd64")
 
     def test_admission_checks_credentials_before_base_transaction(self):
         with ExitStack() as st:
