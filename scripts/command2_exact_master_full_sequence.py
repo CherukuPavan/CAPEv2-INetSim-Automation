@@ -65,16 +65,21 @@ def absolute(path, label):
     return p
 
 def admitted_dirs(args):
-    for field in ("bundle", "disk_dir", "nvram_dir", "journal_dir",
-                  "iso_dir", "evidence_dir"):
-        absolute(getattr(args, field), field)
-    # The source bundle is a separate read-only input, never a work folder.
-    paths = [args.bundle, args.disk_dir, args.nvram_dir,
-             args.journal_dir, args.iso_dir, args.evidence_dir]
-    need(len(set(paths)) == len(paths),
-         "Master source, OS, firmware, journal, ISO and evidence locations must differ")
-    need(all("/.." not in str(p) for p in paths),
-         "Untrusted directory traversal in stage path")
+    """Refuse ancestor aliases: cold master/VM storage must never overlap."""
+    fields = ("bundle", "disk_dir", "nvram_dir", "journal_dir",
+              "iso_dir", "evidence_dir", "receipt_dir")
+    paths = [absolute(getattr(args, field), field) for field in fields]
+    for p in paths:
+        need(".." not in p.parts, "Parent traversal in stage path")
+        for ancestor in (p, *p.parents):
+            need(not ancestor.is_symlink(),
+                 "Symlinked master, VM, or receipt path refused")
+    for i, parent in enumerate(paths):
+        for child in paths[i + 1:]:
+            need(parent != child and parent not in child.parents and
+                 child not in parent.parents,
+                 "Master, OS, firmware, journal, ISO, evidence and receipt "
+                 "paths must be independent, never nested")
     return paths
 
 def pending_journal(args):
@@ -159,9 +164,15 @@ def script_for(step):
     return str(src)
 
 def run_child(argv):
-    need(len(argv) >= 2 and argv[0] in STEPS.values() or
-         Path(argv[0]).name in STEPS.values(),
-         "Unreviewed executable")
+    """Allow only pinned sibling helpers; basenames alone are not trusted."""
+    need(type(argv) is list and len(argv) >= 2 and
+         type(argv[0]) is str, "Invalid helper invocation")
+    helper = Path(argv[0])
+    need(helper.is_absolute() and not helper.is_symlink() and
+         helper.is_file() and helper.parent ==
+         Path(__file__).resolve().parent and
+         helper.name in STEPS.values(),
+         "Unreviewed executable or helper path")
     try:
         return subprocess.run([sys.executable, "-B", *argv],
                               check=False).returncode
