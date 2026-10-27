@@ -18,7 +18,7 @@ import command123_tracked_prereqs as apt
 from command123_tracked_apt_rollback import trusted_inventory_file
 
 
-def attest(host):
+def attest(host, *, allow_prepared_source=False):
     apt.verify_host()
     ident = tx.active_transaction(host)
     receipt, doc = tx.load(ident, host)
@@ -53,11 +53,18 @@ def attest(host):
     present = apt.installed()
     tx.need(present == after,
             "Host package inventory changed since sealed base stage")
-    tx.need(not any(
-        item.get("kind") == "cape_source" and
-        item.get("status") not in ("rollback_verified",)
-        for item in doc["entries"]),
-        "Upstream CAPE source already attempted; inspect its journal")
+    sources = [item for item in doc["entries"]
+               if item.get("kind") == "cape_source"]
+    if allow_prepared_source:
+        tx.need(len(sources) == 1 and
+                sources[0].get("stage") == "command1" and
+                sources[0].get("status") == "prepared",
+                "Expected exactly one prior PREPARED source for recovery")
+    else:
+        tx.need(not any(
+            item.get("status") not in ("rollback_verified",)
+            for item in sources),
+            "Upstream CAPE source already attempted; inspect its journal")
     return {
         "result": "COMMAND1_EXISTING_BASE_TRANSACTION_ATTESTED",
         "transaction_id": ident,
