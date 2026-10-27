@@ -160,7 +160,8 @@ def plan(manifest_path, lock_path, wheel_dir, externally_approved_hash,
     need(type(metadata) is dict and
          metadata.get("source_commit") and
          SHA40.fullmatch(metadata["source_commit"]) and
-         metadata.get("platform") == "ubuntu-26.04-amd64" and
+         metadata.get("platform") in ("ubuntu-26.04-amd64",
+                                      "ubuntu-22.04-amd64") and
          metadata.get("python_version") == "3.12.12" and
          metadata.get("uv_build_version") == "0.9.15" and
          metadata.get("not_an_approved_host_installer") is True,
@@ -212,7 +213,10 @@ def plan(manifest_path, lock_path, wheel_dir, externally_approved_hash,
         "result": "CAPE_PINNED_PY312_OFFLINE_WHEELHOUSE_VERIFIED",
         "source_sha": metadata["source_commit"],
         "python_version": "3.12.12",
-        "target_release": "Ubuntu 26.04 amd64",
+        "target_release": ("Ubuntu 22.04 amd64" if
+                           metadata["platform"] == "ubuntu-22.04-amd64"
+                           else "Ubuntu 26.04 amd64"),
+        "target_platform": metadata["platform"],
         "packages_verified": count,
         "wheel_bytes_verified": total,
         "approved_manifest_sha256": checksum,
