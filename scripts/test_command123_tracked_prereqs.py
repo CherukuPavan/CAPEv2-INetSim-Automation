@@ -101,6 +101,26 @@ class TrackedAPTTests(unittest.TestCase):
         shadow.assert_not_called()
         simulation.assert_called_once_with(sorted(a.BASE))
 
+    def test_jammy_python_runtime_upgrade_is_explicit_and_bounded(self):
+        before={"dpkg":"1","python3.10":"3.10.12-old"}
+        with mock.patch.object(a,"verify_host",return_value="22.04"), \
+             mock.patch.object(a,"installed",return_value=before), \
+             mock.patch.object(a,"simulate",
+                 return_value=["python3-venv","python3.10"]):
+            report=a.plan()
+        self.assertEqual(
+            report["approved_existing_python_package_upgrades"],["python3.10"])
+        self.assertFalse(report["package_rollback_supported"])
+        self.assertFalse(report["snapshot_stack_authorized"])
+
+    def test_jammy_unrelated_upgrade_remains_blocked(self):
+        with mock.patch.object(a,"verify_host",return_value="22.04"), \
+             mock.patch.object(a,"installed",return_value={"dpkg":"1","libc6":"1"}), \
+             mock.patch.object(a,"simulate",return_value=["libc6"]):
+            with self.assertRaisesRegex(tx.TransactionBlocked,
+                                        "outside Jammy Python"):
+                a.plan()
+
     def test_noble_plan_remains_exact_old_seven_base_packages(self):
         with mock.patch.object(a,"verify_host",return_value="24.04"), \
              mock.patch.object(a,"installed",return_value={"dpkg":"1"}), \
