@@ -32,6 +32,7 @@ import uuid
 import xml.etree.ElementTree as ET
 
 import command3_cape_api_ratelimit as backup_guard
+import command123_libvirt_quiescence as quiescence
 
 CONF = Path("/opt/CAPEv2/conf/kvm.conf")
 BACKUPS = backup_guard.DEFAULT_BACKUPS
@@ -275,8 +276,10 @@ def discover(host, journal, master_snapshot):
     need(os.geteuid() == 0, "Root needed to read private Command2 VM journal")
     rows = nat.journal_rows(host, Path(journal))
     need(1 <= len(rows) <= 16, "Expected 1..16 count-driven Windows clones")
-    need(not nat.virsh("list", "--name").strip(),
-         "Require ALL Windows guests SHUT OFF during CAPE KVM registration")
+    # A default active-only list is not sufficient provenance for paused,
+    # suspended or concurrently renamed foreign domains. Query every
+    # defined libvirt UUID/state twice, fail closed on unknown state.
+    quiescence.no_nonshutoff_domains()
     # Include collision checks against *all* known libvirt domain NICs,
     # not only the count-driven clones.
     domains = [name.strip() for name in
