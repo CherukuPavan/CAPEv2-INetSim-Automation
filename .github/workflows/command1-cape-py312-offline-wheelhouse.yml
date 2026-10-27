@@ -1,4 +1,4 @@
-name: Build and reinstall CAPE Python3.12 wheelhouse fully offline
+name: Rebuild exact source-matched CAPE Python3.12 wheelhouse offline
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
       - "scripts/test_ci_normalize_python_tlsh_wheel.py"
       - "scripts/command1_cape_runtime_offline_admission.py"
       - "scripts/command1_cape_runtime_rootless_stage.py"
+      - "scripts/command1_tracked_cape_source.py"
       - ".github/workflows/command1-cape-py312-offline-wheelhouse.yml"
   workflow_dispatch:
 
@@ -27,7 +28,7 @@ jobs:
       - name: Produce reviewed platform-specific Python wheelhouse from pinned CAPE metadata
         env:
           DEBIAN_FRONTEND: noninteractive
-          UPSTREAM_REV: 004d73c51dcd12dacb97b3657262bdea8376d710
+          UPSTREAM_REV: 297bbbcc15386e903734cec8f8a7c805053d6d0c
           UV_PYTHON_INSTALL_DIR: /tmp/cape-python-versions
           UV_PYTHON_INSTALL_BIN: "0"
           UV_NO_CACHE: "1"
@@ -140,7 +141,7 @@ jobs:
               f"{name}=={data['version']} --hash=sha256:{data['sha256']}\n"
               for name,data in sorted(records.items())))
           manifest={
-             "source_commit":"004d73c51dcd12dacb97b3657262bdea8376d710",
+             "source_commit":"297bbbcc15386e903734cec8f8a7c805053d6d0c",
              "python_version":"3.12.12",
              "uv_build_version":"0.9.15",
              "platform":"ubuntu-26.04-amd64",
@@ -179,7 +180,7 @@ jobs:
             /tmp/cape-built-wheels/python_tlsh-*.whl
             /tmp/cape-replayed-wheels/python_tlsh-*.whl
           if-no-files-found: warn
-          retention-days: 3
+          retention-days: 14
       - name: Check real 170-wheel approved assets cannot be replaced by CAPE runtime user
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -284,7 +285,7 @@ jobs:
             /tmp/cape-wheel-manifest.json
             /tmp/cape-offline-wheels-hash.lock
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 90
       - name: Preserve disposable platform wheelhouse for manual binary provenance review
         if: success()
         uses: actions/upload-artifact@v4
