@@ -104,6 +104,8 @@ class SourceTests(unittest.TestCase):
         self.run_git(self.origin,"update-index","--add","--cacheinfo",
                      "160000",self.revision,"tests/data")
         self.run_git(self.origin,"commit","-qm","vetted CAPE symbolic metadata")
+        # Git checkout materializes an empty placeholder for a gitlink.
+        (self.origin / "tests" / "data").mkdir(parents=True)
         pinned=self.run_git(self.origin,"rev-parse","HEAD").strip()
         with mock.patch.object(s,"VETTED_CAPE_SPECIAL_REV",pinned), \
              mock.patch.object(s,"VETTED_SOURCE_GITLINKS",
