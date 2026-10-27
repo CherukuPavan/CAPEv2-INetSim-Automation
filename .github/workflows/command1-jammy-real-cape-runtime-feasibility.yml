@@ -55,10 +55,30 @@ jobs:
             --requirement /tmp/cape-jammy-lock.txt
           count="$(find /tmp/cape-jammy-wheels -maxdepth 1 -type f -name '*.whl' | wc -l)"
           test "$count" -ge 160
+          # uv compile hashes the DISTRIBUTIONS available on the index.
+          # Local builds necessarily have different wheel hashes. Generate a
+          # second exact offline INSTALL lock over the built wheel bytes.
+          /tmp/cape-py312/bin/python - <<'PY'
+          from pathlib import Path
+          from pip._vendor.packaging.utils import parse_wheel_filename
+          import hashlib
+          root=Path('/tmp/cape-jammy-wheels')
+          records={}
+          for f in sorted(root.glob('*.whl')):
+              name,version,_,_=parse_wheel_filename(f.name)
+              name=str(name).lower()
+              assert name not in records,name
+              records[name]=(str(version),hashlib.sha256(f.read_bytes()).hexdigest())
+          assert len(records)>=160,len(records)
+          Path('/tmp/cape-jammy-built-hash.lock').write_text(
+              ''.join(f'{name}=={version} --hash=sha256:{digest}\\n'
+                      for name,(version,digest) in sorted(records.items())))
+          print('JAMMY_BUILD_WHEEL_SHA256_LOCK_CREATED',len(records))
+          PY
           /tmp/cape-py312/bin/python -m pip install \
-            --no-index --no-deps --only-binary=:all: \
+            --no-index --no-deps --only-binary=:all: --require-hashes \
             --find-links=/tmp/cape-jammy-wheels \
-            --requirement /tmp/cape-jammy-lock.txt
+            --requirement /tmp/cape-jammy-built-hash.lock
           /tmp/cape-py312/bin/python - <<'PY'
           import sys,gevent,greenlet,django,sqlalchemy,yara
           assert sys.version_info[:3] == (3,12,12),sys.version
@@ -78,6 +98,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cape-source297-jammy-py312-dependency-lock
-          path: /tmp/cape-jammy-lock.txt
+          path: |
+            /tmp/cape-jammy-lock.txt
+            /tmp/cape-jammy-built-hash.lock
           if-no-files-found: warn
           retention-days: 14
