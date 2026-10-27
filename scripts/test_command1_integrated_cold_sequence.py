@@ -134,6 +134,52 @@ class IntegratedColdTests(unittest.TestCase):
         self.assertEqual(child_args.receipt_dir,self.handoff)
         self.assertEqual(self.args.receipt_dir,self.receipts)
 
+    def test_resume_existing_base_stages_source_without_new_apt(self):
+        self.args.use_active_base=True
+        ordered=[]
+        with ExitStack() as st:
+            st.enter_context(mock.patch.object(seq.sys.stdin,"isatty",
+                                                 return_value=True))
+            st.enter_context(mock.patch.object(seq,"preflight",
+                                                 return_value=self.plan))
+            st.enter_context(mock.patch("builtins.input",
+                                                 return_value=seq.APPROVAL))
+            st.enter_context(mock.patch.object(
+                seq.master,"private_receipt_dir",return_value=self.receipts))
+            st.enter_context(mock.patch.object(seq.master,"durable_receipt"))
+            st.enter_context(mock.patch.object(
+                seq.master,"inputs",return_value={"host_modified":False}))
+            st.enter_context(mock.patch.object(seq.sealed_base,"attest",
+                return_value={"transaction_id":"a"*32}))
+            staged=st.enter_context(mock.patch.object(
+                seq.cape_source,"install",side_effect=lambda *args:(
+                    ordered.append("source") or {
+                        "result":"COMMAND1_CAPE_PINNED_SOURCE_STAGED_ONLY"})))
+            block=st.enter_context(mock.patch.object(
+                seq.base,"apply",side_effect=AssertionError(
+                    "never create a second APT transaction")))
+            st.enter_context(mock.patch.object(
+                seq.master,"execute",side_effect=lambda *args:(
+                    ordered.append("master") or {
+                        "master_imported_shut_off":True,
+                        "guest_started":False})))
+            out=seq.execute(self.args)
+        self.assertEqual(ordered,["source","master"])
+        self.assertEqual(out["tracked_transaction"],"a"*32)
+        block.assert_not_called()
+        staged.assert_called_once_with(
+            self.args.approved_host,"a"*32,self.args.cape_revision)
+
+    def test_resume_declined_approval_does_not_stage_source(self):
+        self.args.use_active_base=True
+        with mock.patch.object(seq.sys.stdin,"isatty",return_value=True), \
+             mock.patch.object(seq,"preflight",return_value=self.plan), \
+             mock.patch("builtins.input",return_value="NO"), \
+             mock.patch.object(seq.cape_source,"install") as stage:
+            with self.assertRaises(seq.IntegratedBlocked):
+                seq.execute(self.args)
+        stage.assert_not_called()
+
     def test_optional_rootless_runtime_executes_in_middle_with_receipt(self):
         for key in seq.RUNTIME_FIELDS:
             setattr(self.args,key,("a"*64 if "sha256" in key
