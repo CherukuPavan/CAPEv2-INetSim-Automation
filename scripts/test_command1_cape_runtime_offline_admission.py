@@ -75,6 +75,16 @@ class WheelAdmissionTests(unittest.TestCase):
         self.assertFalse(result["host_modified"])
         self.assertFalse(result["production_installation_executed"])
 
+    def test_jammy_exact_manifest_accepted_for_review_not_install(self):
+        package=json.loads(self.manifest.read_text())
+        package["platform"]="ubuntu-22.04-amd64"
+        self.manifest.write_text(json.dumps(package))
+        self.hash=hashlib.sha256(self.manifest.read_bytes()).hexdigest()
+        output=self.check()
+        self.assertEqual(output["target_platform"],"ubuntu-22.04-amd64")
+        self.assertEqual(output["target_release"],"Ubuntu 22.04 amd64")
+        self.assertFalse(output["production_installation_executed"])
+
     def test_reject_unreviewed_manifest_sha(self):
         with self.assertRaisesRegex(
                 subject.AdmissionBlocked, "externally approved"):
