@@ -33,10 +33,11 @@ def checked_address(text):
          re.fullmatch(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}", text) is not None,
          "Only a literal lab-bound IPv4 may be used")
     address = ipaddress.IPv4Address(text)
-    need(str(address) == text and address.is_private and
-         not address.is_loopback and not address.is_link_local and
-         not address.is_multicast and not address.is_unspecified,
-         "INetSim must bind an exact private dedicated lab IPv4")
+    networks = tuple(ipaddress.IPv4Network(net) for net in (
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
+    need(str(address) == text and
+         any(address in network for network in networks),
+         "INetSim must bind an exact RFC1918 dedicated lab IPv4")
     return str(address)
 
 def active_directives(lines):
