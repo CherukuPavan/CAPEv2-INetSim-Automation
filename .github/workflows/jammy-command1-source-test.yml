@@ -1,0 +1,32 @@
+name: Jammy Command 1 verified source regression
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command1_tracked_cape_source.py"
+      - "scripts/test_command1_tracked_cape_source.py"
+      - "scripts/command1_sealed_base_handoff.py"
+      - "scripts/command1_resume_pinned_cape_source.py"
+      - ".github/workflows/jammy-command1-source-test.yml"
+  workflow_dispatch:
+
+jobs:
+  jammy-source:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: false
+      - name: Environment versions
+        run: |
+          cat /etc/os-release
+          python3 --version
+          git --version
+      - name: Run exact source + rollback regression under Ubuntu 22.04
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_command1_tracked_cape_source.py' -v
+          python3 -m unittest discover -s scripts -p 'test_command1_sealed_base_handoff.py' -v
+          python3 -m unittest discover -s scripts -p 'test_command1_resume_pinned_cape_source.py' -v
