@@ -155,6 +155,28 @@ class BaseCommand1Tests(unittest.TestCase):
                 c.apply("rakshati")
             start.assert_called_once_with("rakshati")
 
+    def test_preflight_error_diagnostic_without_starting_transaction(self):
+        from contextlib import ExitStack
+        import io
+        from contextlib import redirect_stderr
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(
+                c.tx, "host_guard", return_value="rakshati"))
+            stack.enter_context(mock.patch.object(
+                c.packages, "plan", side_effect=tx.TransactionBlocked(
+                    "APT would upgrade or reinstall a preexisting package")))
+            stack.enter_context(mock.patch.object(
+                c.sys, "argv", ["script", "--mode", "plan",
+                                "--approved-host", "rakshati"]))
+            begin=stack.enter_context(mock.patch.object(c.tx, "begin"))
+            output=io.StringIO()
+            with redirect_stderr(output):
+                self.assertEqual(c.main(),2)
+            value=__import__("json").loads(output.getvalue())
+        self.assertIn("APT would upgrade",value["block_reason"])
+        self.assertFalse(value["three_command_deployment_complete"])
+        begin.assert_not_called()
+
     def test_no_root_no_start(self):
         with mock.patch.object(c.os, "geteuid", return_value=1000):
             with self.assertRaises(tx.TransactionBlocked):
