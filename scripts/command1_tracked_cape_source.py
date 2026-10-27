@@ -282,6 +282,106 @@ def install(host, transaction, revision):
             ) from err
 
 
+
+def recover_prepared(host, transaction, revision):
+    """Finish ONLY an authenticated existing prepared source; NEVER refetch.
+
+    A previous pinned import may have fetched and checked out exact bytes,
+    then failed before sealing its source receipt. Confirm the original
+    base APT state, source ledger, trusted paths, Git tree and every file
+    before any rename. An incomplete/foreign source is always preserved.
+    """
+    need(os.geteuid() == 0 and sys.stdin.isatty(),
+         "Interactive root required to recover prepared source")
+    from command1_sealed_base_handoff import attest
+    need(SHA40.fullmatch(revision or "") is not None,
+         "Pinned 40-hex source revision required")
+    with tx.exclusive_transaction_lock(transaction):
+        prior = attest(host, allow_prepared_source=True)
+        need(prior["transaction_id"] == transaction,
+             "APT base transaction differs from source recovery")
+        receipt, ledger = tx.load(transaction, host)
+        need(ledger["phase"] == "active",
+             "Deployment no longer active")
+        entry = source_entry(ledger)
+        need(entry["status"] == "prepared" and
+             entry.get("revision") == revision and
+             entry.get("before_present") is False and
+             entry.get("after") is None,
+             "Unexpected source journal state; preserve it")
+        root = safe_root(create=False)
+        parent = root / transaction
+        stage = root / (".cape-stage-" + transaction)
+        final = parent / "CAPEv2"
+        need(entry.get("target") == str(final) and
+             entry.get("staging") == str(stage),
+             "Source journal target does not match this transaction")
+        need(not any(p.is_symlink() for p in (root, stage, parent, final)),
+             "Source staging or target contains symlink")
+        present_stage = stage.is_dir()
+        present_final = final.is_dir()
+        need(present_stage != present_final,
+             "Expected exactly one original stage or final directory")
+        src = stage if present_stage else final
+        st = src.stat()
+        need(st.st_uid == 0 and stat.S_ISDIR(st.st_mode) and
+             not st.st_mode & 0o022,
+             "Prepared source path must be root-owned and protected")
+        if present_stage:
+            need(not parent.exists(),
+                 "Partial final directory exists; refuse to change")
+        else:
+            need(parent.is_dir() and not parent.is_symlink() and
+                 parent.stat().st_uid == 0 and
+                 not parent.stat().st_mode & 0o022,
+                 "Untrusted final source directory parent")
+        first = pristine(src, revision)
+        preview = {
+            "result": "COMMAND1_PREPARED_CAPE_SOURCE_RECOVERY_PLAN",
+            "existing_transaction": transaction,
+            "original_prepared_step": entry["id"],
+            "source_state": "checked_out_stage" if present_stage else
+                            "placed_final_not_sealed",
+            "pinned_source_sha": revision,
+            "source_file_manifest": first,
+            "no_network_fetch": True,
+            "no_new_transaction": True,
+            "no_apts_or_vm_changes": True,
+        }
+        print(json.dumps(preview, indent=2, sort_keys=True), flush=True)
+        phrase = "RECOVER-VERIFIED-CAPE-SOURCE-" + transaction
+        need(input("Type " + phrase + ": ").strip() == phrase,
+             "Operator declined prepared source recovery")
+        need(attest(host, allow_prepared_source=True) == prior and
+             pristine(src, revision) == first,
+             "Original source or APT inventory changed during consent")
+        if present_stage:
+            need(not parent.exists() and not parent.is_symlink(),
+                 "Source destination changed after approval")
+            parent.mkdir(mode=0o755)
+            tx.fsync_dir(root)
+            os.rename(stage, final)
+            final.chmod(0o755)
+            tx.fsync_dir(parent)
+        need(pristine(final, revision) == first,
+             "Placed source differs from pinned source")
+        entry["after"] = first
+        entry["status"] = "sealed"
+        tx.atomic_receipt(receipt, ledger)
+        return {
+            "result": "COMMAND1_PREPARED_CAPE_SOURCE_RECOVERED_AND_SEALED",
+            "transaction_id": transaction,
+            "source_target": str(final),
+            "source_sha": revision,
+            "no_fetch_performed": True,
+            "new_transaction_created": False,
+            "host_base_apts_not_repeated": True,
+            "full_Cape_installed": False,
+            "VM_snapshot_proven": False,
+        }
+
+
+
 def portable_quarantine_digest(directory, revision=None):
     """Digest ALL source and .git bytes without invoking Git or executable code.
 
@@ -458,7 +558,7 @@ def undo(host, transaction):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--mode",
-                   choices=("plan", "install", "plan-undo", "undo"),
+                   choices=("plan", "install", "recover-prepared", "plan-undo", "undo"),
                    default="plan")
     p.add_argument("--approved-host", required=True)
     group = p.add_mutually_exclusive_group(required=True)
@@ -473,6 +573,8 @@ def main():
             out = plan(args.approved_host, target, args.revision)
         elif args.mode == "install":
             out = install(args.approved_host, target, args.revision)
+        elif args.mode == "recover-prepared":
+            out = recover_prepared(args.approved_host, target, args.revision)
         elif args.mode == "plan-undo":
             out = undo_plan(args.approved_host, target)
         else:
