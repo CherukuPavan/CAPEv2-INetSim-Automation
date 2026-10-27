@@ -71,7 +71,7 @@ jobs:
               records[name]=(str(version),hashlib.sha256(f.read_bytes()).hexdigest())
           assert len(records)>=160,len(records)
           Path('/tmp/cape-jammy-built-hash.lock').write_text(
-              ''.join(f'{name}=={version} --hash=sha256:{digest}\\n'
+              ''.join(f'{name}=={version} --hash=sha256:{digest}\n'
                       for name,(version,digest) in sorted(records.items())))
           print('JAMMY_BUILD_WHEEL_SHA256_LOCK_CREATED',len(records))
           PY
