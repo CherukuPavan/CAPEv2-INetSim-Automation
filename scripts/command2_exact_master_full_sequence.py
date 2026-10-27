@@ -99,8 +99,9 @@ def child_args(args, count, script, step, vm=None):
                 "--journal-dir", str(args.journal_dir),
                 "--iso-dir", str(args.iso_dir),
                 "--count", str(count)]
-    if step == "all_clone_uefi_qcow2":
-        return [script, "--mode", "apply", "--approved-host", h,
+    if step in ("all_clone_uefi_qcow2", "verify_all_clone_uefi_qcow2"):
+        return [script, "--mode", ("apply" if step == "all_clone_uefi_qcow2"
+                                   else "verify"), "--approved-host", h,
                 "--journal", journal, "--evidence-dir", evidence]
     if step == "boot_exact_windows":
         return [script, "--mode", "boot", "--approved-host", h,
@@ -119,8 +120,9 @@ def child_args(args, count, script, step, vm=None):
                 "--nat-iso", iso, "--evidence-dir", evidence]
     if step == "all_clones_agent_health":
         return [script, "--approved-host", h, "--journal", journal]
-    if step == "capture_all_running_candidates":
-        return [script, "--mode", "capture", "--approved-host", h,
+    if step in ("capture_all_running_candidates", "verify_all_running_candidates"):
+        return [script, "--mode", ("capture" if step == "capture_all_running_candidates"
+                                   else "verify"), "--approved-host", h,
                 "--journal", journal, "--evidence-dir", evidence]
     if step == "all_graceful_shutdown":
         return [script, "--mode", "shutdown", "--approved-host", h,
@@ -131,6 +133,7 @@ def child_args(args, count, script, step, vm=None):
 STEPS = {
     "cold_count_stage": "command2_from_exact_master_bundle.py",
     "all_clone_uefi_qcow2": "command2_portable_master_nat_ovmf_qcow2.py",
+    "verify_all_clone_uefi_qcow2": "command2_portable_master_nat_ovmf_qcow2.py",
     "boot_exact_windows": "command2_portable_master_nat_firstboot.py",
     "upload_trusted_windows_setup": "command2_portable_nat_agent_setup_transport.py",
     "request_benign_windows_identity": "command2_portable_nat_agent_execute.py",
@@ -138,13 +141,16 @@ STEPS = {
     "all_clones_agent_health": "command2_portable_master_nat_agent_batch.py",
     "capture_all_running_candidates":
         "command2_portable_master_nat_running_snapshots.py",
+    "verify_all_running_candidates":
+        "command2_portable_master_nat_running_snapshots.py",
     "all_graceful_shutdown": "command2_portable_master_nat_final_shutdown.py",
 }
 
 def phases(count):
     vm_names(count)
     s = [("cold_count_stage", None),
-         ("all_clone_uefi_qcow2", None)]
+         ("all_clone_uefi_qcow2", None),
+         ("verify_all_clone_uefi_qcow2", None)]
     for vm in vm_names(count):
         s += [(name, vm) for name in (
             "boot_exact_windows",
@@ -153,6 +159,7 @@ def phases(count):
             "independently_verify_windows")]
     s += [("all_clones_agent_health", None),
           ("capture_all_running_candidates", None),
+          ("verify_all_running_candidates", None),
           ("all_graceful_shutdown", None)]
     return s
 
