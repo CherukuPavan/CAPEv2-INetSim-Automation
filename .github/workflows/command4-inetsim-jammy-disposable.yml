@@ -4,7 +4,8 @@ on:
     branches: [development]
     paths:
       - ".github/workflows/command4-inetsim-jammy-disposable.yml"
-      - "scripts/command4_inetsim_guard.py"
+      - "scripts/command4_inetsim_config_guard.py"
+      - "scripts/test_command4_inetsim_config_guard.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -41,5 +42,9 @@ jobs:
           sed -n '1,140p' /etc/default/inetsim
           echo "INETSIM_CONF_SAFE_BIND_OPTIONS"
           grep -E '^[[:space:]#]*(service_bind_address|dns_default_ip|service_run_as_user|start_service)' /etc/inetsim/inetsim.conf | head -n 35 || :
+          PYTHONPATH=scripts python3 -m unittest discover -s scripts -p 'test_command4_inetsim_config_guard.py' -v
+          python3 -B scripts/command4_inetsim_config_guard.py \
+            --config /etc/inetsim/inetsim.conf --lab-ip 192.168.122.1
+          test -f /etc/inetsim/inetsim.conf
           echo "COMMAND4_SIGNED_DISTRO_BINARIES_INSTALLED_IN_EPHEMERAL_CONTAINER_ONLY"
           echo "NO_INETSIM_SERVICE_STARTED_NO_HOST_NETWORK_CHANGED_NO_GUEST"
