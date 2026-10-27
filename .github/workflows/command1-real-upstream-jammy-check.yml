@@ -1,0 +1,39 @@
+name: Command1 real upstream checkout Jammy integration
+on:
+  workflow_dispatch:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/command1_tracked_cape_source.py"
+      - ".github/workflows/command1-real-upstream-jammy-check.yml"
+jobs:
+  actual-cape:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reproduce actual pinned upstream checkout and hash
+        shell: bash
+        run: |
+          set -Eeuxo pipefail
+          mkdir -p /tmp/cape-real-upstream
+          git -C /tmp/cape-real-upstream -c maintenance.auto=false -c gc.auto=0 init -q
+          git -C /tmp/cape-real-upstream -c maintenance.auto=false -c gc.auto=0 remote add origin https://github.com/kevoreilly/CAPEv2.git
+          git -C /tmp/cape-real-upstream -c maintenance.auto=false -c gc.auto=0 fetch --no-tags --depth=1 origin 297bbbcc15386e903734cec8f8a7c805053d6d0c
+          git -C /tmp/cape-real-upstream -c maintenance.auto=false -c gc.auto=0 checkout -q --detach FETCH_HEAD
+          git -C /tmp/cape-real-upstream status --short
+          ls -ld /tmp/cape-real-upstream/tests /tmp/cape-real-upstream/tests/data || true
+          ls -ld /tmp/cape-real-upstream/data/yara/monitor/yara || true
+          PYTHONPATH=scripts python3 - <<'PY'
+          import pathlib, traceback
+          import command1_tracked_cape_source as s
+          rev='297bbbcc15386e903734cec8f8a7c805053d6d0c'
+          try:
+              print(s.pristine(pathlib.Path('/tmp/cape-real-upstream'),rev),flush=True)
+          except Exception as e:
+              print('REPRO_FAILURE',type(e).__name__,str(e),flush=True)
+              traceback.print_exc()
+              raise
+          PY
