@@ -172,6 +172,35 @@ class SequenceTests(unittest.TestCase):
                  self.assertRaises(s.workflow.WorkflowBlocked):
                 s.execute(a)
 
+    def test_stage_locations_must_be_independent_and_symlink_free(self):
+        with tempfile.TemporaryDirectory() as td:
+            a=self.args(td)
+            self.assertEqual(len(s.admitted_dirs(a)), 7)
+            a.iso_dir = a.bundle / "iso"
+            with self.assertRaisesRegex(s.SequenceBlocked, "independent"):
+                s.admitted_dirs(a)
+            a=self.args(td)
+            a.receipt_dir = a.journal_dir / "receipts"
+            with self.assertRaisesRegex(s.SequenceBlocked, "independent"):
+                s.admitted_dirs(a)
+            a=self.args(td)
+            a.bundle = Path(td) / "bundle" / ".." / "cape-master-abcd"
+            with self.assertRaisesRegex(s.SequenceBlocked, "traversal"):
+                s.admitted_dirs(a)
+            a=self.args(td)
+            alias=Path(td) / "alias"
+            alias.symlink_to(Path(td), target_is_directory=True)
+            a.iso_dir=alias / "iso"
+            with self.assertRaisesRegex(s.SequenceBlocked, "Symlinked"):
+                s.admitted_dirs(a)
+
+    def test_basename_does_not_authorize_foreign_helper(self):
+        with tempfile.TemporaryDirectory() as td:
+            fake=Path(td) / s.STEPS["cold_count_stage"]
+            fake.write_text("print('should never execute')", encoding="utf-8")
+            with self.assertRaisesRegex(s.SequenceBlocked, "Unreviewed"):
+                s.run_child([str(fake), "--mode", "plan"])
+
     def test_unapproved_programs_never_run(self):
         with self.assertRaises(s.SequenceBlocked):
             s.run_child(["/tmp/unauthorized.py","--mode","apply"])
