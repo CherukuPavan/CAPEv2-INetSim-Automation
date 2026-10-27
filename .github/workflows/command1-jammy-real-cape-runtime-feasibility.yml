@@ -132,6 +132,77 @@ jobs:
           print('JAMMY_SOURCE297_MANIFEST_SHA256',hashlib.sha256(meta.read_bytes()).hexdigest())
           PY
           sha256sum /tmp/cape-jammy-wheel-manifest.json /tmp/cape-jammy-built-hash.lock
+      - name: Export exact Jammy-managed Python 3.12 and uv alongside wheelhouse
+        if: success()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mapfile -t found < <(find /tmp/cape-pyversions -mindepth 1 -maxdepth 1 -type d -name 'cpython-3.12.12-*' | sort)
+          test "${#found[@]}" -eq 1
+          dist="${found[0]}"
+          test -x "$dist/bin/python3.12"
+          "$dist/bin/python3.12" -c 'import ssl,sqlite3,sys; assert sys.version_info[:3] == (3,12,12)'
+          mkdir -p /tmp/cape-jammy-python-replay
+          tar -C /tmp/cape-pyversions -cf /tmp/cape-jammy-python312.tar "$(basename "$dist")"
+          tar -C /tmp/cape-jammy-python-replay -xf /tmp/cape-jammy-python312.tar
+          replay="/tmp/cape-jammy-python-replay/$(basename "$dist")/bin/python3.12"
+          "$replay" -c 'import ssl,sqlite3,venv,sys; assert sys.version_info[:3] == (3,12,12)'
+          CAPE_ROOT="$dist" python3 -B - <<'PY'
+          import os
+          from pathlib import Path
+          root=Path(os.environ['CAPE_ROOT']).resolve(strict=True)
+          for dirpath,subdirs,files in os.walk(root,followlinks=False):
+              for name in subdirs+files:
+                  item=Path(dirpath)/name
+                  if item.is_symlink():
+                      target=item.resolve(strict=True)
+                      assert target.is_relative_to(root), (item,target)
+          print('JAMMY_ISOLATED_PYTHON_TAR_SYMLINKS_VERIFIED')
+          PY
+          CAPE_DIST="$(basename "$dist")" python3 -B - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          sha=lambda x:hashlib.sha256(Path(x).read_bytes()).hexdigest()
+          meta=json.loads(Path('/tmp/cape-jammy-wheel-manifest.json').read_text())
+          assert meta['source_commit']=='297bbbcc15386e903734cec8f8a7c805053d6d0c'
+          details={
+             'schema':1, 'platform':'ubuntu-22.04-amd64',
+             'source_commit':meta['source_commit'],
+             'interpreter_version':'3.12.12',
+             'uv_version':'0.9.15',
+             'interpreter_root_name':os.environ['CAPE_DIST'],
+             'interpreter_archive':'cape-jammy-python312.tar',
+             'interpreter_archive_sha256':sha('/tmp/cape-jammy-python312.tar'),
+             'uv_sha256':sha('/tmp/cape-uv-tool/bin/uv'),
+             'wheel_manifest_sha256':sha('/tmp/cape-jammy-wheel-manifest.json'),
+             'wheel_lock_sha256':sha('/tmp/cape-jammy-built-hash.lock'),
+             'wheels_count':meta['wheel_count'],
+             'not_independently_approved_to_execute':True,
+             'no_host_change':True,
+             'full_CAPEv2_services_installed':False,
+             'TPM_snapshot_restore_proven':False
+          }
+          Path('/tmp/cape-jammy-runtime-provenance.json').write_text(
+              json.dumps(details,indent=2,sort_keys=True)+'\n')
+          print('JAMMY_RUNTIME_INPUT_SHA256')
+          for x in ('/tmp/cape-jammy-python312.tar',
+                    '/tmp/cape-uv-tool/bin/uv',
+                    '/tmp/cape-jammy-wheel-manifest.json',
+                    '/tmp/cape-jammy-built-hash.lock'):
+              print(sha(x), x)
+          PY
+      - name: Preserve Jammy reviewed CPython uv toolchain
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-source297-jammy-python312-uv-toolchain
+          path: |
+            /tmp/cape-jammy-python312.tar
+            /tmp/cape-uv-tool/bin/uv
+            /tmp/cape-jammy-runtime-provenance.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
       - name: Preserve Jammy SHA256 manifest and offline install lock
         if: success()
         uses: actions/upload-artifact@v4
