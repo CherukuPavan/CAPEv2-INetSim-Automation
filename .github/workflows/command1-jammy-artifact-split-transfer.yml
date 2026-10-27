@@ -1,0 +1,94 @@
+name: Prepare source-matched Jammy CAPE runtime parts under 100 MB
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/command1-jammy-artifact-split-transfer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  split-verified-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cape-source297-jammy-python312-wheels
+          run-id: 40543740228
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/wheels
+      - uses: actions/download-artifact@v4
+        with:
+          name: cape-source297-jammy-python312-uv-toolchain
+          run-id: 40543740228
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/toolchain
+      - uses: actions/download-artifact@v4
+        with:
+          name: cape-source297-jammy-python312-wheel-manifest
+          run-id: 40543740228
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/manifest
+      - name: Validate source-matched manifest and split bounded reproducible archives
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -f input/manifest/cape-jammy-wheel-manifest.json
+          test -f input/manifest/cape-jammy-built-hash.lock
+          test -f input/toolchain/cape-jammy-python312.tar
+          test -f input/toolchain/uv
+          mkdir -p output
+          python3 -B - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          p=Path('input')
+          man=(p/'manifest'/'cape-jammy-wheel-manifest.json').read_bytes()
+          d=json.loads(man)
+          assert d['source_commit']=='297bbbcc15386e903734cec8f8a7c805053d6d0c'
+          assert d['platform']=='ubuntu-22.04-amd64'
+          assert d['wheel_count']==171
+          lock=(p/'manifest'/'cape-jammy-built-hash.lock').read_bytes()
+          assert hashlib.sha256(lock).hexdigest()==d['lock_sha256']
+          disk={q.name:q for q in (p/'wheels').iterdir() if q.is_file()}
+          assert set(disk)==set(x['wheel'] for x in d['wheels'].values())
+          for value in d['wheels'].values():
+              q=disk[value['wheel']]
+              assert q.stat().st_size==value['size']
+              assert hashlib.sha256(q.read_bytes()).hexdigest()==value['sha256']
+          uv=hashlib.sha256((p/'toolchain'/'uv').read_bytes()).hexdigest()
+          proof=json.loads((p/'toolchain'/'cape-jammy-runtime-provenance.json').read_bytes())
+          assert proof['uv_sha256']==uv
+          assert proof['wheel_manifest_sha256']==hashlib.sha256(man).hexdigest()
+          print('PINNED_SOURCE_JAMMY_171_WHEELS_AND_INTERPRETER_HASH_VERIFIED')
+          PY
+          tar --sort=name --mtime='UTC 2023-11-14' --owner=0 --group=0 --numeric-owner -cf output/cape-jammy-wheels.tar -C input/wheels .
+          cp input/toolchain/cape-jammy-python312.tar output/cape-jammy-python312.tar
+          cp input/toolchain/uv output/cape-jammy-uv
+          sha256sum output/*.tar output/cape-jammy-uv > output/whole-input.sha256
+          split -b 65M -d -a 2 output/cape-jammy-wheels.tar output/wheels-part-
+          split -b 65M -d -a 2 output/cape-jammy-python312.tar output/python-part-
+          for part in output/wheels-part-* output/python-part-*; do
+            test -s "$part" && test "$(stat -c '%s' "$part")" -lt 70000000
+          done
+          sha256sum output/*-part-* > output/parts.sha256
+          cat output/parts.sha256
+          cat output/whole-input.sha256
+      - name: Upload each split segment with enforced size below connector transfer limit
+        uses: actions/upload-artifact@v4
+        with:
+          name: cape-jammy-runtime-split-bundle
+          path: |
+            output/wheels-part-*
+            output/python-part-*
+            output/cape-jammy-uv
+            output/parts.sha256
+            output/whole-input.sha256
+          compression-level: 0
+          retention-days: 14
