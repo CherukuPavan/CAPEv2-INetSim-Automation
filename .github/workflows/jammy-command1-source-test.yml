@@ -30,3 +30,6 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_command1_tracked_cape_source.py' -v
           python3 -m unittest discover -s scripts -p 'test_command1_sealed_base_handoff.py' -v
           python3 -m unittest discover -s scripts -p 'test_command1_resume_pinned_cape_source.py' -v
+      - name: Run same rollback regression as root (matches operator runner)
+        run: |
+          sudo python3 -m unittest discover -s scripts -p 'test_command1_tracked_cape_source.py' -v
