@@ -204,7 +204,9 @@ class RootlessRuntimeTests(unittest.TestCase):
             self.stubs(stack)
             stack.enter_context(mock.patch.object(
                 stage.wheels,"plan",return_value={
-                    "source_sha":"f"*40,"packages_verified":2}))
+                    "source_sha":"f"*40,
+                "target_platform":"ubuntu-26.04-amd64",
+                "packages_verified":2}))
             with self.assertRaisesRegex(stage.RuntimeBlocked,
                                         "not for this CAPE source"):
                 stage.plan(*self.params)
