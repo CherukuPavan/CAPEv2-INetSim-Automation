@@ -99,11 +99,15 @@ class SourceTests(unittest.TestCase):
         branch.mkdir(parents=True)
         (branch / "yara").symlink_to("analyzer/windows/data/yara/")
         self.run_git(self.origin,"add","data/yara/monitor/yara")
+        # A Git link must point at a locally known commit in test repos.
+        # Production continues to require its separately vetted upstream SHA.
         self.run_git(self.origin,"update-index","--add","--cacheinfo",
-                     "160000,b394a00ba3649afc69e7f22ad845a3a8a659200,tests/data")
+                     "160000",self.revision,"tests/data")
         self.run_git(self.origin,"commit","-qm","vetted CAPE symbolic metadata")
         pinned=self.run_git(self.origin,"rev-parse","HEAD").strip()
-        with mock.patch.object(s,"VETTED_CAPE_SPECIAL_REV",pinned):
+        with mock.patch.object(s,"VETTED_CAPE_SPECIAL_REV",pinned), \
+             mock.patch.object(s,"VETTED_SOURCE_GITLINKS",
+                               {"tests/data":self.revision}):
             result=s.pristine(self.origin,pinned)
             self.assertEqual(result["file_count"],4)
             first=s.portable_quarantine_digest(self.origin,pinned)
