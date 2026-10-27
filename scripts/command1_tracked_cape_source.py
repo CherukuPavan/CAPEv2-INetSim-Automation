@@ -35,6 +35,11 @@ SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 NO_GIT = frozenset((".git",))
 MAX_TRACKED = 18000
 MAX_BYTES = 2 * 1024 * 1024 * 1024
+# Vetted against the GitHub tree for the 2026-10-27 upstream HEAD.
+# This pin prevents loosening symlink/submodule admission for other commits.
+VETTED_CAPE_SPECIAL_REV = "297bbbcc15386e903734cec8f8a7c805053d6d0c"
+VETTED_SOURCE_SYMLINKS = {"data/yara/monitor/yara": "analyzer/windows/data/yara/"}
+VETTED_SOURCE_GITLINKS = {"tests/data": "b394a00ba3649afc69e7f22ad845a3a8a659200"}
 GIT_ENV = {
     "LC_ALL": "C",
     "PATH": "/usr/bin:/bin",
@@ -87,57 +92,91 @@ def execute_git(path, *args, timeout=120):
     return result.stdout
 
 
-def tracked_hash(directory):
-    """Compute SHA256 tree from Git's tracked regular files, no links/devices."""
+def tracked_hash(directory, pinned=None):
+    """Hash source files with one revision-scoped known symlink and gitlink.
+
+    NEVER traverse the allowed symlink. The submodule is tracked by Git's
+    pinned commit ID and must remain unpopulated (no remote submodule fetch).
+    Unknown link types/paths are refused before any regular-file read.
+    """
     need(directory.is_absolute() and not directory.is_symlink(),
          "Source path invalid")
     raw = execute_git(directory, "ls-files", "--stage", "-z")
-    rows = raw.split(b"\0")
+    rows = raw.split(b"\\0")
     need(rows[-1] == b"" and 0 < len(rows) - 1 <= MAX_TRACKED,
          "Git checkout tracked-file inventory invalid")
     summary = hashlib.sha256()
     total = 0
     seen = set()
+    has_specials = pinned == VETTED_CAPE_SPECIAL_REV
     for row in rows[:-1]:
-        need(b"\t" in row, "Malformed Git tracked-file record")
-        header, encoded_path = row.split(b"\t", 1)
+        need(b"\\t" in row, "Malformed Git tracked-file record")
+        header, encoded_path = row.split(b"\\t", 1)
         fields = header.split()
-        need(len(fields) == 3 and fields[0] in (b"100644", b"100755") and
-             fields[2] == b"0", "Link, submodule or unresolved index refused")
+        need(len(fields) == 3 and fields[2] == b"0",
+             "Unmerged Git index entry")
+        mode = fields[0]
         try:
             filename = encoded_path.decode("utf-8")
         except UnicodeError as err:
             raise SourceBlocked("Invalid UTF-8 checkout filename") from err
         relative = Path(filename)
+        file = directory / relative
         need(not relative.is_absolute() and filename == str(relative) and
              filename not in seen and len(filename) < 1024 and
              all(x not in (".", "..", "") for x in relative.parts) and
-             not any(part.is_symlink()
-                     for part in (directory / relative, *(directory / relative).parents)
-                     if part != directory.parent),
+             not any(parent.is_symlink() for parent in file.parents
+                     if parent != directory.parent),
              "Unsafe or repeated source path")
         seen.add(filename)
-        file = directory / relative
-        fd = os.open(file, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
-        try:
-            st = os.fstat(fd)
-            need(stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and
-                 (stat.S_IMODE(st.st_mode) & 0o111 != 0) ==
-                 (fields[0] == b"100755") and st.st_size <= 100 * 1024 * 1024,
-                 "Unexpected source object type, executable mode or size")
-            current = hashlib.sha256()
-            remaining = st.st_size
-            while remaining > 0:
-                chunk = os.read(fd, min(1024 * 1024, remaining))
-                need(bool(chunk), "Source file changed during inspection")
-                current.update(chunk)
-                remaining -= len(chunk)
-            total += st.st_size
-            need(total <= MAX_BYTES, "Source checkout unexpectedly large")
-        finally:
-            os.close(fd)
-        summary.update(encoded_path + b"\0" + fields[0] + b"\0")
-        summary.update(current.digest())
+        if mode == b"120000":
+            need(has_specials and filename in VETTED_SOURCE_SYMLINKS,
+                 "Unapproved source symlink")
+            target = VETTED_SOURCE_SYMLINKS[filename]
+            st = file.lstat()
+            need(stat.S_ISLNK(st.st_mode) and os.readlink(file) == target and
+                 st.st_size == len(target.encode("utf-8")),
+                 "Source symbolic link differs from exact pinned tree")
+            content = target.encode("utf-8")
+            # Refuse a symlink pointing at an absolute path or crossing ..
+            need(not Path(target).is_absolute() and
+                 ".." not in Path(target).parts,
+                 "Untrusted symbolic link target")
+            current = hashlib.sha256(content).digest()
+            total += len(content)
+        elif mode == b"160000":
+            need(has_specials and filename in VETTED_SOURCE_GITLINKS and
+                 fields[1].decode("ascii") == VETTED_SOURCE_GITLINKS[filename],
+                 "Unapproved or changed Git submodule")
+            need(not file.is_symlink() and
+                 (not file.exists() or
+                  (file.is_dir() and not any(file.iterdir()))),
+                 "Source submodule must remain empty and uninitialized")
+            current = hashlib.sha256(fields[1]).digest()
+        else:
+            need(mode in (b"100644", b"100755"),
+                 "Unknown Git tracked-file mode")
+            fd = os.open(file, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+            try:
+                st = os.fstat(fd)
+                need(stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and
+                     (stat.S_IMODE(st.st_mode) & 0o111 != 0) ==
+                     (mode == b"100755") and st.st_size <= 100 * 1024 * 1024,
+                     "Unexpected source object type, executable mode or size")
+                hasher = hashlib.sha256()
+                remaining = st.st_size
+                while remaining > 0:
+                    chunk = os.read(fd, min(1024 * 1024, remaining))
+                    need(bool(chunk), "Source file changed during inspection")
+                    hasher.update(chunk)
+                    remaining -= len(chunk)
+                total += st.st_size
+                current = hasher.digest()
+            finally:
+                os.close(fd)
+        need(total <= MAX_BYTES, "Source checkout unexpectedly large")
+        summary.update(encoded_path + b"\\0" + mode + b"\\0")
+        summary.update(current)
     return {"file_count": len(seen), "total_bytes": total,
             "content_sha256": summary.hexdigest()}
 
@@ -153,7 +192,7 @@ def pristine(directory, pinned):
     need(execute_git(directory, "status", "--porcelain=v1",
                      "--untracked-files=all") == b"",
          "Unexpected source changes, untracked additions or index drift")
-    result = tracked_hash(directory)
+    result = tracked_hash(directory, pinned)
     result.update({"revision": pinned, "tree": tree})
     return result
 
@@ -241,7 +280,7 @@ def install(host, transaction, revision):
             ) from err
 
 
-def portable_quarantine_digest(directory):
+def portable_quarantine_digest(directory, revision=None):
     """Digest ALL source and .git bytes without invoking Git or executable code.
 
     This must work after package rollback has uninstalled a newly-added git
@@ -270,8 +309,14 @@ def portable_quarantine_digest(directory):
             entries_seen += 1
             need(entries_seen <= 40000, "Unreasonably large quarantine tree")
             st = item.stat(follow_symlinks=False)
-            need(not stat.S_ISLNK(st.st_mode),
-                 "Quarantine contains symbolic links")
+            if stat.S_ISLNK(st.st_mode):
+                need(revision == VETTED_CAPE_SPECIAL_REV and
+                     relative in VETTED_SOURCE_SYMLINKS and
+                     os.readlink(item.path) == VETTED_SOURCE_SYMLINKS[relative],
+                     "Quarantine contains unapproved symbolic link")
+                digest.update(b"L" + relative.encode("utf-8") + b"\\0")
+                digest.update(VETTED_SOURCE_SYMLINKS[relative].encode())
+                continue
             if stat.S_ISDIR(st.st_mode):
                 digest.update(b"D" + relative.encode("utf-8") + b"\0")
                 stack.append((Path(item.path), relative + "/", depth + 1))
@@ -393,7 +438,7 @@ def undo(host, transaction):
             # Later APT removal of newly-installed Git does not prevent
             # final transaction-level source verification.
             entry["quarantine_content_sha256"] = portable_quarantine_digest(
-                quarantine)
+                quarantine, entry["revision"])
             entry["status"] = "rollback_verified"
             entry["quarantine"] = str(quarantine)
             tx.atomic_receipt(receipt, doc)
