@@ -26,6 +26,7 @@ import uuid
 import command123_deployment_transaction as tx
 import command1_tracked_cape_source as source
 import command1_cape_runtime_offline_admission as wheels
+import command123_tracked_prereqs as apt
 
 ROOT = Path("/var/lib/cape-command1-runtime")
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
@@ -146,9 +147,23 @@ def source_entry(doc):
     return matches[0]
 
 
+def verified_runtime_release():
+    """Require the exact Ubuntu 26.04 ABI used to build approved wheels.
+
+    The source-only and base APT stages may run on Jammy/Noble, but the
+    CPython3.12 native wheels built on Resolute must never be installed into
+    an older glibc host. Fail before journaling or executing uv.
+    """
+    release = apt.verify_host()
+    need(release == "26.04",
+         "Reviewed CAPE native wheelhouse targets Ubuntu 26.04 x86_64 only")
+    return release
+
+
 def plan(host, transaction, manifest, lock, wheelhouse, approved_manifest,
          uv, approved_uv_sha, python, approved_python_sha, user):
     tx.host_guard(host)
+    verified_runtime_release()
     need(type(transaction) is str and
          re.fullmatch(r"[0-9a-f]{32}",transaction),
          "Exact active deployment ID needed")
