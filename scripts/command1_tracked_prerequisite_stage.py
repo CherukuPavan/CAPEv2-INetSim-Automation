@@ -110,6 +110,11 @@ def main():
         print(json.dumps({
             "result": "COMMAND1_TRACKED_BASE_STAGE_BLOCKED_OR_PARTIAL",
             "error_type": type(error).__name__,
+            # Preflight failures should not force blind retry cycles.
+            # Reasons are our own bounded safety diagnostics, not tokens.
+            "block_reason": (str(error)[:300]
+                             if isinstance(error, tx.TransactionBlocked)
+                             else "OS/parse error (see protected host logs)"),
             "never_reset_unresolved_transaction": True,
             "three_command_deployment_complete": False,
         }, sort_keys=True), file=sys.stderr)
