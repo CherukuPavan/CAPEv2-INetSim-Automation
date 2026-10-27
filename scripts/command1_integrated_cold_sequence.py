@@ -28,6 +28,8 @@ import command1_private_master_handoff_sequence as master
 import command1_worldwide_drive_reader as reader
 import command123_deployment_transaction as tx
 import command1_cape_runtime_rootless_stage as runtime
+import command1_sealed_base_handoff as sealed_base
+import command1_tracked_cape_source as cape_source
 
 RECEIPTS = Path("/var/lib/cape-command1-integrated-cold")
 APPROVAL = "INTEGRATE-CAPE-SOURCE-AND-PRIVATE-COLD-MASTER"
@@ -136,7 +138,16 @@ def admitted(args):
 
 def preflight(args):
     identity=admitted(args)
-    current=base.preflight(args.approved_host,args.cape_revision)
+    if getattr(args, "use_active_base", False):
+        existing = sealed_base.attest(args.approved_host)
+        source_plan = cape_source.plan(
+            args.approved_host, existing["transaction_id"],
+            args.cape_revision)
+        current = {"existing_sealed_base": existing,
+                   "pinned_source_plan": source_plan,
+                   "reused_transaction": True}
+    else:
+        current=base.preflight(args.approved_host,args.cape_revision)
     python_profile=runtime_preflight(args)
     return {
         "result":"COMMAND1_INTEGRATED_COLD_SEQUENCE_PLAN_ONLY",
@@ -184,10 +195,21 @@ def execute(args):
         master.durable_receipt(receipt,doc)
         try:
             if phase=="tracked_host_and_cape_source":
-                result=base.apply(args.approved_host,args.cape_revision)
-                need(result.get("exact_public_source_staged") is True,
-                     "Pinned CAPE source was not staged")
-                doc["transaction_id"]=result["transaction_id"]
+                if getattr(args,"use_active_base",False):
+                    existing = sealed_base.attest(args.approved_host)
+                    transaction = existing["transaction_id"]
+                    result = cape_source.install(
+                        args.approved_host,transaction,args.cape_revision)
+                    need(result.get("result") ==
+                         "COMMAND1_CAPE_PINNED_SOURCE_STAGED_ONLY",
+                         "Pinned CAPE source did not seal under existing transaction")
+                    doc["transaction_id"] = transaction
+                    doc["resumed_existing_base"] = True
+                else:
+                    result=base.apply(args.approved_host,args.cape_revision)
+                    need(result.get("exact_public_source_staged") is True,
+                         "Pinned CAPE source was not staged")
+                    doc["transaction_id"]=result["transaction_id"]
             elif phase == RUNTIME_PHASE:
                 fields=runtime_arguments(args)
                 need(fields is not None and doc.get("transaction_id"),
@@ -253,6 +275,8 @@ def main():
     p.add_argument("--mode",choices=("plan","run"),default="plan")
     p.add_argument("--approved-host",required=True)
     p.add_argument("--cape-revision",required=True)
+    p.add_argument("--use-active-base",action="store_true",
+                   help="Attest existing sealed Command1 APT transaction and stage only source; never start another base transaction")
     p.add_argument("--service-account-file",type=Path,required=True)
     p.add_argument("--shared-parent-folder-id",required=True)
     p.add_argument("--crypt-subfolder",default="master-backups")
