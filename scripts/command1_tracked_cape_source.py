@@ -84,7 +84,9 @@ def execute_git(path, *args, timeout=120):
     result = subprocess.run(
         ["git", "-C", str(path), "-c", "core.hooksPath=/dev/null",
          "-c", "core.fsmonitor=false",
-         "-c", "core.externalDiff=false", *args],
+         "-c", "core.externalDiff=false",
+         "-c", "maintenance.auto=false",
+         "-c", "gc.auto=0", *args],
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         env=GIT_ENV, timeout=timeout, check=False)
     need(result.returncode == 0 and len(result.stdout) <= MAX_BYTES,
