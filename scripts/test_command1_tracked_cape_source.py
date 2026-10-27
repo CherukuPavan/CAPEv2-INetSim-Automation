@@ -92,6 +92,40 @@ class SourceTests(unittest.TestCase):
         with self.assertRaises(s.SourceBlocked):
             s.pristine(self.origin, modified_rev)
 
+    def test_vetted_cape_upstream_symlink_and_gitlink_are_pinned(self):
+        # Actual CAPEv2 upstream 2026-10-27 metadata: exactly one benign
+        # literal relative symlink and one UNPOPULATED tests/data gitlink.
+        branch=self.origin / "data" / "yara" / "monitor"
+        branch.mkdir(parents=True)
+        (branch / "yara").symlink_to("analyzer/windows/data/yara/")
+        self.run_git(self.origin,"add","data/yara/monitor/yara")
+        self.run_git(self.origin,"update-index","--add","--cacheinfo",
+                     "160000,b394a00ba3649afc69e7f22ad845a3a8a659200,tests/data")
+        self.run_git(self.origin,"commit","-qm","vetted CAPE symbolic metadata")
+        pinned=self.run_git(self.origin,"rev-parse","HEAD").strip()
+        with mock.patch.object(s,"VETTED_CAPE_SPECIAL_REV",pinned):
+            result=s.pristine(self.origin,pinned)
+            self.assertEqual(result["file_count"],4)
+            first=s.portable_quarantine_digest(self.origin,pinned)
+            self.assertEqual(len(first),64)
+            link=branch / "yara"
+            link.unlink()
+            link.symlink_to("../../../../etc/passwd")
+            with self.assertRaises(s.SourceBlocked):
+                s.tracked_hash(self.origin,pinned)
+            with self.assertRaises(s.SourceBlocked):
+                s.portable_quarantine_digest(self.origin,pinned)
+
+    def test_unvetted_revision_rejects_even_known_link(self):
+        branch=self.origin / "data" / "yara" / "monitor"
+        branch.mkdir(parents=True)
+        (branch / "yara").symlink_to("analyzer/windows/data/yara/")
+        self.run_git(self.origin,"add","data/yara/monitor/yara")
+        self.run_git(self.origin,"commit","-qm","unapproved pinned symlink")
+        pinned=self.run_git(self.origin,"rev-parse","HEAD").strip()
+        with self.assertRaises(s.SourceBlocked):
+            s.pristine(self.origin,pinned)
+
     def test_plan_is_read_only_and_pinned(self):
         stages = self.stage()
         out = s.plan("rakshati", self.txid, self.revision)
