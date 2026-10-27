@@ -74,6 +74,7 @@ class RootlessRuntimeTests(unittest.TestCase):
         stack.enter_context(mock.patch.object(
             stage.wheels,"plan",
             return_value={"source_sha":self.revision,
+                          "target_platform":"ubuntu-26.04-amd64",
                           "packages_verified":2}))
         stack.enter_context(mock.patch.object(
             stage,"verify_root_immutable_inputs",
@@ -156,23 +157,28 @@ class RootlessRuntimeTests(unittest.TestCase):
                         wheelhouse=self.wheels,uv=self.uv,
                         python=self.python,cape_source=self.checkout)
 
-    def test_runtime_rejects_jammy_before_opening_ledger_or_wheelhouse(self):
-        with mock.patch.object(stage.apt,"verify_host",return_value="22.04"), \
-             mock.patch.object(stage.tx,"host_guard"), \
-             mock.patch.object(stage.tx,"load") as load:
-            with self.assertRaisesRegex(stage.RuntimeBlocked,
-                                        "Ubuntu 26.04"):
-                stage.plan(*self.params)
-        load.assert_not_called()
+    def test_native_wheel_release_guard_blocks_mismatched_hosts(self):
+        for os_version in ("22.04", "24.04"):
+            with self.subTest(host=os_version), \
+                 mock.patch.object(stage.apt,"verify_host",
+                                   return_value=os_version):
+                with self.assertRaisesRegex(stage.RuntimeBlocked,
+                                            "Reviewed CAPE native wheelhouse"):
+                    stage.verified_runtime_release("ubuntu-26.04-amd64")
 
-    def test_runtime_rejects_noble_before_opening_ledger_or_wheelhouse(self):
-        with mock.patch.object(stage.apt,"verify_host",return_value="24.04"), \
-             mock.patch.object(stage.tx,"host_guard"), \
-             mock.patch.object(stage.tx,"load") as load:
+    def test_native_wheel_release_guard_allows_exact_jammy_and_resolute(self):
+        for os_version in ("22.04", "26.04"):
+            with self.subTest(host=os_version), \
+                 mock.patch.object(stage.apt,"verify_host",
+                                   return_value=os_version):
+                self.assertEqual(stage.verified_runtime_release(
+                    "ubuntu-" + os_version + "-amd64"), os_version)
+
+    def test_unknown_platform_cannot_bypass_native_wheel_release_guard(self):
+        with mock.patch.object(stage.apt,"verify_host",return_value="24.04"):
             with self.assertRaisesRegex(stage.RuntimeBlocked,
-                                        "Ubuntu 26.04"):
-                stage.plan(*self.params)
-        load.assert_not_called()
+                                        "Reviewed CAPE native wheelhouse"):
+                stage.verified_runtime_release("ubuntu-24.04-amd64")
 
     def test_plan_binds_source_and_wheel_manifest_to_transaction(self):
         with ExitStack() as stack:
